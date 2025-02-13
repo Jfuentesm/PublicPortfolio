@@ -3,8 +3,9 @@
 main.py
 
 The entry point for the local note-taking and task management application backend.
-This module sets up the FastAPI application, integrates note operations and task endpoints,
-and starts the local development server.
+This module sets up the FastAPI application, integrates note operations, task endpoints,
+canvas operations, search functionality, and backup/versioning endpoints, and starts
+the local development server.
 """
 
 from fastapi import FastAPI, HTTPException, Path, Body
@@ -12,20 +13,24 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from config import Config  # Import configuration constants
-from file_handler import NoteManager  # For Markdown note operations
+from config import Config
+from file_handler import NoteManager
 
-# Import the tasks router (Wave 2 integration)
+# Import task routes (Wave 2)
 from tasks.routes import router as tasks_router
+# Import canvas routes (Wave 3)
+from canvas.routes import router as canvas_router
+# Import search routes (Wave 3)
+from search.routes import router as search_router
+# Import backup routes (Wave 3)
+from backup.routes import router as backup_router
 
-# Initialize the FastAPI application.
 app = FastAPI(
     title="Local Note-Taking & Task Management App",
-    version="0.2.0",
+    version="0.3.0",
     description="A local, file-based note-taking and task management application inspired by Obsidian."
 )
 
-# Configure CORS to allow requests from all origins during development.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -34,13 +39,13 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Initialize the NoteManager for note file operations.
 note_manager = NoteManager()
 
-# Include the tasks router to add task management endpoints.
+# Include routers for tasks, canvas, search, and backup
 app.include_router(tasks_router)
-
-# --- Note Endpoints (Wave 1 functionality) ---
+app.include_router(canvas_router)
+app.include_router(search_router)
+app.include_router(backup_router)
 
 
 @app.get("/notes", summary="List all notes")
@@ -70,9 +75,6 @@ async def get_note(
 
     Returns:
         JSONResponse: A JSON response containing the note's name and content.
-
-    Raises:
-        HTTPException: If the note is not found.
     """
     try:
         content = note_manager.read_note(note_path)
@@ -97,9 +99,6 @@ async def create_note(
 
     Returns:
         JSONResponse: A JSON response confirming note creation and providing the note path.
-
-    Raises:
-        HTTPException: If a note with the same name already exists.
     """
     try:
         note_path = note_manager.create_note(note_name, content)
@@ -124,9 +123,6 @@ async def update_note(
 
     Returns:
         JSONResponse: A JSON response confirming the note update.
-
-    Raises:
-        HTTPException: If the note is not found.
     """
     try:
         # Verify that the note exists before updating.
@@ -138,8 +134,6 @@ async def update_note(
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
 
-
-# --- End Note Endpoints ---
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host=Config.HOST, port=Config.PORT, reload=True)
