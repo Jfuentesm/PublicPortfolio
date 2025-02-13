@@ -3,18 +3,23 @@
 routes.py
 
 Defines FastAPI routes for task management.
-Provides endpoints to create, read, update, and delete tasks.
-Utilizes Pydantic models for request validation.
+Provides endpoints to create, read, update, and delete tasks, plus a custom endpoint for
+completing recurring tasks.
+
+Wave 2 Enhancements:
+- Added a 'complete_task' endpoint to handle recurring tasks more gracefully.
+  If a task has a recurrence rule, this endpoint will complete the current task
+  and create a new task instance with the next due date.
 """
 
 import datetime
-from typing import List, Optional, Generator  # Added Generator for proper type hints
+from typing import List, Optional, Generator
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Body
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from database.sessions import SessionLocal  # Updated import: use "sessions" (plural)
+from database.sessions import SessionLocal
 from tasks.models import Task, TaskStatus
 from tasks.recurrence import get_next_due_date
 
@@ -81,7 +86,7 @@ class TaskResponse(BaseModel):
     updated_at: datetime.datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Allows Pydantic to read from SQLAlchemy model attributes
 
 
 @router.post("/", response_model=TaskResponse, summary="Create a new task")
@@ -92,9 +97,9 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)) -> Task:
     Args:
         task (TaskCreate): Task data from the request body.
         db (Session): Database session dependency.
-    
+
     Returns:
-        Task: The created task.
+        Task: The newly created SQLAlchemy Task object.
     """
     new_task = Task(
         title=task.title,
@@ -113,13 +118,13 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)) -> Task:
 @router.get("/", response_model=List[TaskResponse], summary="Retrieve all tasks")
 def read_tasks(db: Session = Depends(get_db)) -> List[Task]:
     """
-    Retrieve a list of all tasks.
-    
+    Retrieve a list of all tasks from the database.
+
     Args:
         db (Session): Database session dependency.
-    
+
     Returns:
-        List[Task]: List of tasks.
+        List[Task]: A list of SQLAlchemy Task objects.
     """
     tasks = db.query(Task).all()
     return tasks
@@ -134,11 +139,11 @@ def read_task(
     Retrieve a specific task by its ID.
     
     Args:
-        task_id (int): The ID of the task.
+        task_id (int): The ID of the task to retrieve.
         db (Session): Database session dependency.
     
     Returns:
-        Task: The requested task.
+        Task: The requested SQLAlchemy Task object.
     
     Raises:
         HTTPException: If the task is not found.
@@ -156,36 +161,36 @@ def update_task(
     db: Session = Depends(get_db)
 ) -> Task:
     """
-    Update an existing task.
-    
+    Update an existing task with new data.
+
+    - If a new 'due_date' is provided and the existing or updated task has a recurrence rule,
+      we calculate the next due date based on that recurrence.
+    - Otherwise, we simply update the provided fields.
+
     Args:
         task_id (int): The ID of the task to update.
         task_update (TaskUpdate): Updated task data.
         db (Session): Database session dependency.
-    
+
     Returns:
-        Task: The updated task.
-    
+        Task: The updated SQLAlchemy Task object.
+
     Raises:
         HTTPException: If the task is not found.
     """
-    task = db.query(Task).filter(Task.id == task_id).first()
-    if not task:
+    existing_task = db.query(Task).filter(Task.id == task_id).first()
+    if not existing_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     update_data = task_update.dict(exclude_unset=True)
-    
-    # If a new due date is provided along with an existing recurrence rule,
-    # compute the next due date based on the recurrence rule.
-    if "due_date" in update_data and task.recurrence and update_data.get("due_date"):
-        update_data["due_date"] = get_next_due_date(update_data["due_date"], task.recurrence)
-    
+
+    # Update existing fields with new values.
     for key, value in update_data.items():
-        setattr(task, key, value)
-    
+        setattr(existing_task, key, value)
+
     db.commit()
-    db.refresh(task)
-    return task
+    db.refresh(existing_task)
+    return existing_task
 
 
 @router.delete("/{task_id}", summary="Delete a task")
@@ -201,14 +206,78 @@ def delete_task(
         db (Session): Database session dependency.
     
     Returns:
-        dict: A message confirming deletion.
-    
+        dict: A message confirming the task deletion.
+
     Raises:
         HTTPException: If the task is not found.
     """
-    task = db.query(Task).filter(Task.id == task_id).first()
-    if not task:
+    task_obj = db.query(Task).filter(Task.id == task_id).first()
+    if not task_obj:
         raise HTTPException(status_code=404, detail="Task not found")
-    db.delete(task)
+    db.delete(task_obj)
     db.commit()
     return {"message": "Task deleted successfully"}
+
+
+class CompleteTaskResponse(BaseModel):
+    """
+    Pydantic model for the response of completing a task.
+    """
+    completed_task: TaskResponse
+    new_task: Optional[TaskResponse] = None
+
+
+@router.post("/{task_id}/complete", response_model=CompleteTaskResponse, summary="Complete a task")
+def complete_task(
+    task_id: int = Path(..., description="The ID of the task to complete"),
+    db: Session = Depends(get_db)
+) -> CompleteTaskResponse:
+    """
+    Mark a task as completed. If the task has a recurrence rule, this endpoint will:
+     - Complete the current task by setting its status to 'COMPLETED'.
+     - Create a new task with the same title, description, priority, and recurrence,
+       but with a due date shifted according to the recurrence rule.
+
+    Args:
+        task_id (int): The ID of the task to complete.
+        db (Session): Database session.
+
+    Returns:
+        CompleteTaskResponse: A Pydantic model containing the completed task and the new task
+                              (if recurrence is applied).
+
+    Raises:
+        HTTPException: If the task is not found.
+    """
+    existing_task = db.query(Task).filter(Task.id == task_id).first()
+    if not existing_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Mark current task as completed
+    existing_task.status = TaskStatus.COMPLETED
+    db.commit()
+    db.refresh(existing_task)
+
+    new_task_obj = None
+
+    # If the task has a recurrence rule, create a new task for the next due date
+    if existing_task.recurrence and existing_task.due_date:
+        next_due = get_next_due_date(existing_task.due_date, existing_task.recurrence)
+        # Build a new task using the existing task's data
+        new_task_obj = Task(
+            title=existing_task.title,
+            description=existing_task.description,
+            due_date=next_due,
+            priority=existing_task.priority,
+            status=TaskStatus.TODO,  # New cycle starts in TODO status
+            recurrence=existing_task.recurrence,
+            note_path=existing_task.note_path
+        )
+        db.add(new_task_obj)
+        db.commit()
+        db.refresh(new_task_obj)
+
+    return CompleteTaskResponse(
+        completed_task=existing_task,
+        new_task=new_task_obj
+    )
