@@ -1,6 +1,6 @@
-# src/backend/database/session.py
+# src/backend/database/sessions.py
 """
-session.py
+sessions.py
 
 Sets up the SQLAlchemy engine and session factory for database interactions.
 The SQLite database file is stored in the local storage directory.

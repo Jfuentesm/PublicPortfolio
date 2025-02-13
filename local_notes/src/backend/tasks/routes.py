@@ -8,13 +8,13 @@ Utilizes Pydantic models for request validation.
 """
 
 import datetime
-from typing import List, Optional
+from typing import List, Optional, Generator  # Added Generator for proper type hints
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Body
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from database.session import SessionLocal
+from database.sessions import SessionLocal  # Updated import: use "sessions" (plural)
 from tasks.models import Task, TaskStatus
 from tasks.recurrence import get_next_due_date
 
@@ -25,7 +25,7 @@ router = APIRouter(
 )
 
 
-def get_db() -> Session:
+def get_db() -> Generator[Session, None, None]:
     """
     Dependency that provides a database session.
     

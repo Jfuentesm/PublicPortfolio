@@ -6,7 +6,7 @@ Initializes the database by creating all necessary tables.
 Imports all model definitions so they are registered with the SQLAlchemy metadata.
 """
 
-from database.session import engine
+from database.sessions import engine  # Updated import: use "sessions" (plural)
 from database.base import Base
 from tasks.models import Task  # Import Task model to register it with the metadata
 
