@@ -12,6 +12,9 @@ from pathlib import Path
 from datetime import datetime
 from typing import List
 
+# Updated import for file_handler
+from src.backend.file_handler import NoteManager
+
 # Directory for backups
 BACKUP_DIR = Path(os.getcwd(), "storage", "backups")
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
@@ -40,7 +43,6 @@ def create_version(note_path: str) -> None:
     Args:
         note_path (str): Relative path to the note within the vault.
     """
-    from file_handler import NoteManager  # Import here to avoid circular dependency
     note_manager = NoteManager()
     full_note_path = note_manager.vault_dir / note_path
     if not full_note_path.exists():
@@ -61,7 +63,6 @@ def restore_version(note_path: str, version_file: str) -> None:
         note_path (str): Relative path to the note within the vault.
         version_file (str): The backup file name to restore.
     """
-    from file_handler import NoteManager  # Import here to avoid circular dependency
     note_manager = NoteManager()
     note_backup_dir = BACKUP_DIR / note_path.replace(os.sep, "_")
     backup_file = note_backup_dir / version_file

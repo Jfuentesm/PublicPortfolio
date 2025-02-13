@@ -13,17 +13,18 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from config import Config
-from file_handler import NoteManager
+from src.backend.config import Config
+from src.backend.file_handler import NoteManager
 
-# Import task routes (Wave 2)
-from tasks.routes import router as tasks_router
-# Import canvas routes (Wave 3)
-from canvas.routes import router as canvas_router
-# Import search routes (Wave 3)
-from search.routes import router as search_router
-# Import backup routes (Wave 3)
-from backup.routes import router as backup_router
+# Updated to use absolute imports under src.backend
+from src.backend.tasks.routes import router as tasks_router
+from src.backend.canvas.routes import router as canvas_router
+from src.backend.search.routes import router as search_router
+from src.backend.backup.routes import router as backup_router
+
+# >>> ADD THESE TWO LINES <<<
+from src.backend.database.init_db import init_db
+
 
 app = FastAPI(
     title="Local Note-Taking & Task Management App",
@@ -46,6 +47,16 @@ app.include_router(tasks_router)
 app.include_router(canvas_router)
 app.include_router(search_router)
 app.include_router(backup_router)
+
+
+# >>> ADD THIS EVENT HANDLER <<<
+@app.on_event("startup")
+def on_startup():
+    """
+    Automatically create database tables if they do not exist.
+    Ensures the 'tasks' table is present so task creation won't fail.
+    """
+    init_db()
 
 
 @app.get("/notes", summary="List all notes")

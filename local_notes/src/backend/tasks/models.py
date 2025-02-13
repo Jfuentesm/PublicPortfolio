@@ -1,3 +1,4 @@
+# src/backend/tasks/models.py
 """
 models.py
 
@@ -8,16 +9,19 @@ This module includes the Task model and the TaskStatus enumeration.
 import datetime
 import enum
 from sqlalchemy import Column, Integer, String, DateTime, Enum
-from database.base import Base  # Shared SQLAlchemy declarative base
+
+# Updated import path for Base
+from src.backend.database.base import Base  # Shared SQLAlchemy declarative base
 
 
-class TaskStatus(enum.Enum):
+class TaskStatus(str, enum.Enum):
     """
     Enumeration for task status values.
+    Updated to match the short uppercase strings used by the frontend.
     """
-    TODO = "To Do"
-    IN_PROGRESS = "In Progress"
-    COMPLETED = "Completed"
+    TODO = "TODO"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
 
 
 class Task(Base):

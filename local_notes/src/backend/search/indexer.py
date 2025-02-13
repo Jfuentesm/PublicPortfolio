@@ -12,8 +12,9 @@ from whoosh import index
 from whoosh.fields import Schema, TEXT, ID
 from whoosh.qparser import QueryParser
 
-from config import Config
-from file_handler import NoteManager
+# Updated imports for config and file_handler
+from src.backend.config import Config
+from src.backend.file_handler import NoteManager
 
 # Define index directory
 INDEX_DIR = Path(os.getcwd(), "storage", "search_index")

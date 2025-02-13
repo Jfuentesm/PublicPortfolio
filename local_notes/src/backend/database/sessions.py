@@ -10,7 +10,9 @@ import os
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from config import Config  # Import configuration constants
+
+# Updated import for config
+from src.backend.config import Config
 
 # Define the SQLite database file path.
 DATABASE_PATH = Path(os.getcwd(), "storage", "database.db")

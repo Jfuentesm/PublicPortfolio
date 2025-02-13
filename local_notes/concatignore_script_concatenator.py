@@ -13,16 +13,22 @@ def read_file_content(file_path):
         return f"Error reading {file_path}: {str(e)}"
 
 def get_files_recursively(directory):
-    """Recursively get all files in directory, excluding .venv folder and directories."""
+    """Recursively get all files in the directory, excluding:
+       - The .venv folder,
+       - Hidden files and folders (names starting with '.'),
+       - Items with names starting with 'juanignore'.
+       
+       Only Python, text, and Markdown files are included.
+    """
     files = []
     for item in sorted(directory.iterdir()):
-        # Skip .venv folder and hidden files
-        if item.name == '.venv' or item.name.startswith('.'):
+        # Skip .venv, hidden items, and items starting with 'concatignore'
+        if item.name == '.venv' or item.name.startswith('.') or item.name.startswith('concatignore'):
             continue
         
         if item.is_file():
-            # Only include python files and text files
-            if item.suffix in ['.py', '.txt', '.md']:
+            # Only include python, text, and markdown files
+            if item.suffix in ['.py', '.txt', '.md','.html','.json','.js','.vue','.sh']:
                 files.append(item)
         elif item.is_dir():
             # Recursively get files from subdirectories
@@ -32,15 +38,15 @@ def get_files_recursively(directory):
 def main():
     # Define paths
     root_dir = Path(__file__).parent
-    backlog_generation_dir = root_dir 
+    backlog_generation_dir = root_dir  # assuming backlog_generation is the current root dir
 
-    # Gather all files recursively, excluding .venv
+    # Gather all files recursively, excluding the items as specified
     files_to_include = get_files_recursively(backlog_generation_dir)
 
     # Create a timestamp string in the format YYYYMMDD_HHMMSS
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-    # Construct the output file name (foldersincluded_datetimestamp.py)
+    # Construct the output file name (foldername_datetimestamp.py)
     output_file_name = f"{backlog_generation_dir.name}_{timestamp_str}.py"
     output_file = root_dir / output_file_name
 
