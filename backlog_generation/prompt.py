@@ -1,0 +1,171 @@
+# prompt.py
+
+prompt_content = """
+<system_instruction>
+You are tasked with generating innovative sustainability automation project ideas that would be valuable additions to a technology portfolio. These ideas should be technically feasible, demonstrate advanced capabilities, and address real business needs in corporate sustainability.
+
+Consider the following technical capabilities:
+- Python-based development
+- LLM integration
+- Knowledge graph implementation
+- RAG systems
+- UI development with Streamlit
+- Ontology management
+
+Focus areas should include but not be limited to:
+- Regulatory compliance automation
+- Sustainability risk assessment
+- ESG data analysis and reporting
+- Value chain optimization
+- Impact measurement and management
+</system_instruction>
+
+<few_shot_examples>
+{
+    "example_1": {
+        "project_name": "CSRD Value Chain Automation Engine",
+        "business_problem": "Consulting teams need to efficiently analyze and map complex corporate value chains for CSRD compliance, a process that is typically manual and time-consuming.",
+        "technical_solution": {
+            "core_components": [
+                "Natural Language Processing Pipeline",
+                "Value Chain Graph Database",
+                "Automated Report Generator"
+            ],
+            "key_technologies": [
+                "LangChain",
+                "Python",
+                "Neo4j/NetworkX",
+                "Large Language Models"
+            ],
+            "architecture_overview": "RAG-based system that processes company documentation to automatically extract and visualize value chain relationships, with AI-powered relationship inference",
+            "unique_selling_points": [
+                "Automated value chain mapping",
+                "Relationship inference engine",
+                "Visual network analysis",
+                "Report generation capabilities"
+            ]
+        },
+        "implementation_complexity": "Advanced",
+        "estimated_timeline": "8 weeks",
+        "portfolio_value": "Demonstrates expertise in both technical implementation and regulatory domain knowledge",
+        "potential_extensions": [
+            "Industry comparison module",
+            "Risk propagation analysis",
+            "Supplier sustainability scoring"
+        ]
+    },
+    "example_2": {
+        "project_name": "Impact Risk & Opoortunity Assessment AI Platform",
+        "business_problem": "Organizations struggle to systematically identify, assess, and prioritize Impact, Risks, and Opportunities (IROs) for sustainability reporting.",
+        "technical_solution": {
+            "core_components": [
+                "IRO Generation Engine",
+                "Materiality Assessment Module",
+                "Financial Impact Calculator"
+            ],
+            "key_technologies": [
+                "LangChain",
+                "Streamlit",
+                "LLMs",
+                "Python Analytics Libraries"
+            ],
+            "architecture_overview": "Web-based platform combining LLM-powered analysis with structured assessment frameworks",
+            "unique_selling_points": [
+                "Automated IRO generation",
+                "Dual materiality assessment",
+                "Financial impact quantification",
+                "Stakeholder-specific reporting"
+            ]
+        },
+        "implementation_complexity": "Intermediate",
+        "estimated_timeline": "6 weeks",
+        "portfolio_value": "Shows ability to combine AI with structured business frameworks",
+        "potential_extensions": [
+            "Scenario analysis module",
+            "Stakeholder engagement tracker",
+            "Automated action plan generator"
+        ]
+    },
+    "example_3": {
+        "project_name": "CSRD report Knowledge Graph Analytics",
+        "business_problem": "Need to analyze and derive insights from Wave 1 CSRD reports to identify patterns, best practices, and benchmark against peers.",
+        "technical_solution": {
+            "core_components": [
+                "Document Processing Pipeline",
+                "Knowledge Graph Builder",
+                "Query Interface"
+            ],
+            "key_technologies": [
+                "owlready2",
+                "RDFlib",
+                "SpaCy",
+                "LLMs for text extraction"
+            ],
+            "architecture_overview": "Knowledge graph-based system that processes CSRD reports and creates queryable semantic relationships",
+            "unique_selling_points": [
+                "Semantic relationship mapping",
+                "Cross-company analysis",
+                "Pattern identification",
+                "Benchmark generation"
+            ]
+        },
+        "implementation_complexity": "Advanced",
+        "estimated_timeline": "10 weeks",
+        "portfolio_value": "Demonstrates advanced knowledge graph implementation and domain expertise",
+        "potential_extensions": [
+            "Visual graph explorer",
+            "Automated reporting insights",
+            "Industry taxonomy builder"
+        ]
+    }
+}
+</few_shot_examples>
+
+
+<input_parameters>
+{
+    "number_of_ideas": ${NUMBER_OF_IDEAS_REQUESTED},
+    "complexity_level": ${COMPLEXITY_LEVEL}, // "beginner" | "intermediate" | "advanced"
+    "time_frame": ${ESTIMATED_DEVELOPMENT_TIME} // in weeks
+}
+</input_parameters>
+
+<output_format>
+Return a JSON array of ideas. Each idea must have the following structure (no extra keys):
+[
+  {
+    "project_name": "",
+    "business_problem": "",
+    "technical_solution": {
+      "core_components": [],
+      "key_technologies": [],
+      "architecture_overview": "",
+      "unique_selling_points": []
+    },
+    "implementation_complexity": "",
+    "estimated_timeline": "",
+    "portfolio_value": "",
+    "potential_extensions": []
+  },
+  ...
+]
+</output_format>
+
+<constraints>
+- Projects must be distinct from existing implementations
+- Solutions should be scalable and maintainable
+- Ideas should demonstrate innovative use of AI/ML technologies
+- Projects should address real-world sustainability challenges
+- Implementation should be feasible for a single developer
+</constraints>
+
+<evaluation_criteria>
+- Technical sophistication
+- Business value
+- Innovation level
+- Portfolio impact
+- Implementation feasibility
+</evaluation_criteria>
+
+Please respond strictly with a **valid JSON array** of idea objects, with no additional text outside the JSON. Do NOT wrap the JSON.
+"""
