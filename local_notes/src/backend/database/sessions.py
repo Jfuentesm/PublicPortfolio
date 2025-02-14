@@ -6,22 +6,19 @@ Sets up the SQLAlchemy engine and session factory for database interactions.
 The SQLite database file is stored in the local storage directory.
 """
 
-import os
-from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# Updated import for config
+# Import Config for centralized configuration values.
 from src.backend.config import Config
 
-# Define the SQLite database file path.
-DATABASE_PATH = Path(os.getcwd(), "storage", "database.db")
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+# Use the DATABASE_PATH from the configuration for the SQLite database file.
+DATABASE_URL = f"sqlite:///{Config.DATABASE_PATH}"
 
 # Create the SQLAlchemy engine with SQLite-specific options.
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False}  # Required for SQLite with multiple threads
+    connect_args={"check_same_thread": False}  # SQLite-specific option for multi-threading.
 )
 
 # Create a session factory bound to the engine.

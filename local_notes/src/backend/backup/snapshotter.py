@@ -3,25 +3,24 @@
 snapshotter.py
 
 Implements a simple snapshot mechanism for creating periodic backups of the vault.
-This can be integrated with a scheduler to run every 5 minutes.
+This module can be integrated with a scheduler to run every 5 minutes.
 """
 
-import os
 import shutil
 from pathlib import Path
 from datetime import datetime
 
-# Updated import for config
+# Import Config for centralized configuration values.
 from src.backend.config import Config
 
-# Directory for storing snapshots
-SNAPSHOT_DIR = Path(os.getcwd(), "storage", "backups", "snapshots")
+# Use the backup directory defined in the configuration and create a "snapshots" subfolder.
+SNAPSHOT_DIR = Config.BACKUP_DIR / "snapshots"
 SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
-
 
 def create_snapshot() -> None:
     """
     Create a snapshot backup of the entire vault.
+    
     The snapshot is a copy of the vault directory stored with a timestamp.
     """
     vault_path = Path(Config.VAULT_DIR)
