@@ -6,12 +6,16 @@ The entry point for the local note-taking and task management application backen
 This module sets up the FastAPI application, integrates note operations, task endpoints,
 canvas operations, search functionality, and backup/versioning endpoints, and starts
 the local development server.
+
+Added:
+ - '/notes/daily' route for automatically creating/opening a daily note.
 """
 
 from fastapi import FastAPI, HTTPException, Path, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import datetime
 
 from src.backend.config import Config
 from src.backend.file_handler import NoteManager
@@ -49,7 +53,6 @@ app.include_router(search_router)
 app.include_router(backup_router)
 
 
-# >>> ADD THIS EVENT HANDLER <<<
 @app.on_event("startup")
 def on_startup():
     """
@@ -57,7 +60,6 @@ def on_startup():
     Ensures the 'tasks' table is present so task creation won't fail.
     """
     init_db()
-
 
 @app.get("/notes", summary="List all notes")
 async def list_notes() -> JSONResponse:
@@ -72,7 +74,6 @@ async def list_notes() -> JSONResponse:
         return JSONResponse(content={"notes": notes})
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
-
 
 @app.get("/notes/{note_path:path}", summary="Retrieve a note")
 async def get_note(
@@ -94,7 +95,6 @@ async def get_note(
         raise HTTPException(status_code=404, detail="Note not found")
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
-
 
 @app.post("/notes", summary="Create a new note")
 async def create_note(
@@ -119,7 +119,6 @@ async def create_note(
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
 
-
 @app.put("/notes/{note_path:path}", summary="Update an existing note")
 async def update_note(
     note_path: str = Path(..., description="Relative path to the note file"),
@@ -136,8 +135,7 @@ async def update_note(
         JSONResponse: A JSON response confirming the note update.
     """
     try:
-        # Verify that the note exists before updating.
-        _ = note_manager.read_note(note_path)
+        _ = note_manager.read_note(note_path)  # Ensure it exists
         note_manager.write_note(note_path, content)
         return JSONResponse(content={"message": "Note updated", "note": note_path})
     except FileNotFoundError:
@@ -145,6 +143,64 @@ async def update_note(
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
 
+# -------------------------------------------------------------------------
+#       DAILY NOTE ENDPOINT
+# -------------------------------------------------------------------------
+@app.post("/notes/daily", summary="Create or open a daily note")
+async def create_daily_note(
+    date_str: str = Body(None, embed=True, description="YYYY-MM-DD format; defaults to today")
+) -> JSONResponse:
+    """
+    Create (if missing) and return a daily note, stored in the 'daily' subfolder.
+    If date_str is not provided, today's date is used. 
+    If a daily template is configured, it will be used when creating a new note.
+
+    Returns:
+        JSONResponse: A JSON object with { "message": ..., "note": ..., "content": ... } 
+    """
+    try:
+        # 1) Determine date to use
+        if date_str is None:
+            date_str = datetime.date.today().strftime(Config.DAILY_NOTES_DATE_FORMAT)
+        # 2) Daily note name
+        daily_filename = date_str + Config.NOTE_EXTENSION
+
+        # 3) Full path: daily folder + date_str
+        #    We create a dedicated NoteManager pointing to daily subfolder:
+        daily_manager = NoteManager(str(Config.DAILY_NOTES_DIR))
+
+        # 4) Check if note already exists
+        existing_notes = daily_manager.list_notes()
+        if daily_filename in existing_notes:
+            # If it exists, just read and return
+            content = daily_manager.read_note(daily_filename)
+            return JSONResponse(content={
+                "message": f"Daily note for {date_str} already exists.",
+                "note": f"daily/{daily_filename}",
+                "content": content
+            })
+
+        # 5) If it doesn't exist, try to load template
+        template_content = ""
+        if Config.DAILY_NOTES_TEMPLATE.exists():
+            try:
+                template_content = Config.DAILY_NOTES_TEMPLATE.read_text(encoding="utf-8")
+            except Exception:
+                template_content = ""
+        else:
+            # If no template, fallback to something minimal
+            template_content = f"# {date_str} Daily Note\n\n"
+
+        # 6) Create the note with the template
+        note_path = daily_manager.create_note(daily_filename, template_content)
+        return JSONResponse(content={
+            "message": f"Daily note created for {date_str}.",
+            "note": f"daily/{daily_filename}",
+            "content": template_content
+        })
+
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error))
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host=Config.HOST, port=Config.PORT, reload=True)
