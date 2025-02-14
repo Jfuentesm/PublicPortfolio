@@ -3,13 +3,22 @@
   <div class="app-container">
       <div class="header-bar">
           <h1>Local Notes App</h1>
-          <!-- Toggle button to switch between Kanban view & normal layout -->
-          <button @click="toggleKanbanView">
-              {{ showKanbanBoard ? 'Back to Notes View' : 'Show Kanban Board' }}
-          </button>
+          <!-- Toggle buttons to switch between views -->
+          <div class="view-toggle">
+              <button @click="setViewMode('notes')" :class="{ active: viewMode === 'notes' }">
+                  Notes View
+              </button>
+              <button @click="setViewMode('kanban')" :class="{ active: viewMode === 'kanban' }">
+                  Kanban Board
+              </button>
+              <button @click="setViewMode('canvas')" :class="{ active: viewMode === 'canvas' }">
+                  Infinite Canvas
+              </button>
+          </div>
       </div>
 
-      <div class="layout" v-if="!showKanbanBoard">
+      <!-- Notes view: File explorer, editor/preview, and task panel -->
+      <div class="layout" v-if="viewMode === 'notes'">
           <!-- Left Pane: Note Explorer -->
           <section class="pane side">
               <NoteExplorer 
@@ -40,8 +49,15 @@
           </section>
       </div>
 
-      <!-- If Kanban toggle is active, show the Kanban board -->
-      <KanbanBoard v-else />
+      <!-- Kanban view -->
+      <div v-else-if="viewMode === 'kanban'">
+          <KanbanBoard />
+      </div>
+
+      <!-- Infinite Canvas view -->
+      <div v-else-if="viewMode === 'canvas'" class="canvas-view-container">
+          <CanvasView />
+      </div>
   </div>
 </template>
 
@@ -52,15 +68,14 @@ import EditorPane from './components/EditorPane.vue'
 import PreviewPane from './components/PreviewPane.vue'
 import TaskPanel from './components/TaskPanel.vue'
 import KanbanBoard from './components/KanbanBoard.vue'
+import CanvasView from './components/CanvasView.vue'
 
 /**
-* App.vue
-*
-* The top-level component that manages the main layout. We add:
-* - A header bar with a toggle button to switch views (Kanban or standard).
-* - The default layout with NoteExplorer, Editor/Preview, and TaskPanel.
-* - The Kanban board in place of the default layout when toggled on.
-*/
+ * App.vue
+ *
+ * The top-level component that manages the main layout.
+ * It supports multiple views: Notes view, Kanban board, and Infinite Canvas.
+ */
 export default {
   name: 'App',
 
@@ -69,7 +84,8 @@ export default {
       EditorPane,
       PreviewPane,
       TaskPanel,
-      KanbanBoard
+      KanbanBoard,
+      CanvasView
   },
 
   data() {
@@ -77,7 +93,7 @@ export default {
           notesList: [],
           currentNotePath: null,
           currentNoteContent: '',
-          showKanbanBoard: false    // Controls whether Kanban is displayed
+          viewMode: 'notes'  // 'notes', 'kanban', or 'canvas'
       }
   },
 
@@ -87,14 +103,15 @@ export default {
 
   methods: {
       /**
-       * Toggles the boolean that controls whether to show the Kanban view.
+       * Sets the current view mode.
+       * @param {String} mode - The view mode to set ('notes', 'kanban', or 'canvas').
        */
-      toggleKanbanView() {
-          this.showKanbanBoard = !this.showKanbanBoard
+      setViewMode(mode) {
+          this.viewMode = mode
       },
 
       /**
-       * Fetches the list of notes (filenames) from the backend.
+       * Fetches the list of notes from the backend.
        */
       async fetchNotes() {
           try {
@@ -106,9 +123,8 @@ export default {
       },
 
       /**
-       * Called when a note is selected from the NoteExplorer. Sets the current
-       * note path and loads its content.
-       * @param {String} notePath - The relative path of the selected note
+       * Handles the event when a note is selected from the NoteExplorer.
+       * @param {String} notePath - The relative path of the selected note.
        */
       handleNoteSelected(notePath) {
           this.currentNotePath = notePath
@@ -116,8 +132,8 @@ export default {
       },
 
       /**
-       * Fetches the content of the specified note from the backend.
-       * @param {String} notePath
+       * Fetches the content of the selected note from the backend.
+       * @param {String} notePath - The relative path of the note.
        */
       async fetchNoteContent(notePath) {
           try {
@@ -129,8 +145,8 @@ export default {
       },
 
       /**
-       * Updates the content of the current note (PUT request to the backend).
-       * @param {String} newContent - The updated markdown content
+       * Updates the content of the current note by sending a PUT request to the backend.
+       * @param {String} newContent - The updated markdown content.
        */
       async updateNoteContent(newContent) {
           if (!this.currentNotePath) {
@@ -166,6 +182,22 @@ export default {
   background: #f3f3f3;
   padding: 0.5rem;
   border-bottom: 1px solid #ccc;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.view-toggle button {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.view-toggle button.active {
+  background-color: #007acc;
+  color: #fff;
+  border: none;
 }
 
 .layout {
@@ -210,5 +242,10 @@ export default {
 
 .editor-preview-container > *:last-child {
   border-right: none;
+}
+
+.canvas-view-container {
+  flex: 1;
+  padding: 1rem;
 }
 </style>

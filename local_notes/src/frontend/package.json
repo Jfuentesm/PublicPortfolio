@@ -3,18 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"uvicorn src.backend.main:app --host 127.0.0.1 --port 8000 --reload --app-dir ../..\" \"vite\"",
-    "build": "vite build",
-    "preview": "vite preview"
+      "dev": "concurrently \"uvicorn src.backend.main:app --host 127.0.0.1 --port 8000 --reload --app-dir ../..\" \"vite\"",
+      "build": "vite build",
+      "preview": "vite preview"
   },
   "dependencies": {
-    "axios": "^1.3.2",
-    "vue": "^3.2.47",
-    "marked": "^5.1.0"
+      "axios": "^1.3.2",
+      "vue": "^3.2.47",
+      "marked": "^5.1.0",
+      "d3": "^7.8.2"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^4.0.0",
-    "vite": "^4.0.0",
-    "concurrently": "^7.6.0"
+      "@vitejs/plugin-vue": "^4.0.0",
+      "vite": "^4.0.0",
+      "concurrently": "^7.6.0"
   }
 }
