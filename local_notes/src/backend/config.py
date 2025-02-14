@@ -1,13 +1,12 @@
+#!/usr/bin/env python3
+# config.py
 """
-config.py
-
 Provides application-wide configuration settings.
 All constant values and paths are defined here.
 """
 
 import os
 from pathlib import Path
-import datetime
 
 class Config:
     """
@@ -41,15 +40,23 @@ class Config:
     # Directory for canvas data.
     CANVAS_DIR: Path = STORAGE_DIR / "canvas"
 
-    # ** Daily notes subfolder inside the vault. **
+    # Daily notes subfolder inside the vault.
     DAILY_NOTES_DIR: Path = Path(VAULT_DIR, "daily")
 
-    # ** A default daily note template file (optional). **
+    # A default daily note template file (optional).
     # If you don't have a template, simply ignore or remove it.
     # e.g., place your template at: storage/vault/templates/daily_template.md
     DAILY_NOTES_TEMPLATE: Path = Path(VAULT_DIR, "templates", "daily_template.md")
 
-    # ** Date format to use for daily notes filename. **
+    # Date format to use for daily notes filename.
     DAILY_NOTES_DATE_FORMAT: str = "%Y-%m-%d"
 
-    # For demonstration, if the daily template doesn't exist, code will fallback.
+    # -------------------------
+    # NEW PERIODIC SNAPSHOT SETTINGS
+    # -------------------------
+    # Enable or disable periodic vault snapshots
+    ENABLE_PERIODIC_SNAPSHOTS: bool = True
+
+    # Interval (in minutes) between automatic snapshots
+    SNAPSHOT_INTERVAL_MINUTES: int = 5
+
