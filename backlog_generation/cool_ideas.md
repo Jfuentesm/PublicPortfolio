@@ -14,6 +14,11 @@
 - Markdown notes
 
 
+# CSRD 
+- IRO management platform
+- External stakeholder process
+
+
 # Learning paths 20 -weeks
 ## String 1: Strategic Due Diligence & Market Intelligence
 Competitive Intelligence Radar (6 weeks)

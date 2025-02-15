@@ -1,284 +1,215 @@
 <template>
     <div class="app-container">
-        <div class="header-bar">
-            <h1>Local Notes App</h1>
-
-            <!-- The view-toggle container still has the same buttons -->
-            <div class="view-toggle">
-                <button @click="setViewMode('notes')" :class="{ active: viewMode === 'notes' }">
-                    Notes View
-                </button>
-                <button @click="setViewMode('kanban')" :class="{ active: viewMode === 'kanban' }">
-                    Kanban Board
-                </button>
-                <button @click="setViewMode('canvas')" :class="{ active: viewMode === 'canvas' }">
-                    Infinite Canvas
-                </button>
-
-                <!-- NEW Daily Note button -->
-                <button @click="createDailyNote">
-                    Daily Note
-                </button>
-            </div>
+      <div class="header-bar">
+        <h1>Local Notes App</h1>
+        <div class="view-toggle">
+          <button @click="setViewMode('notes')" :class="{ active: viewMode === 'notes' }">
+            Notes View
+          </button>
+          <button @click="setViewMode('kanban')" :class="{ active: viewMode === 'kanban' }">
+            Kanban Board
+          </button>
+          <button @click="setViewMode('canvas')" :class="{ active: viewMode === 'canvas' }">
+            Infinite Canvas
+          </button>
+          <!-- Daily Note Button -->
+          <button @click="createDailyNote">
+            Daily Note
+          </button>
         </div>
-
-        <!-- Notes view: File explorer, editor/preview, and task panel -->
-        <div class="layout" v-if="viewMode === 'notes'">
-            <!-- Left Pane: Note Explorer -->
-            <section class="pane side">
-                <NoteExplorer 
-                    :notes="notesList" 
-                    @selectNote="handleNoteSelected"
-                    @reloadNotes="fetchNotes"
-                />
-            </section>
-
-            <!-- Center Pane: Editor + Preview -->
-            <section class="pane main">
-                <div class="editor-preview-container">
-                    <EditorPane
-                        v-if="currentNotePath"
-                        :currentNoteContent="currentNoteContent"
-                        @updateContent="updateNoteContent"
-                    />
-                    <PreviewPane
-                        v-if="currentNoteContent"
-                        :markdownText="currentNoteContent"
-                    />
-                </div>
-            </section>
-
-            <!-- Right Pane: Task Panel -->
-            <section class="pane side tasks-side">
-                <TaskPanel />
-            </section>
-        </div>
-
-        <!-- Kanban view -->
-        <div v-else-if="viewMode === 'kanban'">
-            <KanbanBoard />
-        </div>
-
-        <!-- Infinite Canvas view -->
-        <div v-else-if="viewMode === 'canvas'" class="canvas-view-container">
-            <CanvasView />
-        </div>
+      </div>
+  
+      <!-- Notes view: File explorer, single Tiptap editor, and task panel -->
+      <div class="layout" v-if="viewMode === 'notes'">
+        <!-- Left Pane: Note Explorer -->
+        <section class="pane side">
+          <NoteExplorer 
+            :notes="notesList" 
+            @selectNote="handleNoteSelected"
+            @reloadNotes="fetchNotes"
+          />
+        </section>
+  
+        <!-- Center Pane: Editor -->
+        <section class="pane main">
+          <div class="editor-container">
+            <EditorPane
+              v-if="currentNotePath"
+              :currentNoteContent="currentNoteContent"
+              @updateContent="updateNoteContent"
+            />
+          </div>
+        </section>
+  
+        <!-- Right Pane: Task Panel -->
+        <section class="pane side tasks-side">
+          <TaskPanel />
+        </section>
+      </div>
+  
+      <!-- Kanban view -->
+      <div v-else-if="viewMode === 'kanban'">
+        <KanbanBoard />
+      </div>
+  
+      <!-- Infinite Canvas view -->
+      <div v-else-if="viewMode === 'canvas'" class="canvas-view-container">
+        <CanvasView />
+      </div>
     </div>
-</template>
-
-<script>
-import axios from 'axios'
-import NoteExplorer from './components/NoteExplorer.vue'
-import EditorPane from './components/EditorPane.vue'
-import PreviewPane from './components/PreviewPane.vue'
-import TaskPanel from './components/TaskPanel.vue'
-import KanbanBoard from './components/KanbanBoard.vue'
-import CanvasView from './components/CanvasView.vue'
-
-/**
- * App.vue
- *
- * The top-level component that manages the main layout.
- * It supports multiple views: Notes view, Kanban board, and Infinite Canvas.
- *
- * NEW: Adds 'createDailyNote()' method to integrate the daily note feature.
- */
-export default {
+  </template>
+  
+  <script>
+  import axios from 'axios'
+  import NoteExplorer from './components/NoteExplorer.vue'
+  import EditorPane from './components/EditorPane.vue'
+  import TaskPanel from './components/TaskPanel.vue'
+  import KanbanBoard from './components/KanbanBoard.vue'
+  import CanvasView from './components/CanvasView.vue'
+  
+  export default {
     name: 'App',
-
     components: {
-        NoteExplorer,
-        EditorPane,
-        PreviewPane,
-        TaskPanel,
-        KanbanBoard,
-        CanvasView
+      NoteExplorer,
+      EditorPane,
+      TaskPanel,
+      KanbanBoard,
+      CanvasView
     },
-
     data() {
-        return {
-            notesList: [],
-            currentNotePath: null,
-            currentNoteContent: '',
-            viewMode: 'notes'  // 'notes', 'kanban', or 'canvas'
-        }
+      return {
+        notesList: [],
+        currentNotePath: null,
+        currentNoteContent: '',
+        viewMode: 'notes'  // options: 'notes', 'kanban', or 'canvas'
+      }
     },
-
     mounted() {
-        this.fetchNotes()
+      this.fetchNotes()
     },
-
     methods: {
-        /**
-         * Sets the current view mode ('notes', 'kanban', or 'canvas').
-         */
-        setViewMode(mode) {
-            this.viewMode = mode
-        },
-
-        /**
-         * Fetches the list of notes from the backend.
-         */
-        async fetchNotes() {
-            try {
-                const response = await axios.get('http://localhost:8000/notes')
-                this.notesList = response.data.notes || []
-            } catch (err) {
-                console.error('App.vue: Failed to fetch notes:', err)
-            }
-        },
-
-        /**
-         * Handles the event when a note is selected from the NoteExplorer.
-         * @param {String} notePath - The relative path of the selected note.
-         */
-        handleNoteSelected(notePath) {
-            this.currentNotePath = notePath
-            this.fetchNoteContent(notePath)
-        },
-
-        /**
-         * Fetches the content of the selected note from the backend.
-         * @param {String} notePath - The relative path of the note.
-         */
-        async fetchNoteContent(notePath) {
-            try {
-                const response = await axios.get(`http://localhost:8000/notes/${notePath}`)
-                this.currentNoteContent = response.data.content
-            } catch (err) {
-                console.error('App.vue: Failed to load note content:', err)
-            }
-        },
-
-        /**
-         * Updates the content of the current note by sending a PUT request to the backend.
-         * @param {String} newContent - The updated markdown content.
-         */
-        async updateNoteContent(newContent) {
-            if (!this.currentNotePath) {
-                return
-            }
-            try {
-                await axios.put(`http://localhost:8000/notes/${this.currentNotePath}`, {
-                    content: newContent
-                })
-                this.currentNoteContent = newContent
-            } catch (err) {
-                console.error('App.vue: Failed to update note content:', err)
-            }
-        },
-
-        /**
-         * NEW: Creates (or opens) today's daily note by calling the '/notes/daily' endpoint.
-         * Upon success, sets the new note path/content and refreshes the notes list.
-         */
-        async createDailyNote() {
-            try {
-                // If you want to create a daily note for a custom date, you could do:
-                //   const customDateStr = '2025-02-14' // or user input
-                //   const response = await axios.post('http://localhost:8000/notes/daily', { date_str: customDateStr })
-                // For now, we default to "today" by sending no date_str.
-                const response = await axios.post('http://localhost:8000/notes/daily')
-                const { note, content } = response.data
-
-                // e.g. note might be "daily/2025-02-14.md"
-                this.currentNotePath = note
-                this.currentNoteContent = content
-
-                // Reload notes so the new daily note shows up in the explorer.
-                this.fetchNotes()
-
-                // Switch to notes view in case the user was on Kanban or Canvas.
-                this.viewMode = 'notes'
-            } catch (err) {
-                console.error('App.vue: Failed to create or open daily note:', err)
-            }
+      setViewMode(mode) {
+        this.viewMode = mode
+      },
+      async fetchNotes() {
+        try {
+          const response = await axios.get('http://localhost:8000/notes')
+          this.notesList = response.data.notes || []
+        } catch (err) {
+          console.error('App.vue: Failed to fetch notes:', err)
         }
+      },
+      handleNoteSelected(notePath) {
+        this.currentNotePath = notePath
+        this.fetchNoteContent(notePath)
+      },
+      async fetchNoteContent(notePath) {
+        try {
+          const response = await axios.get(`http://localhost:8000/notes/${notePath}`)
+          this.currentNoteContent = response.data.content
+        } catch (err) {
+          console.error('App.vue: Failed to load note content:', err)
+        }
+      },
+      async updateNoteContent(newContent) {
+        if (!this.currentNotePath) return
+        try {
+          await axios.put(`http://localhost:8000/notes/${this.currentNotePath}`, {
+            content: newContent
+          })
+          this.currentNoteContent = newContent
+        } catch (err) {
+          console.error('App.vue: Failed to update note content:', err)
+        }
+      },
+      async createDailyNote() {
+        try {
+          const response = await axios.post('http://localhost:8000/notes/daily')
+          const { note, content } = response.data
+          this.currentNotePath = note
+          this.currentNoteContent = content
+          this.fetchNotes()
+          this.viewMode = 'notes'
+        } catch (err) {
+          console.error('App.vue: Failed to create or open daily note:', err)
+        }
+      }
     }
-}
-</script>
-
-<style scoped>
-.app-container {
+  }
+  </script>
+  
+  <style scoped>
+  .app-container {
     height: 100vh;
     display: flex;
     flex-direction: column;
     margin: 0;
     font-family: sans-serif;
     box-sizing: border-box;
-}
-
-.header-bar {
+  }
+  
+  .header-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     background: #f3f3f3;
     padding: 0.5rem;
     border-bottom: 1px solid #ccc;
-}
-
-.view-toggle {
+  }
+  
+  .view-toggle {
     display: flex;
     gap: 0.5rem;
-}
-
-.view-toggle button {
+  }
+  
+  .view-toggle button {
     padding: 0.5rem 1rem;
     cursor: pointer;
-}
-
-.view-toggle button.active {
+  }
+  
+  .view-toggle button.active {
     background-color: #007acc;
     color: #fff;
     border: none;
-}
-
-.layout {
+  }
+  
+  .layout {
     flex: 1;
     display: flex;
     flex-direction: row;
-}
-
-.pane {
+  }
+  
+  .pane {
     border: 1px solid #ccc;
     box-sizing: border-box;
     padding: 0.5rem;
-}
-
-.side {
+  }
+  
+  .side {
     width: 20%;
     overflow-y: auto;
-}
-
-.tasks-side {
+  }
+  
+  .tasks-side {
     width: 25%;
-}
-
-.main {
+  }
+  
+  .main {
     flex: 1;
     display: flex;
     flex-direction: column;
-}
-
-.editor-preview-container {
-    display: flex;
-    flex-direction: row;
-    height: 100%;
-}
-
-.editor-preview-container > * {
-    width: 50%;
+  }
+  
+  /* Single container for the TipTap Editor */
+  .editor-container {
+    flex: 1;
+    overflow-y: auto;
     padding: 0.5rem;
-    box-sizing: border-box;
-    border-right: 1px dashed #ccc;
-}
-
-.editor-preview-container > *:last-child {
-    border-right: none;
-}
-
-.canvas-view-container {
+  }
+  
+  .canvas-view-container {
     flex: 1;
     padding: 1rem;
-}
-</style>
+  }
+  </style>
+  
