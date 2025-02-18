@@ -1,33 +1,63 @@
-<context>
-You are a Senior Cloud Solutions Architect specializing in multi-tenant SaaS applications on AWS. You have extensive experience with PostgreSQL, data isolation patterns, and security compliance requirements (GDPR, SOC2).
-</context>
+<schema design>
 
-<goals>
-based on the "core table change request" below, please update the original core table design in the tenant schema architecture for a multi-tenant Enterprise SaaS solution on AWS PostgreSQL.
-</input_requirements>
+---
 
-<output_format>
-Provide a COMPLETE UPDATED SCHEMA DESIGN in the following structured format:
+## 1. SCHEMA DESIGN
+### 1.1 Database Structure
+- **Primary Engine**: **Amazon RDS (PostgreSQL)** with `Multi-AZ` support for high availability.  
+- **Multi-Tenant Isolation Approach**:  
+  - **Option 1**: **Separate Schemas** per tenant, each containing the same structure (tables, views, etc.).  
+  - **Option 2**: **Single Schema** with **Row-Level Security (RLS)** filters on every table (each row stores a `tenant_id`).  
 
-1. SCHEMA DESIGN
-   - Database structure
-   - Isolation method
-   - Naming conventions
-   - Core tables
+**Recommended Strategy**  
+- Default approach is **separate schemas** for standard tenants (simplifies indexing and permission scoping).  
+- For very small tenants or those comfortable sharing the same schema, use **RLS** for finer control with fewer schema objects.  
+- For **premium or highly regulated** tenants, optionally migrate to a **dedicated database** or cluster.
 
-</output_format>
+### 1.2 Isolation Method
+1. **Separate Schemas (Default)**  
+   - Each tenant gets a schema named `tenant_{tenant_id}` (e.g., `tenant_abc`).  
+   - Access to each schema is restricted via schema-level privileges.  
+   - Eases bulk exports or backups by schema.  
+2. **Row-Level Security (Alternative)**  
+   - All tenants share one schema and table set.  
+   - PostgreSQL RLS policies restrict rows based on `tenant_id` = user’s assigned tenant ID.  
+   - Simpler ongoing schema maintenance but requires thorough RLS policy management.
 
-<constraints>
-- Must follow AWS Well-Architected Framework
-- Must be compliant with GDPR and SOC2
-- Must support horizontal scaling
-- Must enable tenant isolation
-- Must include automated provisioning
-</constraints>
+### 1.3 Naming Conventions
+- **Schemas**: `tenant_<tenant_name_or_id>` or `tenant_{uuid}` to guarantee uniqueness.  
+- **Tables**: Use a consistent prefix or domain-based approach, for example:  
+  - `iro`, `dm_assessment`, `review`, `signoff`, `audit_trail` (core domain tables).  
+- **Columns**: Lowercase with underscores (e.g., `tenant_id`, `created_on`).  
+- **Indexes**: Named as `idx_{table_name}_{column_name}` (e.g., `idx_iro_tenant_id`).
+
+### 1.4 Core Tables 
+Below is **an expanded definition** of each core table—**IRO**, **DMAssessment**, **Review**, **Signoff**, and **AuditTrail**—with detailed **columns, constraints, indexes, and best practices**. These definitions align with the **multi-tenant PostgreSQL** architecture and incorporate **tenant isolation**, **security**, and **compliance** needs as described in the broader solution design.
 
 
+---
 
-<core table change request>
+## 1. SCHEMA DESIGN
+
+### 1.1 Database Structure
+- **Primary Engine**: **Amazon RDS (PostgreSQL)** with `Multi-AZ` for high availability and automated backups.  
+- **Multi-Tenant Isolation**:  
+  - **Default**: Each tenant in its own PostgreSQL schema (`tenant_<tenant_id>`).  
+
+### 1.2 Isolation Method
+1. **Separate Schemas (Default)**  
+   - Create the same set of tables/indexes per tenant schema.  
+   - Simplifies permission scoping and data export per tenant.  
+
+
+### 1.3 Naming Conventions
+- **Schemas**: `tenant_{tenant_id}` or `tenant_{tenant_name}`.  
+- **Tables**: snake_case with domain-based naming: `iro`, `iro_version`, `iro_relationship`, `impact_assessment`, `risk_opp_assessment`, `financial_materiality_def`, etc.  
+- **Columns**: lowercase with underscores (`created_on`, `updated_on`).  
+- **Indexes**: `idx_{table}_{column}`.  
+
+---
+
 
 ## 2. CORE TABLES
 
@@ -524,9 +554,293 @@ CREATE INDEX idx_fin_mag_def_version_score ON tenant_xyz.fin_materiality_magnitu
 - If a dimension-specific definition is needed, add a `dimension` column or replicate `fin_materiality_weights` approach.  
 - The `fin_materiality_def_version_id` in `risk_opp_assessment` identifies which version of magnitude definitions was valid at the time.
 
-</core table change request>
+---
+
+#### 6. Usage Scenarios & Relationships
+
+1. **IRO & DMAssessment**  
+   - Each IRO can have **multiple** Double Materiality Assessments over time (e.g., periodic reassessments).  
+   - `dm_assessment.iro_id → iro.iro_id`.  
+2. **Review & Signoff**  
+   - A **review** record tracks the process or stage of verifying an IRO.  
+   - A **signoff** record references a completed review that has been **approved** or “signed.”  
+   - Typically, a review or set of reviews must precede a signoff.  
+3. **AuditTrail**  
+   - Each table above logs changes into **audit_trail** (by table triggers or in application logic).  
+   - E.g., if an IRO is updated, an “UPDATE” entry with the old and new values is written to `audit_trail`.  
+4. **Tenant Isolation**  
+   - All tables carry a `tenant_id` (and possibly a separate schema, e.g., `tenant_abc.iro`).  
+   - Use either **schema-based** or **RLS-based** approach to ensure that queries by Tenant A cannot see Tenant B’s rows.
+
+---
+
+#### 7. Additional Implementation Tips
+
+1. **Foreign Keys & CASCADE/RESTRICT**  
+   - Decide carefully whether to cascade deletes on main entities like `IRO`. For heavily regulated data, you may prefer **RESTRICT** so no data is inadvertently removed.  
+   - Alternatively, “soft delete” an IRO with a status flag, preserving the data and references until an official archival.  
+
+2. **Data Retention & Archiving**  
+   - Some compliance regimes (GDPR, SOC 2) require that data be retained for a specific period.  
+   - Plan for data archiving or partitioning older records to avoid indefinite DB growth.  
+
+3. **Row-Level Security (RLS) Policies** (If you choose the single-schema approach)  
+   ```sql
+   ALTER TABLE tenant_xyz.iro ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY iro_tenant_policy ON tenant_xyz.iro
+   FOR ALL
+   TO saas_app_role
+   USING (tenant_id = current_setting('app.current_tenant_id')::int);
+   ```
+   - Replicate similar policies for `dm_assessment`, `review`, `signoff`, and `audit_trail`.  
+
+4. **Schema-Based Isolation**  
+   - If each tenant is mapped to its own schema, replicate the table definitions per schema (`tenant_abc.iro`, `tenant_abc.dm_assessment`, etc.).  
+   - More straightforward to manage for small or moderate scale but can become cumbersome if you have hundreds or thousands of tenants.  
+
+5. **Triggers for Audit Logging**  
+   - You can use **PostgreSQL triggers** to automatically insert into `audit_trail` on `INSERT/UPDATE/DELETE`.  
+   - Alternatively, the application layer can handle these writes (more control over the structure of `data_diff`).
+
+---
+
+#### 8. Pitfalls to Avoid
+
+1. **Over-Indexing**  
+   - Each new index adds overhead to writes. Start with essential indexes (tenant ID, foreign keys, commonly used filters) and add others if usage patterns justify them.  
+2. **Unbounded JSON Growth**  
+   - Large, arbitrary JSON fields can degrade performance if not managed. Regularly prune old keys or move large historical data to S3 for archival.  
+3. **Complex RLS Policies**  
+   - RLS can introduce queries that are harder to debug if you have multiple policies stacked. Thoroughly test them.  
+4. **Cascading Deletes**  
+   - Ensure you understand the cascade chain, especially for `iro`, `review`, `signoff`, and `dm_assessment` references. Inadvertent deletes can lead to data loss.  
+5. **Insufficient Auditing**  
+   - Failing to log crucial event details (e.g., who made the change, what data changed) can undermine compliance.  
+6. **Missing Multi-Tenant Strategy**  
+   - Not having a consistent approach (RLS vs. separate schemas) leads to confusion and potential data leaks. Commit to one approach or a well-documented hybrid tactic.
+
+---
+
+#### 9. Summary
+
+Each of these **five core tables**—**IRO**, **DMAssessment**, **Review**, **Signoff**, and **AuditTrail**—plays a distinct role in **multi-tenant** Double Materiality workflows. Together, they provide:
+
+- *Clear Ownership & Tracking* (IRO baseline).  
+- *Materiality Evaluations* (DMAssessment).  
+- *Formal Review Processes & Approvals* (Review & Signoff).  
+- *Full Visibility & Compliance Trails* (AuditTrail).  
+
+Following the **best practices** outlined here ensures a **secure**, **scalable**, and **compliant** data layer that meets **AWS Well-Architected Framework** pillars, **GDPR/SOC2** requirements, and the functional needs of an **Enterprise SaaS**. 
 
 
-<original design>
 
-</original design>
+
+
+---
+
+## 2. SECURITY IMPLEMENTATION
+### 2.1 Row-Level Security Policies
+If you opt for **RLS** in a single schema:
+```sql
+-- Enable RLS at the table level:
+ALTER TABLE iro ENABLE ROW LEVEL SECURITY;
+
+-- Define a POLICY that ensures a user only sees rows matching their tenant_id
+CREATE POLICY iro_tenant_policy ON iro
+FOR SELECT
+TO saas_app_role  -- The DB role used by the application
+USING (tenant_id = current_setting('app.current_tenant_id')::int);
+
+-- Similar policies for INSERT, UPDATE, DELETE with appropriate checks
+```
+- Application sets the `current_setting('app.current_tenant_id')` parameter or uses a session variable so the DB can apply RLS automatically.
+
+### 2.2 Encryption Configuration
+- **Data at Rest**: AWS KMS-based encryption on RDS side, plus `sslmode=verify-full` for connections.  
+- **Data in Transit**: Enforce TLS 1.2 or higher for all client connections.  
+- **Secrets Management**: **AWS Secrets Manager** or SSM Parameter Store for database credentials, rotated regularly.
+
+### 2.3 Access Controls
+1. **AWS IAM**  
+   - Grant the **minimum set of privileges** to microservices (e.g., read/write to specific S3 buckets, retrieve DB credentials).  
+2. **DB Roles**  
+   - **Application Role** used by app containers (limited DDL rights, strictly DML read/write).  
+   - **Admin Role** restricted to DB maintenance tasks (schema changes, updates).  
+3. **Network Security**  
+   - Place RDS instances in **private subnets** with no public IP.  
+   - Use **Security Groups** to allow traffic only from the application tasks in AWS Fargate/ECS.  
+4. **WAF & Shield**  
+   - **AWS WAF** filters SQL injection, XSS, malicious IPs.  
+   - **AWS Shield Standard** default; upgrade to Advanced if you observe persistent DDoS attempts.
+
+---
+
+## 3. PROVISIONING AUTOMATION
+### 3.1 Infrastructure as Code Snippets
+Use **AWS CloudFormation** or **Terraform**. Example snippet in **Terraform** (pseudo-code):
+
+```hcl
+resource "aws_rds_cluster" "tenant_db" {
+  engine         = "aurora-postgresql"
+  engine_version = "13"
+  ...
+  storage_encrypted = true
+  kms_key_id        = aws_kms_key.db_encryption_key.arn
+  master_username   = var.db_master_user
+  master_password   = var.db_master_password
+
+  # Multi-AZ, auto-scaling, ...
+}
+
+resource "aws_ecs_cluster" "saas_app_cluster" {
+  name = "saas-app-cluster"
+}
+
+resource "aws_ecs_task_definition" "saas_app_td" {
+  family                = "saas-app"
+  network_mode          = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+
+  container_definitions = file("${path.module}/container_definitions.json")
+  cpu                   = 512
+  memory                = 1024
+  execution_role_arn    = var.ecs_execution_role
+}
+
+resource "aws_ecs_service" "saas_app_service" {
+  name            = "saas-app-service"
+  cluster         = aws_ecs_cluster.saas_app_cluster.id
+  task_definition = aws_ecs_task_definition.saas_app_td.arn
+  desired_count   = 2
+  network_configuration {
+    subnets          = var.private_subnets
+    security_groups  = [aws_security_group.app_sg.id]
+    assign_public_ip = false
+  }
+  load_balancer {
+    target_group_arn = aws_lb_target_group.saas_app_tg.arn
+    container_name   = "saas-app"
+    container_port   = 8080
+  }
+  depends_on = [aws_lb_listener.saas_app_listener]
+}
+```
+
+### 3.2 Provisioning Workflow
+1. **Tenant Signup** triggers a microservice event (via Amazon API Gateway or a serverless function).  
+2. **Terraform/CloudFormation Pipeline** (or AWS CDK) runs automatically to:  
+   - Create new **schema** (if using separate schemas).  
+   - Execute any **custom initialization scripts** (create tables, set RLS or roles).  
+   - Register tenant in a **tenant_config** table or external config store.  
+3. **Validation** step ensures DB objects were created successfully.  
+4. **Notification** is sent to the admin or the new tenant upon successful provisioning.
+
+### 3.3 Error Handling
+- Implement **idempotent** creation steps so if partial failures occur, the pipeline can retry without duplicating resources.  
+- Log every step (CloudWatch logs) to track environment initialization.  
+- Use **SNS** or a Slack webhook for immediate notifications about provisioning failures or partial successes.
+
+---
+
+## 4. COMPLIANCE MEASURES
+### 4.1 Audit Logging
+- **Database Layer**:  
+  - Enable **PostgreSQL logs** for queries and combine them with row-level `AuditTrail` table for user-driven actions.  
+  - Store logs in **CloudWatch** or **Amazon S3** (versioned for immutability).  
+- **Application Layer**:  
+  - Capture each create, update, delete event in the `audit_trail` table (fields: `tenant_id`, `entity_type`, `action`, `timestamp`, `data_diff`).  
+  - Maintain **14+ days** of logs in easy-to-access storage; archive older logs to Glacier.
+
+### 4.2 Data Protection
+- **GDPR**  
+  - Provide a “right to erasure” process: a function that either anonymizes or removes user PII.  
+  - Document data flows and ensure data is processed only for the purposes stated.  
+- **SOC 2**  
+  - Implement consistent control frameworks for **confidentiality, integrity, availability** (e.g., restricting DB access, logging all admin actions).  
+  - Evidence logs (change management, access control reviews) must be easily retrievable.
+
+### 4.3 Compliance Validations
+- **Penetration Testing**: Periodic tests on the multi-tenant environment to check for cross-tenant data leaks.  
+- **Encryption at Rest & in Transit**: Confirm TLS 1.2 or 1.3 is enforced, AWS KMS is active for RDS encryption.  
+- **Incident Response**: Define runbooks for data breaches, unauthorized access, or system downtime compliance notifications.
+
+---
+
+## 5. CODE EXAMPLES
+### 5.1 SQL Creation Scripts (Schema-Based)
+```sql
+-- Example creation in a dedicated schema approach:
+CREATE SCHEMA IF NOT EXISTS tenant_123 AUTHORIZATION db_admin;
+
+CREATE TABLE tenant_123.iro (
+    iro_id SERIAL PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_on TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE tenant_123.audit_trail (
+    audit_id SERIAL PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id INT,
+    action VARCHAR(50),
+    user_id INT,
+    timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+    data_diff JSONB
+);
+
+-- And so on for custom domain tables like DMAssessment, Review, Signoff, etc.
+```
+
+### 5.2 Security Policy Definitions (Row-Level Security)
+```sql
+-- Enable RLS on a shared table
+ALTER TABLE public.iro ENABLE ROW LEVEL SECURITY;
+
+-- Example policy to allow SELECT only for rows matching the session’s tenant_id:
+CREATE POLICY iro_select_policy ON public.iro
+FOR SELECT
+TO saas_app_role
+USING (tenant_id = current_setting('app.current_tenant_id')::int);
+
+-- Additional policies for INSERT, UPDATE, DELETE as needed
+```
+
+### 5.3 Provisioning Scripts (Sample AWS CLI / Bash)
+```bash
+#!/usr/bin/env bash
+# Creates a new tenant schema and user in PostgreSQL
+
+TENANT_NAME=$1
+DB_ENDPOINT=$2
+DB_ADMIN_USER=$3
+DB_ADMIN_PASS=$4
+
+psql "host=$DB_ENDPOINT user=$DB_ADMIN_USER password=$DB_ADMIN_PASS dbname=postgres" <<SQL
+    CREATE SCHEMA IF NOT EXISTS tenant_$TENANT_NAME;
+    -- Optionally create a role for the tenant
+    CREATE ROLE tenant_role_$TENANT_NAME LOGIN PASSWORD 'generateStrongPasswordHere';
+    GRANT USAGE ON SCHEMA tenant_$TENANT_NAME TO tenant_role_$TENANT_NAME;
+    GRANT CREATE ON SCHEMA tenant_$TENANT_NAME TO tenant_role_$TENANT_NAME;
+
+    -- Create the necessary tables in tenant schema
+    CREATE TABLE tenant_$TENANT_NAME.iro (...);
+    CREATE TABLE tenant_$TENANT_NAME.dm_assessment (...);
+    CREATE TABLE tenant_$TENANT_NAME.audit_trail (...);
+
+    -- More table definitions or function creation as needed.
+SQL
+
+if [ $? -eq 0 ]; then
+    echo "Tenant $TENANT_NAME provisioned successfully."
+else
+    echo "Error: Tenant $TENANT_NAME provisioning failed."
+    exit 1
+fi
+```
+
+---
+
+</schema design>

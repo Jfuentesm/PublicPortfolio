@@ -11,7 +11,7 @@ Below is a **comprehensive project backlog** addressing the requested structure.
 **so that** tenant data is isolated and meets security/compliance requirements.
 
 - **Technical Requirements**  
-  - PostgreSQL Row-Level Security or separate schema approach.  
+  - PostgreSQL separate schema approach.  
   - Automated schema provisioning script (CloudFormation/Terraform or custom provisioning service).  
   - Ensure encryption at rest (via KMS) for each tenant’s data.  
 

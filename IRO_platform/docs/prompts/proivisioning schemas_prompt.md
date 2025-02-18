@@ -1,7 +1,144 @@
-Below is a comprehensive **multi-tenant schema architecture** for an Enterprise SaaS solution on **AWS PostgreSQL**, carefully aligned with the **AWS Well-Architected Framework** and **GDPR/SOC2** compliance requirements. The solution follows **schema isolation**, incorporates **robust security**, supports **automated provisioning**, and addresses **horizontal scaling**. Please find the deliverable in the requested structured format:
+<goal>
+Create a detailed provisioning script for setting up automated tenant schema provisioning in PostgreSQL that ensures data isolation and compliance requirements.
+</goal>
+
+
+<output_format>
+Please provide your response in the following structure:
+1. Infrastructure Setup Steps
+2. Schema Provisioning Logic
+3. Security Measures Implementation
+4. Audit Logging Configuration
+5. Sample IaC Code Snippets
+6. Testing Validation Steps
+
+For each section, include:
+- Detailed technical steps
+- Potential pitfalls to avoid
+- Best practices to follow
+- Relevant AWS service configurations
+</output_format>
+
+
+
+<system_context>
+You are an expert AWS cloud architect and database engineer specializing in multi-tenant SaaS applications with deep knowledge of PostgreSQL and infrastructure as code.
+</system_context>
+
+<background>
+A senior architect and product owner have designed an Enterprise SaaS cloud multi-tenant solution in AWS requiring secure tenant isolation at the database level.
+</background>
+
+
+<requirements>
+- Implementation must use PostgreSQL separate schema approach
+- Must include automated provisioning via IaC (CloudFormation/Terraform)
+- Must implement KMS encryption at rest
+- Must maintain audit logs for compliance
+</requirements>
+
+
+<project documentation>
+## **2. System Architecture Overview**
+
+### **2.1 High-Level Architecture**
+
+The solution is organized into four layers:
+
+1. **Presentation Layer**  
+   - **User Interface** built using Django (Python) for Double Materiality dashboards and IRO management.  
+   - **API Endpoints** for external linkage (ESG data, stakeholder portals).  
+   - **Authentication/Authorization** via **Amazon Cognito** (supporting MFA, social logins, and SSO).
+
+2. **Application Layer**  
+   - **Core DMA Features**: IRO Inventory, Double Materiality Engine, Workflow Approvals, Audit Trails, ESRS Reporting.  
+   - **Enterprise Extensions**: Multi-tenancy, row-level security in RDS, RBAC, integration with **Amazon API Gateway**.  
+   - **Serverless Workflow** (optional): AWS Lambda or AWS Step Functions for background tasks (report generation, notifications).
+
+3. **Data Layer**  
+   - **Primary Database**: **Amazon RDS (PostgreSQL)** for critical data storage, row-level security, audit logging.  
+   - **Optional DynamoDB** (future high-throughput needs): Skipped initially unless specific performance or global distribution use cases arise.  
+   - **Immutable Audit Storage**: Use versioned **Amazon S3** buckets for storing logs/audit trails if tamper-evident archives are required.
+
+4. **Infrastructure Layer**  
+   - **Container Orchestration**: **AWS Fargate** for containerized Django services (option to migrate to full EKS if operational scale warrants it).  
+   - **Network & Security**: AWS WAF, Security Groups, AWS Shield (Standard to start, upgrade if needed), Amazon GuardDuty, Cognito, KMS.  
+   - **Monitoring & Observability**: Amazon CloudWatch, AWS X-Ray for distributed tracing, AWS Security Hub, and AWS Backup.
+
+**High-Level Architecture Diagram** (using Mermaid):
+
+```mermaid
+flowchart TB
+    classDef presentation fill:#81D4FA,stroke:#0288D1,color:#000,stroke-width:1px
+    classDef application fill:#C5E1A5,stroke:#558B2F,color:#000,stroke-width:1px
+    classDef data fill:#FBE9E7,stroke:#BF360C,color:#000,stroke-width:1px,shape:cylinder
+    classDef infra fill:#F8BBD0,stroke:#AD1457,color:#000,stroke-width:1px
+
+    User(Stakeholders / Sustainability Teams)
+    User --> SB[Security Boundary]
+
+    subgraph SB[Security Boundary]
+      direction TB
+
+      subgraph PL[Presentation Layer]
+      UI["Django-based Web UI"]:::presentation
+      API([API Endpoints]):::presentation
+      Auth([Amazon Cognito]):::presentation
+      end
+
+      subgraph AL[Application Layer]
+      IROs((IRO Inventory)):::application
+      DME((Double Materiality Engine)):::application
+      Workflow((Review & Approval Workflow)):::application
+      Signoff((Sign-off & Validation)):::application
+      Audit((Audit Trails)):::application
+      ESRS((CSRD/ESRS Reporting)):::application
+
+      MultiT(((Multi-Tenancy & RBAC))):::application
+      APIGateway(((Amazon API Gateway))):::application
+      end
+
+      subgraph DL[Data Layer]
+      RDS["Amazon RDS (PostgreSQL)"]:::data
+      S3Data["Versioned S3 Buckets (Audit)"]:::data
+      end
+
+      subgraph IL[Infrastructure Layer]
+      Fargate{{AWS Fargate}}:::infra
+      Monitor{{CloudWatch & X-Ray}}:::infra
+      Security{{AWS WAF / Shield / GuardDuty}}:::infra
+      Secrets{{AWS KMS / Secrets Manager}}:::infra
+      end
+    end
+
+    PL --> AL
+    AL --> DL
+    AL --> IL
+    DL --> IL
+
+    Auth --> AL
+    AL --> Monitor
+    AL --> Security
+    AL --> Secrets
+    Fargate --> AL
+    RDS --> Monitor
+    S3Data --> Monitor
+```
 
 ---
 
+### **2.2 Technology Stack Details**
+
+- **Application Framework**: **Django (Python)** for rapid development, robust security defaults, and admin UI.  
+- **Container Deployment**: **AWS Fargate** tasks or services to reduce the operational overhead of managing Kubernetes.  
+  - *Future Option*: Migrate to **Amazon EKS** if advanced orchestration, custom scheduling, or large-scale microservices demands arise.  
+- **Database**: **Amazon RDS (PostgreSQL)** with row-level security for multi-tenancy, encryption at rest, and simplified audit trails.  
+  - **Potential DynamoDB** usage if extremely high-scale or globally distributed data ingestion is needed later.  
+- **Security Services**: AWS WAF, Security Groups, AWS Shield (Standard initially, upgrade if needed), Amazon Cognito, AWS KMS.  
+- **Observability**: Amazon CloudWatch (metrics, logs), AWS X-Ray (tracing), and AWS Security Hub to unify security findings.
+</project documentation>
+
+<schema definition>
 ## 1. SCHEMA DESIGN
 ### 1.1 Database Structure
 - **Primary Engine**: **Amazon RDS (PostgreSQL)** with `Multi-AZ` support for high availability.  
@@ -843,6 +980,5 @@ fi
 
 ---
 
-### Final Remarks
 
-This **production-ready multi-tenant architecture** on **AWS PostgreSQL** balances **secure tenant isolation**, **scalability**, and **compliance**. By leveraging **schema-based** or **RLS** isolation patterns, **end-to-end encryption**, and **automated provisioning** workflows, the design satisfies **GDPR** and **SOC2** requirements while offering a streamlined path to onboarding new tenants. Leveraging **AWS native services** (e.g., CloudFormation/Terraform, Secrets Manager, GuardDuty) helps ensure operational excellence and fosters a robust DevSecOps culture. 
+</schema definition>
