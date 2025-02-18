@@ -8,7 +8,7 @@ services:
     volumes:
       - .:/app  # Mount your project directory to allow live code reloading.
     ports:
-      - "8000:8000"  # Expose port 8000 locally.
+      - "8000:8000"  # Expose port 8000 on host.
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings.local
       - DATABASE_URL=postgres://dma_user:password@db:5432/dma_db
@@ -22,13 +22,13 @@ services:
     restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data  # Persist database data.
-      - ./init-scripts:/docker-entrypoint-initdb.d  # Add this line
+      - ./init-scripts:/docker-entrypoint-initdb.d  # Run all SQL scripts at startup.
     environment:
       POSTGRES_USER: dma_user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: dma_db
 
-  # Redis container to serve as the message broker for background tasks.
+  # Redis container to serve as the message broker for background tasks (Celery).
   redis:
     image: redis:7
     restart: always
