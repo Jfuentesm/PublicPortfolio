@@ -52,19 +52,31 @@ def main():
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     # Construct the output file name (foldername_datetimestamp.py)
-    output_file_name = f"{backlog_generation_dir.name}_{timestamp_str}.py"
+    output_file_name = f"concatignore_{backlog_generation_dir.name}_{timestamp_str}.py"
     output_file = root_dir / output_file_name
 
     with open(output_file, 'w', encoding='utf-8') as f:
+
+        # Add goal and output instruction template
+        f.write('<goal>\n\n\n')
+        f.write('</goal>\n\n\n')
+        f.write('<output instruction>\n')
+        f.write('1) Explain \n')
+        f.write('2) Give me the COMPLETE UPDATED VERSION of each script that needs to be updated\n')
+        f.write('</output instruction>\n\n')
+        f.write('\n')
+
         # Write file tree section
-        f.write("'''\nIncluded Files:\n")
+        f.write("\n <Tree of Included Files>\n")
         for file_path in files_to_include:
             rel_path = file_path.relative_to(root_dir)
             f.write(f"- {rel_path}\n")
-        f.write("\n'''\n\n")
+        f.write("\n\n\n")
+        f.write("\n <Tree of Included Files>\n")
+
 
         # Write concatenated source code section
-        f.write("# Concatenated Source Code\n\n")
+        f.write("\n\n<Concatenated Source Code>\n\n")
 
         # Process files
         for file_path in files_to_include:
@@ -84,15 +96,7 @@ def main():
             # Write file footer
             f.write("\n</file>\n\n")
 
-        # Add error and output instruction template
-        f.write('"""\n')
-        f.write('<goal>\n\n\n')
-        f.write('</goal>\n\n\n')
-        f.write('<output instruction>\n')
-        f.write('1) Explain \n')
-        f.write('2) Give me the COMPLETE UPDATED VERSION of each script that needs to be updated\n')
-        f.write('</output instruction>\n')
-        f.write('"""\n')
+        f.write("</Concatenated Source Code>")
 
 if __name__ == "__main__":
     main()

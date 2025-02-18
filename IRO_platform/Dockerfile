@@ -1,19 +1,17 @@
-# Start with an official Python image
-FROM python:3.10-slim
+# Dockerfile - for building the Django and Celery containers
+FROM python:3.11-slim
 
-# Create a working directory in the container
+# Set working directory
 WORKDIR /app
 
 # Copy requirements and install them
-COPY requirements.txt /app/
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the project files into /app
-COPY . /app/
+# Copy all the project files into the container
+COPY . /app
 
-# Expose port 8000 (not strictly necessary if you rely on Docker Compose)
+# Expose port 8000 (though Docker Compose handles port mapping)
 EXPOSE 8000
 
-# By default, just start a bash shell; 
-# actual command is overridden by `command:` in docker-compose
-CMD ["/bin/bash"]
+# Let 'compose.yaml' define the default command (gunicorn or Celery)
