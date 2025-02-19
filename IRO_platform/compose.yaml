@@ -1,14 +1,11 @@
-version: '3.11'
-
 services:
-  # The Django web service, our main application container.
   web:
     build: .
-    command: gunicorn core.wsgi:application --bind 0.0.0.0:8000
+    command: sh -c "python manage.py migrate && gunicorn core.wsgi:application --bind 0.0.0.0:8000"
     volumes:
-      - .:/app  # Mount your project directory to allow live code reloading.
+      - .:/app
     ports:
-      - "8000:8000"  # Expose port 8000 on the host.
+      - "8000:8000"
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings.local
       - DATABASE_URL=postgres://dma_user:password@db:5432/dma_db
@@ -16,29 +13,30 @@ services:
       - db
       - redis
 
-  # The PostgreSQL database container.
   db:
     image: postgres:14
     restart: always
     volumes:
-      - postgres_data:/var/lib/postgresql/data  # Persist database data
-      - ./init-scripts:/docker-entrypoint-initdb.d  # Run all SQL scripts at startup
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d  # Make sure this line exists
     environment:
       POSTGRES_USER: dma_user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: dma_db
+    ports:
+      - "5432:5432"  # Add this to make debugging easier
 
-  # Redis container to serve as the message broker for background tasks (Celery).
+
+
   redis:
     image: redis:7
     restart: always
 
-  # The Celery worker container for handling asynchronous tasks.
   worker:
     build: .
     command: celery -A core worker --loglevel=info
     volumes:
-      - .:/app  # Mount your project directory for consistent code access.
+      - .:/app
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings.local
       - DATABASE_URL=postgres://dma_user:password@db:5432/dma_db

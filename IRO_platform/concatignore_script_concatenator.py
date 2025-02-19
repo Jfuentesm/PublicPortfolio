@@ -16,10 +16,13 @@ def get_files_recursively(directory):
     """Recursively get all files in the directory"""
     files = []
     
-    # Explicitly check for compose.yaml
+    # Explicitly check for compose.yaml and Dockerfile
     compose_file = directory / 'compose.yaml'
+    dockerfile = directory / 'Dockerfile'
     if compose_file.exists():
         files.append(compose_file)
+    if dockerfile.exists():
+        files.append(dockerfile)
     
     for item in sorted(directory.iterdir()):
         # Modified exclusion rules
@@ -32,13 +35,12 @@ def get_files_recursively(directory):
             continue
         
         if item.is_file():
-            if item.suffix in ['.py', '.txt', '.md', '.html', '.json', '.js', '.vue', '.sh', '.yaml', '.yml', '.sql']:
+            # Added Dockerfile to the list of valid extensions
+            if item.suffix in ['.py', '.txt', '.md', '.html', '.json', '.js', '.vue', '.sh', '.yaml', '.yml', '.sql'] or item.name == 'Dockerfile':
                 files.append(item)
         elif item.is_dir():
             files.extend(get_files_recursively(item))
     return files
-
-# Rest of your main() function remains the same...
 
 def main():
     # Define paths
@@ -56,7 +58,6 @@ def main():
     output_file = root_dir / output_file_name
 
     with open(output_file, 'w', encoding='utf-8') as f:
-
         # Add goal and output instruction template
         f.write('<goal>\n\n\n')
         f.write('</goal>\n\n\n')
@@ -73,7 +74,6 @@ def main():
             f.write(f"- {rel_path}\n")
         f.write("\n\n\n")
         f.write("\n <Tree of Included Files>\n")
-
 
         # Write concatenated source code section
         f.write("\n\n<Concatenated Source Code>\n\n")

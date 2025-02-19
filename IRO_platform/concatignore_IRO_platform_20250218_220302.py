@@ -1,3 +1,333 @@
+<goal>
+
+
+</goal>
+
+
+<output instruction>
+1) Explain 
+2) Give me the COMPLETE UPDATED VERSION of each script that needs to be updated
+</output instruction>
+
+
+
+ <Tree of Included Files>
+- compose.yaml
+- Dockerfile
+- Dockerfile
+- compose.yaml
+- core/__init__.py
+- core/celery.py
+- core/settings/__init__.py
+- core/settings/base.py
+- core/settings/local.py
+- core/urls.py
+- core/wsgi.py
+- init-scripts/01-init-schemas.sql
+- manage.py
+- requirements.txt
+
+
+
+
+ <Tree of Included Files>
+
+
+<Concatenated Source Code>
+
+<file path='compose.yaml'>
+services:
+  web:
+    build: .
+    command: sh -c "python manage.py migrate && gunicorn core.wsgi:application --bind 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.local
+      - DATABASE_URL=postgres://dma_user:password@db:5432/dma_db
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:14
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_USER: dma_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: dma_db
+
+  redis:
+    image: redis:7
+    restart: always
+
+  worker:
+    build: .
+    command: celery -A core worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.local
+      - DATABASE_URL=postgres://dma_user:password@db:5432/dma_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:
+</file>
+
+<file path='Dockerfile'>
+# Dockerfile
+# Use a slim Python base image
+FROM python:3.11-slim
+
+# Prevent Python from writing pyc files or buffering stdout
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy project files
+COPY . /app/
+
+# Default command (Docker Compose will typically override this)
+CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000"]
+
+</file>
+
+<file path='Dockerfile'>
+# Dockerfile
+# Use a slim Python base image
+FROM python:3.11-slim
+
+# Prevent Python from writing pyc files or buffering stdout
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy project files
+COPY . /app/
+
+# Default command (Docker Compose will typically override this)
+CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000"]
+
+</file>
+
+<file path='compose.yaml'>
+services:
+  web:
+    build: .
+    command: sh -c "python manage.py migrate && gunicorn core.wsgi:application --bind 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.local
+      - DATABASE_URL=postgres://dma_user:password@db:5432/dma_db
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:14
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_USER: dma_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: dma_db
+
+  redis:
+    image: redis:7
+    restart: always
+
+  worker:
+    build: .
+    command: celery -A core worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.local
+      - DATABASE_URL=postgres://dma_user:password@db:5432/dma_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:
+</file>
+
+<file path='core/__init__.py'>
+
+</file>
+
+<file path='core/celery.py'>
+# core/celery.py
+import os
+from celery import Celery
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings.local')
+
+app = Celery('core')
+app.config_from_object('django.conf:settings', namespace='CELERY')
+app.autodiscover_tasks()
+
+</file>
+
+<file path='core/settings/__init__.py'>
+# This file is intentionally empty (or can be left out if not needed).
+# It just tells Python that 'settings' is a package.
+</file>
+
+<file path='core/settings/base.py'>
+# core/settings/base.py
+import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+SECRET_KEY = 'replace-this-with-a-real-secret-key'
+DEBUG = False
+ALLOWED_HOSTS = []
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    # Add additional apps as needed, e.g. 'myapp',
+]
+
+MIDDLEWARE = [
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = 'core.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [
+            # os.path.join(BASE_DIR, 'templates'),
+        ],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'core.wsgi.application'
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+    }
+}
+
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Celery (common config)
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+
+</file>
+
+<file path='core/settings/local.py'>
+import os
+import dj_database_url
+from .base import *
+
+# In local development we usually want DEBUG = True
+DEBUG = True
+
+# If running in Docker, often we simply allow all hosts or set your domain
+ALLOWED_HOSTS = ["*"]
+
+# Use the environment variable if set, or fallback
+DATABASES = {
+    'default': dj_database_url.config(
+        default='postgres://postgres:password@localhost:5432/postgres',
+        conn_max_age=600,
+    )
+}
+
+# For local dev, we typically turn off password validation
+AUTH_PASSWORD_VALIDATORS = []
+
+# Optionally other local dev settings...
+# e.g. emailing to console, logging, etc.
+</file>
+
+<file path='core/urls.py'>
+# core/urls.py
+from django.urls import path
+
+urlpatterns = [
+    # You can add your URL definitions here, e.g.:
+    # path('', views.home, name='home'),
+]
+
+</file>
+
+<file path='core/wsgi.py'>
+# core/wsgi.py
+import os
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings.local')
+
+application = get_wsgi_application()
+
+</file>
+
+<file path='init-scripts/01-init-schemas.sql'>
 --
 -- 01-init-schemas.sql
 --
@@ -317,7 +647,6 @@ BEGIN
         CREATE INDEX IF NOT EXISTS idx_fin_weights_version_dim ON %I.fin_materiality_weights (version_num, dimension);
     $f$, schema_name, schema_name);
 
-    -- ***** FIXED HERE: added a third "schema_name" argument *****
     EXECUTE format($f$
         CREATE TABLE IF NOT EXISTS %I.fin_materiality_magnitude_def (
             def_id SERIAL PRIMARY KEY,
@@ -336,7 +665,7 @@ BEGIN
         );
         CREATE INDEX IF NOT EXISTS idx_fin_mag_def_tenant_id     ON %I.fin_materiality_magnitude_def (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_fin_mag_def_version_score ON %I.fin_materiality_magnitude_def (version_num, score_value);
-    $f$, schema_name, schema_name, schema_name);
+    $f$, schema_name, schema_name);
 
 END;
 $$ LANGUAGE plpgsql;
@@ -346,3 +675,40 @@ INSERT INTO public.tenant_config (tenant_name) VALUES ('test2') ON CONFLICT DO N
 
 SELECT create_tenant_schema('test1');
 SELECT create_tenant_schema('test2');
+
+</file>
+
+<file path='manage.py'>
+#!/usr/bin/env python
+import os
+import sys
+
+def main():
+    """Run administrative tasks."""
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings.local')
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Make sure it's installed and "
+            "available on your PYTHONPATH environment variable? "
+            "Did you forget to activate a virtual environment?"
+        ) from exc
+    execute_from_command_line(sys.argv)
+
+if __name__ == '__main__':
+    main()
+</file>
+
+<file path='requirements.txt'>
+# requirements.txt
+Django==4.2
+gunicorn==20.1.0
+psycopg2-binary==2.9.6
+redis==4.5.5
+celery==5.2.7
+dj-database-url==0.5.0
+
+</file>
+
+</Concatenated Source Code>
