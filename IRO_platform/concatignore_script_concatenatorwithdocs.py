@@ -61,7 +61,7 @@ def main():
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     # Construct the output file name (foldername_datetimestamp.py)
-    output_file_name = f"concatignore_{backlog_generation_dir.name}_{timestamp_str}.py"
+    output_file_name = f"concatignore_withdocs_{backlog_generation_dir.name}_{timestamp_str}.py"
     output_file = root_dir / output_file_name
 
     with open(output_file, 'w', encoding='utf-8') as f:

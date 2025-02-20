@@ -1,0 +1,328 @@
+Below, you’ll find **(1)** a concise explanation of how to set up, run, and troubleshoot the local environment (fulfilling the goal to provide local documentation) and **(2)** the *complete updated version* of a new `README.md` file (so you have a fully documented local setup script). 
+
+In reviewing the Dockerfiles and Compose files provided, **no direct functional changes** appear necessary (everything already supports local usage). **However**, to fulfill LDE-7 (Local Environment Documentation) and clearly guide developers, **we add a new** `README.md`. 
+
+---
+
+## 1) **Explanation of the Local Development & Usage**
+
+Below is a summary of essential information for anyone setting up and running this environment locally.
+
+### 1.1 System Requirements
+
+- **Docker**: v20.10+ recommended  
+- **Docker Compose**: v2+ recommended  
+- **Memory**: Ensure Docker is allocated at least 2GB RAM (preferably 4GB)  
+- **Ports**:  
+  - **:8000** (application web server)  
+  - **:5432** (PostgreSQL, if exposed)  
+  - **:6379** (Redis, if exposed)  
+
+### 1.2 Starting the Environment Locally
+
+1. **Clone the Repository**
+
+   ```bash
+   git clone https://your-repo-url/iro_platform.git
+   cd iro_platform
+   ```
+
+2. **Build the Containers**
+
+   ```bash
+   docker compose build
+   ```
+
+3. **Start the Environment**
+
+   ```bash
+   docker compose up
+   ```
+   - This spins up four services: `web`, `db`, `redis`, and `worker`.  
+   - On first run, PostgreSQL will initialize the database, apply the `init-scripts`, and run migrations automatically.  
+
+4. **Access the App**
+
+   - Once the containers are up, navigate to:  
+     **http://localhost:8000**  
+   - You’ll see either the Django welcome page or any default “home” view.
+
+### 1.3 Stopping the Environment
+
+- To stop containers while **keeping** database data, in the same project directory run:
+
+  ```bash
+  docker compose down
+  ```
+
+- If you also wish to **remove** DB volumes (e.g., to reset data completely), run:
+
+  ```bash
+  docker compose down -v
+  ```
+
+### 1.4 Running Migrations Manually
+
+Usually migrations run automatically on container startup, but you can manually apply them:
+
+```bash
+# Make sure the database and web container are running:
+docker compose up -d db web
+
+# Run migrations
+docker compose run web python manage.py migrate
+```
+
+### 1.5 Common Environment Variables
+
+The Compose file defines these environment variables for the `web` and `worker` services:
+
+- **`DJANGO_SETTINGS_MODULE`**  
+  Points to `core.settings.local` for local dev.
+- **`DATABASE_URL`**  
+  Example: `postgres://dma_user:password@db:5432/dma_db`  
+  If you override it, ensure it’s a valid Postgres DSN. 
+- **`CELERY_BROKER_URL`** (Worker only)  
+  Example: `redis://redis:6379/0`
+
+You can override these by editing `docker-compose.yml` or by passing environment variables with `docker compose run -e VAR=VALUE ...`.
+
+### 1.6 Test Commands
+
+To run the Django test suite locally:
+
+```bash
+# Make sure db is running
+docker compose up -d db
+
+# Run tests
+docker compose run web python manage.py test
+```
+
+If you have a Celery-based test or concurrency tests, you can also start the `worker` container in the background:
+
+```bash
+docker compose up -d worker
+docker compose run web python manage.py test
+```
+
+### 1.7 Troubleshooting Guide
+
+1. **Database Not Ready / Connection Refused**  
+   - The `web` container waits for Postgres (`db`) to become healthy. If it fails repeatedly, ensure your Docker resources are sufficient (>=2GB RAM).  
+   - Check logs via `docker compose logs db` to see if the DB is starting or if credentials are mismatched.
+2. **Resetting DB**  
+   - Run `docker compose down -v` to remove the database volume, then `docker compose up` again.  
+   - This re-initializes everything from scratch, including the `init-scripts` in `/init-scripts`.
+3. **Containers Failing or Exiting Immediately**  
+   - Check logs of each service:
+     ```bash
+     docker compose logs web
+     docker compose logs worker
+     ```
+   - Look for Python errors, missing environment variables, or Postgres connectivity issues.
+4. **Slow Performance**  
+   - Allocate more memory in Docker settings.  
+   - Close unneeded applications or containers.  
+5. **Permission Denied on `.sql` scripts**  
+   - Ensure your local filesystem allows Docker to read `/init-scripts/01-init-schemas.sql`.  
+   - On UNIX-based systems, you may need `chmod 644 init-scripts/*.sql`.
+
+### 1.8 Checking Container Logs
+
+Use Docker Compose’s built-in logging:
+
+```bash
+# View all logs
+docker compose logs -f
+
+# Logs only for web container
+docker compose logs -f web
+
+# Logs only for Celery worker
+docker compose logs -f worker
+```
+
+Press `Ctrl + C` to stop following logs.
+
+---
+
+## 2) **Complete Updated Version: `README.md`**
+
+Below is the **entire** `README.md` file you can add to the root of your project to fulfill the “comprehensive local documentation” criterion. If you already keep a README, you can replace or merge these sections as needed.
+
+```markdown
+# Local Development & Usage
+
+This document describes how to run, stop, and troubleshoot the local Double Materiality Assessment (DMA) platform environment using Docker/Compose.
+
+---
+
+## Table of Contents
+1. [System Requirements](#system-requirements)  
+2. [Getting Started](#getting-started)  
+3. [Starting & Stopping](#starting--stopping)  
+4. [Running Migrations](#running-migrations)  
+5. [Environment Variables](#environment-variables)  
+6. [Running Tests](#running-tests)  
+7. [Troubleshooting](#troubleshooting)  
+8. [Contact](#contact)
+
+---
+
+## System Requirements
+
+- **Docker** v20.10+  
+- **Docker Compose** v2+  
+- Allocate at least 2GB of memory to Docker (preferably 4GB).  
+- Exposed Ports:
+  - 8000 (Django web app)  
+  - 5432 (Postgres)  
+  - 6379 (Redis)
+
+---
+
+## Getting Started
+
+1. **Clone this repository**:
+
+   ```bash
+   git clone https://your-repo-url/iro_platform.git
+   cd iro_platform
+   ```
+
+2. **Build the containers**:
+
+   ```bash
+   docker compose build
+   ```
+
+3. **Start the environment**:
+
+   ```bash
+   docker compose up
+   ```
+
+   This will spin up:
+   - **web** (Django + Gunicorn)
+   - **worker** (Celery worker)
+   - **db** (PostgreSQL 14)
+   - **redis** (Redis 7)
+
+   The `web` container will wait for the DB to become healthy, run migrations, then start Gunicorn.
+
+4. **Visit the App**:
+
+   - Go to: **http://localhost:8000** to confirm it’s running.
+
+---
+
+## Starting & Stopping
+
+- **Start** (in the foreground):
+
+  ```bash
+  docker compose up
+  ```
+
+- **Start** (detached/background):
+
+  ```bash
+  docker compose up -d
+  ```
+
+- **Stop** while preserving data:
+
+  ```bash
+  docker compose down
+  ```
+
+- **Stop** and remove DB volume (reset data):
+
+  ```bash
+  docker compose down -v
+  ```
+
+---
+
+## Running Migrations
+
+Normally migrations run on startup. To run them manually:
+
+```bash
+docker compose run web python manage.py migrate
+```
+
+You can also run:
+
+```bash
+docker compose run web ./manage.py makemigrations
+```
+
+to create new migration files if you’ve changed models, then `migrate` again.
+
+---
+
+## Environment Variables
+
+Several environment variables are defined in `docker-compose.yml`:
+
+- **DATABASE_URL**  
+  e.g.: `postgres://dma_user:password@db:5432/dma_db`
+
+- **DJANGO_SETTINGS_MODULE**  
+  Points to `core.settings.local` for local dev.  
+  If needed, override with your own settings file.
+
+- **CELERY_BROKER_URL**  
+  e.g.: `redis://redis:6379/0`.
+
+Update or override in the `environment:` section of each service as needed.
+
+---
+
+## Running Tests
+
+To run Django’s test suite:
+
+```bash
+# Ensure the DB is running
+docker compose up -d db
+
+# Run tests
+docker compose run web python manage.py test
+```
+
+- If you have Celery tasks, you may also want the `worker` container running in the background for certain tests.
+
+---
+
+## Troubleshooting
+
+1. **Database Connection Errors**  
+   - Check DB logs: `docker compose logs db`  
+   - Ensure the environment variable `DATABASE_URL` matches `db` host and credentials.
+
+2. **Port Collisions**  
+   - If ports `5432`, `6379`, or `8000` are in use, edit `docker-compose.yml` to remap them.
+
+3. **Memory/Performance Issues**  
+   - Increase Docker’s memory allotment.
+   - If building slows down, close other resource-heavy apps.
+
+4. **Reset Database**  
+   - Run `docker compose down -v` to remove volumes, then `docker compose up` again to re-init.
+
+5. **Container Crashes**  
+   - Check logs: `docker compose logs -f web` or `docker compose logs -f worker`  
+   - Look for Python tracebacks or missing environment variables.
+
+---
+
+## Contact
+
+For assistance or further details, contact your project maintainer or create an issue in this repository.
+
+---
+
+**End of README.md**
