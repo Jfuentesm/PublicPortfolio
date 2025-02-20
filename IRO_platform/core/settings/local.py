@@ -1,23 +1,27 @@
+# core/settings/local.py
 import os
 import dj_database_url
 from .base import *
 
-# In local development we usually want DEBUG = True
+# Enable DEBUG mode for local development
 DEBUG = True
 
-# If running in Docker, often we simply allow all hosts or set your domain
+# Allow all hosts in local dev
 ALLOWED_HOSTS = ["*"]
 
-# Use the environment variable if set, or fallback
+# Database configuration:
+# Read from DATABASE_URL if set; otherwise fall back to a localhost connection
 DATABASES = {
     'default': dj_database_url.config(
-        default='postgres://postgres:password@localhost:5432/postgres',
+        default=os.getenv("DATABASE_URL", "postgres://postgres:password@localhost:5432/postgres"),
         conn_max_age=600,
     )
 }
 
-# For local dev, we typically turn off password validation
+# Disable password validators locally for faster dev iteration
 AUTH_PASSWORD_VALIDATORS = []
 
-# Optionally other local dev settings...
-# e.g. emailing to console, logging, etc.
+# Point Celery broker to Redis via environment variable or default to local Redis container
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+
+# Optionally adjust any additional local-only Django settings or logging here.
