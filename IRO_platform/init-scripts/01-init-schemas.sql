@@ -2,18 +2,20 @@
 -- 01-init-schemas.sql
 --
 
+-- Create the public tenant_config table
 CREATE TABLE IF NOT EXISTS public.tenant_config (
     tenant_id SERIAL PRIMARY KEY,
     tenant_name VARCHAR(100) NOT NULL UNIQUE,
     created_on TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Define the create_tenant_schema function
 CREATE OR REPLACE FUNCTION create_tenant_schema(tenant_name TEXT) RETURNS void AS $$
 DECLARE
-    schema_name TEXT := format('tenant_%I', tenant_name);
+    schema_name TEXT := 'tenant_' || tenant_name;
 BEGIN
     -- 1) Create the tenant schema if it doesn’t exist
-    EXECUTE format('CREATE SCHEMA IF NOT EXISTS %s', schema_name);
+    EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I', schema_name);
 
     ---------------------------------------------------------------------------
     -- 2) IRO
@@ -33,9 +35,9 @@ BEGIN
             created_on TIMESTAMP NOT NULL DEFAULT NOW(),
             updated_on TIMESTAMP NOT NULL DEFAULT NOW(),
             CONSTRAINT iro_tenant_fk
-              FOREIGN KEY (tenant_id)
-              REFERENCES public.tenant_config(tenant_id)
-              ON DELETE CASCADE
+                FOREIGN KEY (tenant_id)
+                REFERENCES public.tenant_config(tenant_id)
+                ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_iro_tenant_id     ON %I.iro (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_iro_stage         ON %I.iro (current_stage);
@@ -43,7 +45,7 @@ BEGIN
     $f$, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
-    -- 3) IRO_Version
+    -- 3) IRO_Version (Corrected: 5 %I placeholders, 5 arguments)
     ---------------------------------------------------------------------------
     EXECUTE format($f$
         CREATE TABLE IF NOT EXISTS %I.iro_version (
@@ -76,7 +78,7 @@ BEGIN
         CREATE INDEX IF NOT EXISTS idx_iro_version_iro_id    ON %I.iro_version (iro_id);
         CREATE INDEX IF NOT EXISTS idx_iro_version_tenant_id ON %I.iro_version (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_iro_version_status    ON %I.iro_version (status);
-    $f$, schema_name, schema_name, schema_name, schema_name);
+    $f$, schema_name, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
     -- 4) IRO_Relationship
@@ -103,8 +105,8 @@ BEGIN
                 REFERENCES %I.iro(iro_id)
         );
         CREATE INDEX IF NOT EXISTS idx_iro_relationship_tenant_id ON %I.iro_relationship (tenant_id);
-        CREATE INDEX IF NOT EXISTS idx_iro_relationship_src_tgt    ON %I.iro_relationship (source_iro_id, target_iro_id);
-    $f$, schema_name, schema_name, schema_name, schema_name);
+        CREATE INDEX IF NOT EXISTS idx_iro_relationship_src_tgt   ON %I.iro_relationship (source_iro_id, target_iro_id);
+    $f$, schema_name, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
     -- 5) impact_assessment
@@ -217,7 +219,7 @@ BEGIN
         CREATE INDEX IF NOT EXISTS idx_review_iro_id     ON %I.review (iro_id);
         CREATE INDEX IF NOT EXISTS idx_review_version_id ON %I.review (iro_version_id);
         CREATE INDEX IF NOT EXISTS idx_review_status     ON %I.review (status);
-    $f$, schema_name, schema_name, schema_name, schema_name);
+    $f$, schema_name, schema_name, schema_name, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
     -- 8) signoff
@@ -248,7 +250,7 @@ BEGIN
         CREATE INDEX IF NOT EXISTS idx_signoff_tenant_id ON %I.signoff (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_signoff_review_id ON %I.signoff (review_id);
         CREATE INDEX IF NOT EXISTS idx_signoff_signed_by ON %I.signoff (signed_by);
-    $f$, schema_name, schema_name, schema_name, schema_name);
+    $f$, schema_name, schema_name, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
     -- 9) audit_trail
@@ -271,11 +273,12 @@ BEGIN
         CREATE INDEX IF NOT EXISTS idx_audit_trail_tenant_id      ON %I.audit_trail (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_audit_trail_entity_type_id ON %I.audit_trail (entity_type, entity_id);
         CREATE INDEX IF NOT EXISTS idx_audit_trail_timestamp      ON %I.audit_trail (timestamp);
-    $f$, schema_name, schema_name, schema_name);
+    $f$, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
     -- 10) AUXILIARY TABLES
     ---------------------------------------------------------------------------
+    -- impact_materiality_def
     EXECUTE format($f$
         CREATE TABLE IF NOT EXISTS %I.impact_materiality_def (
             def_id SERIAL PRIMARY KEY,
@@ -295,8 +298,9 @@ BEGIN
         );
         CREATE INDEX IF NOT EXISTS idx_imp_mat_def_tenant_id   ON %I.impact_materiality_def (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_imp_mat_def_version_dim ON %I.impact_materiality_def (version_num, dimension);
-    $f$, schema_name, schema_name);
+    $f$, schema_name, schema_name, schema_name);
 
+    -- fin_materiality_weights
     EXECUTE format($f$
         CREATE TABLE IF NOT EXISTS %I.fin_materiality_weights (
             weight_id SERIAL PRIMARY KEY,
@@ -315,9 +319,9 @@ BEGIN
         );
         CREATE INDEX IF NOT EXISTS idx_fin_weights_tenant_id   ON %I.fin_materiality_weights (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_fin_weights_version_dim ON %I.fin_materiality_weights (version_num, dimension);
-    $f$, schema_name, schema_name);
+    $f$, schema_name, schema_name, schema_name);
 
-    -- ***** FIXED HERE: added a third "schema_name" argument *****
+    -- fin_materiality_magnitude_def
     EXECUTE format($f$
         CREATE TABLE IF NOT EXISTS %I.fin_materiality_magnitude_def (
             def_id SERIAL PRIMARY KEY,
@@ -341,8 +345,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Insert test tenants
 INSERT INTO public.tenant_config (tenant_name) VALUES ('test1') ON CONFLICT DO NOTHING;
 INSERT INTO public.tenant_config (tenant_name) VALUES ('test2') ON CONFLICT DO NOTHING;
 
+-- Execute the function for test tenants
 SELECT create_tenant_schema('test1');
 SELECT create_tenant_schema('test2');
