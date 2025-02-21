@@ -15,7 +15,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Add additional apps as needed, e.g. 'myapp',
+    # Add additional apps here, e.g., 'rest_framework',
+    # or your own custom apps such as 'assessments', 'reporting', etc.
 ]
 
 MIDDLEWARE = [
@@ -33,7 +34,7 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-            # os.path.join(BASE_DIR, 'templates'),
+            # You can add a path like os.path.join(BASE_DIR, 'templates') if needed
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -52,6 +53,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
+        # The actual name, user, password, and host will be set in local/prod overrides
     }
 }
 
@@ -72,5 +74,5 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Celery (common config)
+# Celery common config
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')

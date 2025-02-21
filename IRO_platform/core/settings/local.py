@@ -10,7 +10,7 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 # Database configuration:
-# Read from DATABASE_URL if set; otherwise fall back to a localhost connection
+# Reads from DATABASE_URL if set; otherwise defaults to a local connection
 DATABASES = {
     'default': dj_database_url.config(
         default=os.getenv("DATABASE_URL", "postgres://postgres:password@localhost:5432/postgres"),
@@ -18,10 +18,10 @@ DATABASES = {
     )
 }
 
-# Disable password validators locally for faster dev iteration
+# Disable password validators locally, for developer convenience
 AUTH_PASSWORD_VALIDATORS = []
 
-# Point Celery broker to Redis via environment variable or default to local Redis container
+# Point Celery broker to Redis, or default to local Redis container
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 
-# Optionally adjust any additional local-only Django settings or logging here.
+# Any additional local-only settings or logging can go below
