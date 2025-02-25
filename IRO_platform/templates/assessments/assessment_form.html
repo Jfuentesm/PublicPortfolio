@@ -1,0 +1,19 @@
+<!-- templates/assessments/assessment_form.html -->
+{% extends "base.html" %}
+
+{% block title %}
+    Assessment Form
+{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h1>Create / Update Assessment</h1>
+    <form method="POST" novalidate>
+        {% csrf_token %}
+        {{ form.as_p }}
+
+        <button type="submit" class="btn btn-success">Save</button>
+        <a href="{% url 'assessments:list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

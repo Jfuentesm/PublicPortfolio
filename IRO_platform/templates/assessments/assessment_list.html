@@ -1,0 +1,44 @@
+<!-- templates/assessments/assessment_list.html -->
+{% extends "base.html" %}
+
+{% block title %}
+    Assessments List
+{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h1>All Assessments</h1>
+    <p>
+        <a href="{% url 'assessments:create' %}" class="btn btn-primary">Create New Assessment</a>
+    </p>
+
+    {% if assessments %}
+      <table class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Created On</th>
+            <th>Updated On</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for assessment in assessments %}
+          <tr>
+            <td>{{ assessment.name }}</td>
+            <td>{{ assessment.description|default_if_none:"(No description)" }}</td>
+            <td>{{ assessment.created_on|date:"Y-m-d H:i" }}</td>
+            <td>{{ assessment.updated_on|date:"Y-m-d H:i" }}</td>
+            <td>
+              <a href="{% url 'assessments:edit' assessment.pk %}" class="btn btn-sm btn-info">Edit</a>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No assessments have been created yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

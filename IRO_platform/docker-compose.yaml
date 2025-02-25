@@ -1,0 +1,109 @@
+services:
+  web:
+    build: .
+    command: >
+      sh -c "
+        until pg_isready -h db -p 5432 -U dma_user; do 
+          echo 'Waiting for database...'; 
+          sleep 2; 
+        done;
+        # Optional but recommended to include the tenants app in makemigrations:
+        python manage.py makemigrations tenants;
+        python manage.py makemigrations;
+
+        # 1) Migrate shared schema
+        python manage.py migrate_schemas --shared;
+
+        # 2) Create or update the default tenant
+        python manage.py init_tenant --name=default --domain=localhost;
+
+        # 3) Migrate the tenant schemas
+        python manage.py migrate_schemas --tenant;
+
+        # 4) Collect static files so admin CSS/JS are available
+        python manage.py collectstatic --noinput;
+
+        # Finally start Gunicorn
+        gunicorn core.wsgi:application --bind 0.0.0.0:8000
+      "
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.local
+      - DATABASE_URL=postgres://dma_user:password@db:5432/dma_db
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    image: postgres:14
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_USER: dma_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: dma_db
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dma_user -d dma_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  worker:
+    build: .
+    command: celery -A core worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.local
+      - DATABASE_URL=postgres://dma_user:password@db:5432/dma_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
