@@ -51,7 +51,7 @@ Please structure the response as follows:
 - core/settings/local.py
 - core/urls.py
 - core/wsgi.py
-- init-scripts/01-init-schemas.sql
+- scripts/01-init-schemas.sql
 - manage.py
 - requirements.txt
 - schema_solve_prompt.md
@@ -102,7 +102,7 @@ services:
     restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./scripts:/docker-entrypoint-initdb.d
     environment:
       POSTGRES_USER: dma_user
       POSTGRES_PASSWORD: password
@@ -253,7 +253,7 @@ services:
     restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./scripts:/docker-entrypoint-initdb.d
     environment:
       POSTGRES_USER: dma_user
       POSTGRES_PASSWORD: password
@@ -466,7 +466,7 @@ application = get_wsgi_application()
 
 </file>
 
-<file path='init-scripts/01-init-schemas.sql'>
+<file path='scripts/01-init-schemas.sql'>
 --
 -- 01-init-schemas.sql
 --
@@ -884,7 +884,7 @@ db-1      | psql:/docker-entrypoint-initdb.d/01-init-schemas.sql:347: ERROR:  to
 db-1      | CONTEXT:  PL/pgSQL function create_tenant_schema(text) line 38 at EXECUTE
 </error>
 
-<init-scripts/01-init-schemas.sql>
+<scripts/01-init-schemas.sql>
 --
 -- 01-init-schemas.sql
 --
@@ -1234,7 +1234,7 @@ INSERT INTO public.tenant_config (tenant_name) VALUES ('test2') ON CONFLICT DO N
 SELECT create_tenant_schema('test1');
 SELECT create_tenant_schema('test2');
 
-</init-scripts/01-init-schemas.sql>
+</scripts/01-init-schemas.sql>
 
 
 </schema design>
@@ -1813,7 +1813,7 @@ services:
     restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d  # Make sure this line exists
+      - ./scripts:/docker-entrypoint-initdb.d  # Make sure this line exists
     environment:
       POSTGRES_USER: dma_user
       POSTGRES_PASSWORD: password

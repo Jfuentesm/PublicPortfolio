@@ -1,4 +1,5 @@
 # core/settings/base.py
+
 import os
 from pathlib import Path
 
@@ -8,19 +9,65 @@ SECRET_KEY = 'replace-this-with-a-real-secret-key'
 DEBUG = False
 ALLOWED_HOSTS = []
 
-INSTALLED_APPS = [
+########################
+# DJANGO-TENANTS SETUP #
+########################
+
+# The main django-tenants library
+# Make sure you have installed django-tenants in your environment:
+# pip install django-tenants
+
+# We must split our apps into SHARED_APPS and TENANT_APPS.
+# SHARED_APPS = apps common to all tenants, created in the public schema.
+# TENANT_APPS = apps that will be created separately in each tenant schema.
+
+SHARED_APPS = [
+    'django_tenants',                  # mandatory for django-tenants
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Add additional apps here, e.g., 'rest_framework',
-    # or your own custom apps such as 'assessments', 'reporting', etc.
+    # Include the app that contains the Tenant and Domain models
+    'tenants',
+    'crispy_forms',
+    'crispy_bootstrap5',
+    'guardian',
+    'rest_framework',
 ]
+
+TENANT_APPS = [
+    # These apps' models will be created in each tenant's individual schema:
+    'apps.assessments',
+    # Add additional tenant-specific apps here if needed
+]
+
+# The combination of SHARED_APPS and TENANT_APPS becomes the full INSTALLED_APPS:
+INSTALLED_APPS = SHARED_APPS + TENANT_APPS
+
+# The model that points to your tenant (public) table:
+TENANT_MODEL = 'tenants.TenantConfig'     # app_label.ModelName
+# The model that stores the domain -> tenant mapping:
+TENANT_DOMAIN_MODEL = "tenants.TenantDomain"     # app_label.ModelName
+
+# For Bootstrap 5 or another template pack, also install crispy-bootstrap5
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+DATABASE_ROUTERS = (
+    'django_tenants.routers.TenantSyncRouter',
+)
+
+########################
+# END DJANGO-TENANTS   #
+########################
 
 MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # The tenant middleware must appear near the top (before DB queries occur):
+    'django_tenants.middleware.main.TenantMainMiddleware',
+
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -28,14 +75,21 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+########################
+# NEW: Guardian & Auth #
+########################
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',             # default model backend
+    'guardian.backends.ObjectPermissionBackend',             # enable object-level perms
+]
+ANONYMOUS_USER_NAME = "AnonymousUser"  # Guardian recommended setting
+
 ROOT_URLCONF = 'core.urls'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [
-            # You can add a path like os.path.join(BASE_DIR, 'templates') if needed
-        ],
+        'DIRS': ["templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -50,10 +104,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+########################
+# DATABASE CONFIG      #
+########################
+# Make sure you set the actual DB credentials in local/production overrides
+# or environment variables. django-tenants uses the default DB connection,
+# but the schema is adjusted per tenant request.
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        # The actual name, user, password, and host will be set in local/prod overrides
+        'ENGINE': 'django_tenants.postgresql_backend',  # Changed from django.db.backends.postgresql
+        'NAME': 'dma_db',
+        'USER': 'dma_user',
+        'PASSWORD': 'password',
+        'HOST': 'db',
+        'PORT': '5432',
     }
 }
 
@@ -74,5 +139,5 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Celery common config
+# Example Celery or other global settings can remain here
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')

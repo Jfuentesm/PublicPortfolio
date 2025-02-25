@@ -27,10 +27,10 @@ def get_files_recursively(directory):
     for item in sorted(directory.iterdir()):
         # Modified exclusion rules
         if (item.name == '.venv' or 
-            (item.name.startswith('.') and item.name != '.init-scripts') or
+            (item.name.startswith('.') and item.name != '.scripts') or
             item.name.startswith('concatignore') or 
             item.name.startswith('archive') or 
-            (item.name.startswith('docs') and 'init-scripts' not in str(item)) or
+            (item.name.startswith('docs') and 'scripts' not in str(item)) or
             item.name.startswith('planning_and_focus_window')):
             continue
         

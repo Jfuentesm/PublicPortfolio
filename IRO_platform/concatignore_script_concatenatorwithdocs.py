@@ -34,10 +34,10 @@ def get_files_recursively(directory):
     for item in sorted(directory.iterdir()):
         # Modified exclusion rules
         if (item.name == '.venv' or 
-            (item.name.startswith('.') and item.name != '.init-scripts') or
+            (item.name.startswith('.') and item.name != '.scripts') or
             item.name.startswith('concatignore') or 
             item.name.startswith('archive') or 
-            (item.name.startswith('docs') and 'init-scripts' not in str(item) and item.is_dir()) or  # Modified to allow .md files in root /docs
+            (item.name.startswith('docs') and 'scripts' not in str(item) and item.is_dir()) or  # Modified to allow .md files in root /docs
             item.name.startswith('planning_and_focus_window')):
             continue
         
@@ -70,7 +70,7 @@ def main():
         f.write('</goal>\n\n\n')
         f.write('<output instruction>\n')
         f.write('1) Explain if this is already complete, or what is missing \n')
-        f.write('2) Give me the COMPLETE UPDATED VERSION of each script that needs to be updated\n')
+        f.write('2) Give me the COMPLETE UPDATED VERSION of each script that needs to be updated or created\n')
         f.write('</output instruction>\n\n')
         f.write('\n')
 

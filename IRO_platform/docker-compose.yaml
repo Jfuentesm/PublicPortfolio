@@ -3,14 +3,26 @@ services:
     build: .
     command: >
       sh -c "
-        echo 'Checking for database availability...' &&
         until pg_isready -h db -p 5432 -U dma_user; do 
-          echo '[$(date)] Still waiting for database to be ready...'; 
+          echo 'Waiting for database...'; 
           sleep 2; 
-        done && 
-        echo 'Database is ready!' &&
-        python manage.py migrate &&
-        gunicorn core.wsgi:application --bind 0.0.0.0:8000 --access-logfile - --error-logfile -"
+        done;
+        # Optional but recommended to include the tenants app in makemigrations:
+        python manage.py makemigrations tenants;
+        python manage.py makemigrations;
+
+        # 1) Migrate shared schema
+        python manage.py migrate_schemas --shared;
+
+        # 2) Create or update the default tenant
+        python manage.py init_tenant --name=default --domain=localhost;
+
+        # 3) Migrate the tenant schemas
+        python manage.py migrate_schemas --tenant;
+
+        # Finally start Gunicorn
+        gunicorn core.wsgi:application --bind 0.0.0.0:8000
+      "      
     volumes:
       - .:/app
     ports:
@@ -35,7 +47,7 @@ services:
     restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./scripts:/docker-entrypoint-initdb.d
     environment:
       POSTGRES_USER: dma_user
       POSTGRES_PASSWORD: password

@@ -39,7 +39,7 @@ Below is a summary of essential information for anyone setting up and running th
    docker compose up
    ```
    - This spins up four services: `web`, `db`, `redis`, and `worker`.  
-   - On first run, PostgreSQL will initialize the database, apply the `init-scripts`, and run migrations automatically.  
+   - On first run, PostgreSQL will initialize the database, apply the `scripts`, and run migrations automatically.  
 
 4. **Access the App**
 
@@ -113,7 +113,7 @@ docker compose run web python manage.py test
    - Check logs via `docker compose logs db` to see if the DB is starting or if credentials are mismatched.
 2. **Resetting DB**  
    - Run `docker compose down -v` to remove the database volume, then `docker compose up` again.  
-   - This re-initializes everything from scratch, including the `init-scripts` in `/init-scripts`.
+   - This re-initializes everything from scratch, including the `scripts` in `/scripts`.
 3. **Containers Failing or Exiting Immediately**  
    - Check logs of each service:
      ```bash
@@ -125,8 +125,8 @@ docker compose run web python manage.py test
    - Allocate more memory in Docker settings.  
    - Close unneeded applications or containers.  
 5. **Permission Denied on `.sql` scripts**  
-   - Ensure your local filesystem allows Docker to read `/init-scripts/01-init-schemas.sql`.  
-   - On UNIX-based systems, you may need `chmod 644 init-scripts/*.sql`.
+   - Ensure your local filesystem allows Docker to read `/scripts/01-init-schemas.sql`.  
+   - On UNIX-based systems, you may need `chmod 644 scripts/*.sql`.
 
 ### 1.8 Checking Container Logs
 

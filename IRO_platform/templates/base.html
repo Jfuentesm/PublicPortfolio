@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Default Title{% endblock %}</title>
+  <!-- Include your CSS here -->
+</head>
+<body>
+  <header>
+    <h2>Site Header</h2>
+  </header>
+
+  <main>
+    {% block content %}
+    <!-- Child templates override this content block -->
+    {% endblock %}
+  </main>
+
+  <footer>
+    <p>&copy; 2025 MyProject</p>
+  </footer>
+</body>
+</html>

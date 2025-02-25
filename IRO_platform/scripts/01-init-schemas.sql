@@ -2,14 +2,12 @@
 -- 01-init-schemas.sql
 --
 
--- Create the public tenant_config table
-CREATE TABLE IF NOT EXISTS public.tenant_config (
-    tenant_id SERIAL PRIMARY KEY,
-    tenant_name VARCHAR(100) NOT NULL UNIQUE,
-    created_on TIMESTAMP NOT NULL DEFAULT NOW()
-);
+-- Define the create_tenant_schema function without trying to create public.tenant_config
+-- or referencing its tenant_id field via foreign keys. 
+-- If you invoke create_tenant_schema('some_tenant') manually, 
+-- it will create the schema and the tenant-specific tables only.
+--
 
--- Define the create_tenant_schema function
 CREATE OR REPLACE FUNCTION create_tenant_schema(tenant_name TEXT) RETURNS void AS $$
 DECLARE
     schema_name TEXT := 'tenant_' || tenant_name;
@@ -33,11 +31,7 @@ BEGIN
             assessment_count INT DEFAULT 0,
             last_assessment_score NUMERIC(5,2),
             created_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            updated_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            CONSTRAINT iro_tenant_fk
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE
+            updated_on TIMESTAMP NOT NULL DEFAULT NOW()
         );
         CREATE INDEX IF NOT EXISTS idx_iro_tenant_id     ON %I.iro (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_iro_stage         ON %I.iro (current_stage);
@@ -45,7 +39,7 @@ BEGIN
     $f$, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
-    -- 3) IRO_Version (Corrected: 5 %I placeholders, 5 arguments)
+    -- 3) IRO_Version
     ---------------------------------------------------------------------------
     EXECUTE format($f$
         CREATE TABLE IF NOT EXISTS %I.iro_version (
@@ -65,20 +59,12 @@ BEGIN
             created_by INT NOT NULL,
             created_on TIMESTAMP NOT NULL DEFAULT NOW(),
             parent_version_id INT,
-            split_type VARCHAR(50),
-            CONSTRAINT fk_iro
-                FOREIGN KEY (iro_id)
-                REFERENCES %I.iro(iro_id)
-                ON DELETE CASCADE,
-            CONSTRAINT fk_tenant
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE
+            split_type VARCHAR(50)
         );
         CREATE INDEX IF NOT EXISTS idx_iro_version_iro_id    ON %I.iro_version (iro_id);
         CREATE INDEX IF NOT EXISTS idx_iro_version_tenant_id ON %I.iro_version (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_iro_version_status    ON %I.iro_version (status);
-    $f$, schema_name, schema_name, schema_name, schema_name, schema_name);
+    $f$, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
     -- 4) IRO_Relationship
@@ -92,21 +78,11 @@ BEGIN
             relationship_type VARCHAR(50) NOT NULL,
             created_on TIMESTAMP NOT NULL DEFAULT NOW(),
             created_by INT NOT NULL,
-            notes TEXT,
-            CONSTRAINT fk_tenant
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE,
-            CONSTRAINT fk_source_iro
-                FOREIGN KEY (source_iro_id)
-                REFERENCES %I.iro(iro_id),
-            CONSTRAINT fk_target_iro
-                FOREIGN KEY (target_iro_id)
-                REFERENCES %I.iro(iro_id)
+            notes TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_iro_relationship_tenant_id ON %I.iro_relationship (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_iro_relationship_src_tgt   ON %I.iro_relationship (source_iro_id, target_iro_id);
-    $f$, schema_name, schema_name, schema_name, schema_name, schema_name);
+    $f$, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
     -- 5) impact_assessment
@@ -133,15 +109,7 @@ BEGIN
             overall_rationale TEXT,
             related_documents TEXT,
             created_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            updated_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            CONSTRAINT fk_impact_iro
-                FOREIGN KEY (iro_id)
-                REFERENCES %I.iro(iro_id)
-                ON DELETE CASCADE,
-            CONSTRAINT fk_impact_tenant
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE
+            updated_on TIMESTAMP NOT NULL DEFAULT NOW()
         );
         CREATE INDEX IF NOT EXISTS idx_impact_assessment_tenant_id ON %I.impact_assessment (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_impact_assessment_iro_id    ON %I.impact_assessment (iro_id);
@@ -174,15 +142,7 @@ BEGIN
             overall_rationale TEXT,
             related_documents TEXT,
             created_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            updated_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            CONSTRAINT fk_risk_opp_iro
-                FOREIGN KEY (iro_id)
-                REFERENCES %I.iro(iro_id)
-                ON DELETE CASCADE,
-            CONSTRAINT fk_risk_opp_tenant
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE
+            updated_on TIMESTAMP NOT NULL DEFAULT NOW()
         );
         CREATE INDEX IF NOT EXISTS idx_risk_opp_assessment_tenant_id ON %I.risk_opp_assessment (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_risk_opp_assessment_iro_id    ON %I.risk_opp_assessment (iro_id);
@@ -201,25 +161,13 @@ BEGIN
             status VARCHAR(50) NOT NULL DEFAULT 'Draft',
             notes TEXT NOT NULL DEFAULT '',
             created_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            updated_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            CONSTRAINT review_iro_fk
-                FOREIGN KEY (iro_id)
-                REFERENCES %I.iro(iro_id)
-                ON DELETE CASCADE,
-            CONSTRAINT review_tenant_fk
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE,
-            CONSTRAINT review_version_fk
-                FOREIGN KEY (iro_version_id)
-                REFERENCES %I.iro_version(version_id)
-                ON DELETE SET NULL
+            updated_on TIMESTAMP NOT NULL DEFAULT NOW()
         );
         CREATE INDEX IF NOT EXISTS idx_review_tenant_id  ON %I.review (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_review_iro_id     ON %I.review (iro_id);
         CREATE INDEX IF NOT EXISTS idx_review_version_id ON %I.review (iro_version_id);
         CREATE INDEX IF NOT EXISTS idx_review_status     ON %I.review (status);
-    $f$, schema_name, schema_name, schema_name, schema_name, schema_name, schema_name, schema_name);
+    $f$, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
     -- 8) signoff
@@ -233,24 +181,12 @@ BEGIN
             signed_by INT NOT NULL,
             signed_on TIMESTAMP NOT NULL DEFAULT NOW(),
             signature_ref VARCHAR(255),
-            comments TEXT NOT NULL DEFAULT '',
-            CONSTRAINT signoff_review_fk
-                FOREIGN KEY (review_id)
-                REFERENCES %I.review(review_id)
-                ON DELETE CASCADE,
-            CONSTRAINT signoff_tenant_fk
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE,
-            CONSTRAINT signoff_version_fk
-                FOREIGN KEY (iro_version_id)
-                REFERENCES %I.iro_version(version_id)
-                ON DELETE SET NULL
+            comments TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS idx_signoff_tenant_id ON %I.signoff (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_signoff_review_id ON %I.signoff (review_id);
         CREATE INDEX IF NOT EXISTS idx_signoff_signed_by ON %I.signoff (signed_by);
-    $f$, schema_name, schema_name, schema_name, schema_name, schema_name, schema_name);
+    $f$, schema_name, schema_name, schema_name, schema_name);
 
     ---------------------------------------------------------------------------
     -- 9) audit_trail
@@ -264,11 +200,7 @@ BEGIN
             action VARCHAR(50) NOT NULL,
             user_id INT NOT NULL,
             timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
-            data_diff JSONB NOT NULL DEFAULT '{}',
-            CONSTRAINT fk_audit_trail_tenant
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE
+            data_diff JSONB NOT NULL DEFAULT '{}'
         );
         CREATE INDEX IF NOT EXISTS idx_audit_trail_tenant_id      ON %I.audit_trail (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_audit_trail_entity_type_id ON %I.audit_trail (entity_type, entity_id);
@@ -278,7 +210,6 @@ BEGIN
     ---------------------------------------------------------------------------
     -- 10) AUXILIARY TABLES
     ---------------------------------------------------------------------------
-    -- impact_materiality_def
     EXECUTE format($f$
         CREATE TABLE IF NOT EXISTS %I.impact_materiality_def (
             def_id SERIAL PRIMARY KEY,
@@ -290,17 +221,12 @@ BEGIN
             valid_from TIMESTAMP NOT NULL,
             valid_to TIMESTAMP,
             created_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            created_by INT NOT NULL,
-            CONSTRAINT fk_tenant_impact_def
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE
+            created_by INT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_imp_mat_def_tenant_id   ON %I.impact_materiality_def (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_imp_mat_def_version_dim ON %I.impact_materiality_def (version_num, dimension);
     $f$, schema_name, schema_name, schema_name);
 
-    -- fin_materiality_weights
     EXECUTE format($f$
         CREATE TABLE IF NOT EXISTS %I.fin_materiality_weights (
             weight_id SERIAL PRIMARY KEY,
@@ -311,17 +237,12 @@ BEGIN
             valid_from TIMESTAMP NOT NULL,
             valid_to TIMESTAMP,
             created_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            created_by INT NOT NULL,
-            CONSTRAINT fk_tenant_fin_weights
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE
+            created_by INT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_fin_weights_tenant_id   ON %I.fin_materiality_weights (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_fin_weights_version_dim ON %I.fin_materiality_weights (version_num, dimension);
     $f$, schema_name, schema_name, schema_name);
 
-    -- fin_materiality_magnitude_def
     EXECUTE format($f$
         CREATE TABLE IF NOT EXISTS %I.fin_materiality_magnitude_def (
             def_id SERIAL PRIMARY KEY,
@@ -332,11 +253,7 @@ BEGIN
             valid_from TIMESTAMP NOT NULL,
             valid_to TIMESTAMP,
             created_on TIMESTAMP NOT NULL DEFAULT NOW(),
-            created_by INT NOT NULL,
-            CONSTRAINT fk_tenant_fin_magnitude_def
-                FOREIGN KEY (tenant_id)
-                REFERENCES public.tenant_config(tenant_id)
-                ON DELETE CASCADE
+            created_by INT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_fin_mag_def_tenant_id     ON %I.fin_materiality_magnitude_def (tenant_id);
         CREATE INDEX IF NOT EXISTS idx_fin_mag_def_version_score ON %I.fin_materiality_magnitude_def (version_num, score_value);
@@ -345,10 +262,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Insert test tenants
-INSERT INTO public.tenant_config (tenant_name) VALUES ('test1') ON CONFLICT DO NOTHING;
-INSERT INTO public.tenant_config (tenant_name) VALUES ('test2') ON CONFLICT DO NOTHING;
-
--- Execute the function for test tenants
-SELECT create_tenant_schema('test1');
-SELECT create_tenant_schema('test2');
+-- NOTE: Removed any 'CREATE TABLE public.tenant_config' and 
+-- any inserts or references that rely on public.tenant_config(tenant_id).
+-- This script now only sets up tenant-side tables in each schema.
+--
+-- If you manually run:
+--     SELECT create_tenant_schema('mytenant');
+-- then the script above will create the 'tenant_mytenant' schema 
+-- and all tenant-scope tables. 
+--
+-- Let Django run migrations to create and manage "public.tenant_config" itself.
