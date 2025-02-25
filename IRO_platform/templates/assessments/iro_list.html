@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}
+    IROs List
+{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h1>All IROs</h1>
+    <p>
+        <a href="{% url 'assessments:iro-create' %}" class="btn btn-primary">Create New IRO</a>
+    </p>
+
+    {% if iros %}
+      <table class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>IRO ID</th>
+            <th>Type</th>
+            <th>Tenant</th>
+            <th>Stage</th>
+            <th>Last Assessment Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in iros %}
+          <tr>
+            <td>{{ item.iro_id }}</td>
+            <td>{{ item.type }}</td>
+            <td>{{ item.tenant.tenant_name }}</td>
+            <td>{{ item.current_stage }}</td>
+            <td>
+              {% if item.last_assessment_date %}
+                {{ item.last_assessment_date|date:"Y-m-d H:i" }}
+              {% else %}
+                --
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'assessments:iro-edit' item.pk %}" class="btn btn-sm btn-info">Edit</a>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No IROs have been created yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

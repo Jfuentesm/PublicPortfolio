@@ -20,9 +20,12 @@ services:
         # 3) Migrate the tenant schemas
         python manage.py migrate_schemas --tenant;
 
+        # 4) Collect static files so admin CSS/JS are available
+        python manage.py collectstatic --noinput;
+
         # Finally start Gunicorn
         gunicorn core.wsgi:application --bind 0.0.0.0:8000
-      "      
+      "
     volumes:
       - .:/app
     ports:
