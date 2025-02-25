@@ -19,9 +19,10 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Body
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from database.sessions import SessionLocal
-from tasks.models import Task, TaskStatus
-from tasks.recurrence import get_next_due_date
+# Updated imports for database and tasks
+from src.backend.database.sessions import SessionLocal
+from src.backend.tasks.models import Task, TaskStatus
+from src.backend.tasks.recurrence import get_next_due_date
 
 router = APIRouter(
     prefix="/tasks",
@@ -163,10 +164,6 @@ def update_task(
     """
     Update an existing task with new data.
 
-    - If a new 'due_date' is provided and the existing or updated task has a recurrence rule,
-      we calculate the next due date based on that recurrence.
-    - Otherwise, we simply update the provided fields.
-
     Args:
         task_id (int): The ID of the task to update.
         task_update (TaskUpdate): Updated task data.
@@ -260,7 +257,7 @@ def complete_task(
 
     new_task_obj = None
 
-    # If the task has a recurrence rule, create a new task for the next due date
+    # If the task has a recurrence rule and a valid due_date, create a new task
     if existing_task.recurrence and existing_task.due_date:
         next_due = get_next_due_date(existing_task.due_date, existing_task.recurrence)
         # Build a new task using the existing task's data

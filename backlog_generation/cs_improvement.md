@@ -15,7 +15,7 @@ Leader at the interesection of AI and Sustainbility, with 10+ years of experienc
 
 
 <work experience>
-PwC logo
+PwC 
 10 yrs 7 mos10 yrs 7 mos
 
 Senior Manager
@@ -67,7 +67,7 @@ Chile
 
 
 Co-Founder
-Inner VirtuosoInner Virtuoso
+Inner Virtuoso
 Jul 2013 - Jul 2014 · 1 yr 1 mo
 Madrid y alrededores, España
 • Designed Company’s go-to-market strategy and the development of a standardized modular solution that allowed us to establish a sell-through agreement with Adecco Spain. 

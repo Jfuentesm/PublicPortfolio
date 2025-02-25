@@ -11,7 +11,8 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-from config import Config  # Import centralized configuration settings
+# Updated import for config
+from src.backend.config import Config
 
 
 class NoteManager:

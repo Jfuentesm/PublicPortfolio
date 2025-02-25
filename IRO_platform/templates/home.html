@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to IRO Platform{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="jumbotron">
+        <h1 class="display-4">Welcome to IRO Platform</h1>
+        <p class="lead">Manage your Impact, Risk, and Opportunity Assessments</p>
+        <hr class="my-4">
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Assessments</h5>
+                    <p class="card-text">Create and manage your assessments</p>
+                    <a href="{% url 'assessments:list' %}" class="btn btn-primary">Go to Assessments</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">IROs</h5>
+                    <p class="card-text">Manage Impact, Risk and Opportunity entries</p>
+                    <a href="{% url 'assessments:iro-list' %}" class="btn btn-primary">Go to IROs</a>
+                </div>
+            </div>
+        </div>
+
+        {% if user.is_staff %}
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Administration</h5>
+                    <p class="card-text">Access admin interface</p>
+                    <a href="{% url 'admin:index' %}" class="btn btn-primary">Go to Admin</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

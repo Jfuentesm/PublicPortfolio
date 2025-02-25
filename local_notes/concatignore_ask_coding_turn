@@ -1,0 +1,511 @@
+<goal>
+Diagnose current build progress and EXECUTE the next best step
+</goal>
+
+
+<context> obsidian.md is the best note taking app, but it is not allowed at my work. We are midway through the development of our alternative solution </context>
+<list of features we want to replicate>
+## Core Features
+
+**File Management**
+- Folder structure matching Obsidian's hierarchy
+- Support for templates and daily notes
+- File-based markdown storage
+- Real-time search indexing
+
+**Editor Capabilities**
+- Split view (editor/preview)
+- Syntax highlighting
+- Wikilink autocomplete
+- Tag management
+- WYSIWYG editor
+- Task checkboxes with completion tracking
+- Due dates for tasks
+- Priority levels (P1, P2, P3)
+
+**Task Management**
+- Task inbox for quick capture
+- Task properties (due date, priority, status, assignee)
+- Task filtering and sorting
+- Progress tracking
+- Recurring tasks support
+- Task relationships (blockers, dependencies)
+
+**Kanban Board**
+- Customizable columns
+- Drag-and-drop interface
+- Card templates
+- Card metadata (labels, due dates, assignees)
+- Column WIP (Work in Progress) limits
+- Swimlanes for categorization
+
+**Canvas**
+- Infinite canvas workspace
+- Node types:
+  - Notes
+  - Tasks
+  - Images
+  - Embedded files
+- Connection types:
+  - Arrows
+  - Lines
+  - Labeled connections
+- Group nodes
+- Mini-map navigation
+- Canvas templates
+
+**Security Considerations**
+- Local-first architecture
+- Encrypted local storage
+
+All features will maintain compatibility with plain markdown files and follow the same linking syntax as Obsidian for maximum interoperability.
+
+</list of features we want to replicate>
+
+
+<Key architecture decisions>
+This clarifies that we’re essentially building a single-user, offline-first, local web application that runs on the user’s machine. Let me summarize the key architectural decisions this leads to:
+Recommended Technical Stack
+	1.	Backend Framework
+	•	FastAPI would be ideal here (lighter than Django, modern, and perfect for single-user scenarios)
+	•	SQLite for metadata/index storage
+	•	Plain markdown files for content storage
+	2.	Frontend
+	•	Electron-like approach using a local browser window
+	•	Vue.js or Svelte (lighter than React) for UI components
+	•	Monaco Editor (VS Code’s editor) for markdown editing
+	•	Mermaid.js for diagrams
+	•	D3.js for canvas visualization
+	3.	Local Architecture
+	•	File watcher for real-time markdown updates
+	•	Local search index using Whoosh (Python full-text search)
+	•	Local backup system using simple file copying with timestamp
+</Key architecture decisions>
+
+<design>
+
+Below is a proposed **high-level design** for an Obsidian-inspired, local-first note-taking and task management application, based on the clarifications you provided. This design focuses on replicating many of Obsidian’s key features while adding an integrated task/kanban system and an infinite canvas, all running as a local web app in Python. 
+
+---
+
+## 1. Overall Architecture
+
+1. **Local-First Storage**  
+   - **Markdown Files**: All notes are stored as `.md` files, preserving compatibility with Obsidian’s linking syntax.  
+   - **Attachments Folder**: PDF and image files automatically stored in a dedicated folder structure (e.g., `attachments/images`, `attachments/pdfs`) with metadata.  
+   - **Local Database/File for Task/Canvas Data**:  
+     - A lightweight file-based database (such as SQLite) or a JSON/YAML-based system for indexing tasks, due dates, priorities, and canvas layouts.  
+     - Periodic checkpoints/backups stored in a dedicated `.backups` folder, with user-accessible version history.
+
+2. **Python-Based Web App**  
+   - **Backend Framework**: A minimal Python 3.11-compatible framework (like Flask or FastAPI) to serve the local web application.  
+   - **Frontend**: A single-page application (SPA) using a modern frontend framework (e.g., React or Vue), ensuring smooth navigation between note view, task management, and canvas.  
+   - **Local-Only Deployment**: Runs on `localhost` with an optional tray icon (if you choose to include a system tray app later).  
+
+3. **Real-Time (or Periodic) Indexing**  
+   - Use a **file watcher** for local folders, scanning for changes in `.md` files.  
+   - Indexing can be partial or on-demand (e.g., only for open folders) to reduce resource usage when thousands of files are present.  
+   - For PDF/image indexing, store minimal metadata in a separate index (e.g., file name, creation date) and optionally extract embedded text from PDFs for searchable content.
+
+---
+
+## 2. File Management
+
+1. **Folder & File Operations**  
+   - Replicate Obsidian’s hierarchical folder structure, allowing creation, deletion, renaming, and moving.  
+   - Provide a file explorer tree in the UI for quick navigation.  
+   - Automatically move associated attachments if a note is relocated.  
+
+2. **Templating & Daily Notes**  
+   - Let users create and store templates (for daily notes, recurring meeting notes, etc.).  
+   - Provide a dedicated “Daily Note” button that generates a date-stamped note somewhere in the user’s note hierarchy.
+
+3. **Version History/Checkpoints**  
+   - Implement an in-app interface to view or restore previous versions of a given note.  
+   - By default, capture incremental checkpoints every 5 minutes (user-definable), plus manual “commit-like” backups.
+
+---
+
+## 3. Editing & Note Features
+
+1. **Split View**  
+   - **Editor + Preview**: A toggle or side-by-side view so users can edit in Markdown on one panel and simultaneously see styled output.  
+
+2. **WYSIWYG Editor**  
+   - Provide a more visual editing interface while still storing everything in Markdown.  
+   - Handle syntax highlighting for code blocks, inline formatting (bold, italics), and task/checkbox elements.
+
+3. **WikiLink Autocomplete & Tag Management**  
+   - Autofill for `[[WikiLinks]]` referencing existing Markdown files.  
+   - Tag sidebar showing all user-defined tags.  
+   - Use standard Obsidian-like syntax for tags (`#tagName`) so they remain compatible.
+
+4. **Inline Task Checkboxes & Metadata**  
+   - Allow `[ ]` checkboxes in markdown.  
+   - Parse due dates (`@due(2025-02-12)`) or priorities (`@p1`) inline if the user chooses the frontmatter or inline metadata approach.  
+
+5. **Attachments Handling**  
+   - When an image or file is inserted, the app stores it in the correct folder (e.g., `attachments/images`, `attachments/pdfs`) and associates it with the note’s metadata so that later reorganizing is simplified.
+
+**Consideration**:  
+- **Extended Syntax Support**: Supporting standard Markdown plus extras like footnotes, diagrams (Mermaid), or math (LaTeX) could be valuable for power users.
+
+---
+
+## 4. Task Management
+
+1. **Task Inbox**  
+   - A global “inbox” where quick tasks can be added without attaching them to specific notes.  
+   - Tasks in the inbox can later be linked or moved to relevant notes.
+
+2. **Task Properties**  
+   - **Due Dates**, **Priority**, **Status**, **Assignee**:  
+     - Editable either inline within a note or via the dedicated task panel.  
+   - **Recurrence**: Basic daily/weekly/monthly.  
+   - **Blockers/Dependencies**: If Task B depends on Task A, highlight or block Task B until Task A is completed.
+
+3. **Filtering & Sorting**  
+   - Filters by due date, priority level (P1, P2, P3), assignee, and tags.  
+   - Sort tasks by urgency, importance, or custom user preference.
+
+4. **Progress Tracking**  
+   - Visual progress bars or statuses (e.g., “To Do,” “In Progress,” “Complete”).
+
+---
+
+## 5. Kanban Board
+
+1. **Board Structure**  
+   - Customizable columns for different statuses or categories (e.g., “Backlog,” “In Progress,” “Done”).  
+   - Swimlanes for further categorization if needed.
+
+2. **Cards**  
+   - Cards represent tasks, with fields like labels, due dates, assignees.  
+   - Drag-and-drop interface to move cards across columns or reorder them.  
+   - Column WIP (work in progress) limits can be set, preventing overloading any single column.
+
+3. **Kanban-Note Linking**  
+   - Each card can link back to a related note or embed the note’s contents directly when expanded.
+
+
+**Consideration**:  
+- **Custom Fields or Labels**: Some users might want to add specialized fields (like story points in Agile) or color-coded labels for quick visual scanning.
+
+
+---
+
+## 6. Infinite Canvas
+
+1. **Canvas Layout**  
+   - An “infinite” 2D editor where nodes can be placed anywhere.  
+   - **Node Types**: 
+     - Notes (rendered content from a .md file or short text entry)  
+     - Tasks (interactive checkboxes, due dates)  
+     - Images  
+     - Embedded files  
+   - **Connections**:  
+     - Lines, arrows, or labeled edges to show relationships between nodes.  
+
+2. **Grouping & Navigation**  
+   - Group nodes visually to represent clusters or categories.  
+   - Mini-map allowing easy panning across the canvas.  
+   - Canvas templates for repeated usage patterns.
+
+3. **In-App Persistence**  
+   - Canvas data is stored locally (e.g., in a JSON file or small database).  
+   - Periodic backups and versioning align with the broader note version history scheme.
+
+**Consideration**:  
+- **Collapsible Groups**: If nodes can grow large in number, grouping (and optionally collapsing) them will help keep the canvas organized
+
+---
+
+## 7. Security Considerations
+
+1. **Local-Only, No Server**  
+   - The application runs entirely on `localhost` behind the user’s firewall.  
+   - No external sync or collaboration unless desired.
+
+2. **Encryption**  
+   - No password protection or OS-level integration needed, per your clarification.  
+   - If future encryption is required, you can integrate OS-level or Python-based encryption for the note folder.
+
+3. **User Permissions**  
+   - Single-user scenario (only 1 concurrent user) simplifies permissions.  
+
+---
+
+## 8. Backup & Version History
+
+1. **Automatic Backups**  
+   - **Frequency**: Every 5 minutes by default (configurable).  
+   - **Strategy**: Incremental, storing diffs of Markdown files to save space.  
+   - A “Backup Now” button to trigger manual backups.
+
+2. **Version Browsing**  
+   - Users can view a timeline of changes for each note within the app.  
+   - Restoration of a previous version is a one-click operation, with the old version retrieved from the incremental backups.
+
+3. **Attachment Backup**  
+   - Keep copies of changed/removed attachments in snapshot form, though attachments are typically large and versioning them may require more storage. This can be optional.
+
+---
+
+## 9. User Interface & Theming
+
+1. **Layout**  
+   - **Two Panels**:  
+     - Main note-taking panel (markdown editor/preview and file explorer).  
+     - Side panel for tasks, Kanban board access, or additional reference.  
+   - Support additional pop-out or split layout if the user wants to see more than two panels at once (like Obsidian’s multi-split view).
+
+2. **Themes**  
+   - **Solarized Light & Dark** built-in.  
+   - No immediate need for custom theme building.  
+
+3. **Minimal vs. Rich**  
+   - Strive to keep the UI clean and Obsidian-like.  
+   - Let the user expand to “Task View,” “Kanban View,” or “Canvas View” as needed.
+
+---
+
+## 10. Development Approach
+
+1. **Phased Delivery**  
+   - **Phase 1**: Focus on the core note-taking interface (file explorer, search, markdown editor) with partial task integration (inline tasks).  
+   - **Phase 2**: Add a robust task management panel and Kanban board.  
+   - **Phase 3**: Introduce the canvas functionality and extended versioning options.
+
+2. **Tech Stack**  
+   - **Backend**: Flask/FastAPI with Python 3.11.  
+   - **Frontend**: React or Vue for an SPA.  
+   - **Storage**:  
+     - Markdown files for notes, attachments in separate folders.  
+     - SQLite or JSON-based store for tasks, indexing, and canvas data.  
+   - **Search**:  
+     - Simple in-memory or SQLite-based full-text search of note content.  
+     - Tag/metadata-based search for tasks.
+
+3. **Build & Run**  
+   - Packaged as a Python project that can be run with `python app.py`.  
+   - No official “executable,” but can be turned into a tray app in future if desired.  
+
+---
+
+## 11. Next Steps
+
+1. **Prototype & Validate**  
+   - Begin with a minimal prototype to confirm folder structure handling, markdown editing, and search.  
+   - Validate that the performance is acceptable with thousands of notes.  
+
+2. **Iterative Feature Addition**  
+   - Incrementally add tasks, Kanban, and canvas based on user feedback.  
+   - Ensure each feature (e.g., recurring tasks, version history) is thoroughly tested and remains responsive even for large volumes of files.
+
+3. **UI Polish & Theming**  
+   - Add the Solarized dark/light toggle.  
+   - Fine-tune the multi-panel layout and ensure a fluid user experience.
+
+4. **Ongoing Maintenance**  
+   - Plan for how to handle updates or bug fixes in a local-only environment.  
+   - Document the recommended backup strategies, including manual backup triggers.
+
+---
+
+### Conclusion
+
+This design aims to replicate Obsidian’s strengths—local, file-based notes with WikiLinking and daily notes—while incorporating robust task management and an infinite canvas. By leveraging Python 3.11 for a local web app, you can stay within workplace constraints while delivering an experience similar to Obsidian, customized for your specific note-taking and project/task needs.
+
+</design>
+
+<dev order>
+
+Dev order
+
+Below is a three-wave development plan that gradually adds complexity and features. Each wave specifies which files/folders are essential to develop or stub out in that phase. The goal is to get a minimal, working system early (Wave 1) and then layer on task management (Wave 2) and advanced/optional features (Wave 3).
+
+Wave 1: Core Note-Taking & Basic Structure
+
+Objective:
+	•	Get a minimal “Obsidian-like” note editor working with local Markdown files.
+	•	Provide basic navigation, file handling (create/update notes), and a simple UI for editing and preview.
+	•	Lay the groundwork (backend framework, config, basic database init, basic file structure) so you can expand in the next waves.
+
+Backend (Wave 1)
+	1.	main.py (4)
+	•	Initialize the FastAPI/Flask app, define the essential routes (e.g., for serving notes).
+	•	Minimal routing to test that the server runs and can serve basic JSON responses.
+	2.	config.py (20)
+	•	Load fundamental configuration (e.g., paths, port).
+	•	Keep it simple—just enough to handle local file paths and any dev settings.
+	3.	file_handler.py (5)
+	•	Implement basic read/write operations for Markdown files.
+	•	Support creating new notes, updating existing notes, listing notes in a folder.
+	•	You can stub out attachment handling if needed.
+	4.	database/ (15) & init_db.py (16)
+	•	If you need a minimal schema at this stage (e.g., store only user preferences or a skeleton tasks table), set it up here.
+	•	Or keep it extremely bare-bones if tasks aren’t used yet.
+	5.	(Optional) search/indexer.py (7)
+	•	If you want basic text search from the start, create a minimal indexer.
+	•	Otherwise, you can defer full-text indexing to Wave 2 or 3.
+	•	A quick placeholder function that returns a list of note filenames might suffice.
+
+Frontend (Wave 1)
+	1.	public/index.html (23)
+	•	Basic HTML entry point with minimal references to Vue/React scripts.
+	2.	src/main.js (42)
+	•	Initialize your chosen framework (Vue or React).
+	•	Mount the root component (App.vue or equivalent).
+	3.	App.vue (41)
+	•	Set up a simple layout with a top-level panel or split to show:
+	•	A file explorer or note list on one side.
+	•	The main editor/preview area on the other side.
+	4.	Core Components
+	•	EditorPane.vue (28): Basic markdown editor.
+	•	PreviewPane.vue (29): Rendered markdown preview.
+	•	NoteView.vue (34): A page or component containing both the editor and preview.
+	•	(Optional) notes.js (39) in store/ if you plan to use Vuex (or React context). Focus on storing current note content and updating it.
+	5.	Minimal Services
+	•	services/api.js (37): If you’re using Axios or Fetch, create minimal endpoints to load/save notes.
+
+Scripts & Docs (Wave 1)
+	1.	install.sh (63) & run_dev.sh (64)
+	•	At least stub them out or create minimal versions:
+	•	install.sh can install dependencies (pip install -r requirements.txt, npm install, etc.).
+	•	run_dev.sh can run both backend and frontend in development mode concurrently.
+	2.	requirements.txt (52)
+	•	List the fundamental Python dependencies (e.g., FastAPI, uvicorn, or Flask + waitress).
+	3.	.env (53) (Optional, if needed)
+	•	Define local environment variables (e.g., PORT=8000, DEV_MODE=true).
+	4.	docs/ARCHITECTURE.md (55)
+	•	Provide a quick overview of the current subset of functionality.
+	•	Update as you go.
+
+Wave 2: Task Management & Intermediate Features
+
+Objective:
+	•	Introduce the integrated task management system (task panel, basic properties, due dates).
+	•	Include recurring tasks logic if needed.
+	•	Optionally add more robust searching or partial backups.
+
+Backend (Wave 2)
+	1.	tasks/ (9) Folder
+	•	models.py (10): Define the Task model(s) in SQLite (fields: title, due_date, priority, status, etc.).
+	•	recurrence.py (11): Implement basic daily/weekly/monthly recurrence logic if required.
+	2.	Extended Database
+	•	Update init_db.py (16) for new task tables or migrations.
+	3.	Task Routes
+	•	Expand main.py with routes to create, update, delete, and list tasks.
+	•	Or create a dedicated tasks_api.py in the same folder if you want to keep main.py lean.
+	4.	(Optional) Backup/Versioning
+	•	If you want incremental backups at this stage, start implementing versioning.py (18) or snapshotter.py (19).
+	•	Otherwise, you can push backups to Wave 3.
+	5.	search/query_parser.py (8)
+	•	If you introduced a basic search in Wave 1, you can now add advanced parsing for tasks (e.g., search by priority or due date).
+
+Frontend (Wave 2)
+	1.	Task UI Components
+	•	TaskPanel.vue (30): Display tasks, let users filter by due date or priority, and add new tasks.
+	•	TaskView.vue (35): A top-level “page” that combines the TaskPanel, filters, and lists.
+	2.	Vuex/Store Updates
+	•	tasks.js (40): Holds task data, handles sorting/filtering.
+	•	Integrate with the existing store if you used notes.js.
+	3.	Kanban Board (Optional if you want it in Wave 2)
+	•	If you consider Kanban a core part of the “task management” experience, build KanbanBoard.vue (31) here.
+	•	Or postpone Kanban to Wave 3 if you want to separate “basic tasks” from a “Kanban system.”
+	4.	Minimal UI Polish
+	•	Add some styling or the ability to toggle between a Light and Dark theme from themes/ (26).
+
+Testing & Docs (Wave 2)
+	•	Add or expand tests in tests/backend and tests/frontend for the new task features.
+	•	Update USER_GUIDE.md (56) to explain how to create tasks, mark them complete, etc.
+
+Wave 3: Kanban, Canvas, Advanced Search & Full Backups
+
+Objective:
+	•	Complete the feature set (Kanban, infinite canvas, advanced indexing/backups).
+	•	Polish UI, add version history browsing, finalize search.
+	•	Implement optional features like real-time watchers or complex watchers.
+
+Backend (Wave 3)
+	1.	Kanban
+	•	If not done in Wave 2, finalize any routes or data structures for Kanban columns/cards.
+	•	This can reuse or extend the tasks schema to group tasks by column.
+	2.	Canvas
+	•	canvas/ (12) folder:
+	•	canvas_store.py (13): Save and load the user’s canvas layout (nodes, edges).
+	•	node_processor.py (14): Handle relationships or references within the canvas.
+	3.	Backup & Version History
+	•	snapshotter.py (19): Implement the 5-minute interval checkpoints.
+	•	versioning.py (18): Let users restore older note versions in-app.
+	4.	Enhanced Search
+	•	If you only had a basic or placeholder search, fully implement the advanced features in indexer.py (7) and query_parser.py (8) (tag-based, metadata-based searches, etc.).
+	•	Integrate with tasks or frontmatter if desired.
+
+Frontend (Wave 3)
+	1.	KanbanBoard.vue (31) (if not in Wave 2)
+	•	Full drag-and-drop columns, WIP limits, column titles, etc.
+	2.	CanvasView.vue (32)
+	•	Implement the infinite canvas with D3.js (or your chosen library).
+	•	Add the ability to place notes, tasks, images, and connect them visually.
+	3.	Backup/Restore UI
+	•	Provide a small version history panel or a pop-up for rolling back to an older note version.
+	•	Possibly an item in the settings to trigger a manual “Backup Now.”
+	4.	Theme Polish
+	•	Implement toggles for Solarized Light and Dark from themes/ (26).
+	•	Finalize any color or layout details.
+	5.	Refine File Management
+	•	If you want to handle attachments more automatically (e.g., move them when a note is relocated), finalize that logic on the frontend.
+
+Final Testing & Documentation (Wave 3)
+	•	Expand test coverage in tests/ for Kanban, canvas features, backup/restore.
+	•	Write any advanced usage guides or “tips and tricks” in USER_GUIDE.md (56).
+	•	Update ARCHITECTURE.md (55) with final architecture diagrams or notes on performance.
+
+Summary of the 3-Wave Approach
+	1.	Wave 1 (Core Notes)
+	•	Stand up the Python backend (app entry point, file ops).
+	•	Create a minimal UI (split editor/preview).
+	•	Possibly add rudimentary text search or stub it out.
+	2.	Wave 2 (Tasks & Basic Management)
+	•	Define the task data model, UI panel, basic filtering.
+	•	(Optional) Introduce the Kanban board.
+	•	(Optional) Begin backups/versioning or expand search.
+	3.	Wave 3 (Full Feature Set)
+	•	Finalize Kanban (if not done in Wave 2), add infinite canvas.
+	•	Implement robust backups/version history, advanced search, theming.
+	•	Polish UI/UX and complete documentation.
+
+By following these waves, you ensure you always have a usable product at the end of each phase, and you can gather feedback from actual note usage before investing time in more complex features like the infinite canvas or version history.
+
+</dev order>
+
+<Current code>
+
+</current code>
+
+
+
+<goal>
+
+Diagnose current build progress and EXECUTE the next best step
+</goal>
+
+<output instructions>
+
+1) Explain 
+2) Give me the COMPLETE UPDATED VERSION of each script that needs to be updated
+
+Style Guidance:
+	•	Clear module organization and imports
+	•	Code wrapped in ```python blocks
+	•	Comprehensive inline comments
+	•	Variables for constants and configuration   Remember the guidance:
+	•	Writing clean, readable, and well-documented code
+	•	Using 4 spaces for indentation
+	•	Following one statement per line principle
+	•	Implementing proper naming conventions
+	•	Using object-oriented patterns where appropriate
+    •	follow PEP 8 standards and best practices
+
+</output instructions>
