@@ -6,8 +6,13 @@
 # Exit on error
 set -e
 
-echo "Building Docker images..."
+echo "Stopping any running containers..."
 docker compose down
+
+echo "Removing postgres volume to ensure a fresh database..."
+docker volume rm -f $(docker volume ls -q | grep postgres_data) || true
+
+echo "Building Docker images..."
 docker compose build
 
 echo "Starting containers in the background..."
