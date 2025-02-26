@@ -1,22 +1,21 @@
-# core/urls.py
+# core/urls.py - Update the home URL pattern
+
 from django.contrib import admin
-from django.http import HttpResponse
 from django.urls import path, include
 from django.views.generic import TemplateView
-from . import views  # Add this import to reference the core/views.py module
-
-def home(request):
-    return HttpResponse("Welcome to the IRO Platform!")
+from . import views
 
 urlpatterns = [
-    path('', TemplateView.as_view(template_name='home.html'), name='home'),
+    # Replace this line:
+    # path('', TemplateView.as_view(template_name='home.html'), name='home'),
+    # With this:
+    path('', views.home_dashboard, name='home'),
+    
+    # Keep the rest of the URL patterns the same
     path('admin/', admin.site.urls),
-    path('assessments/', include('apps.assessments.urls')),  # Existing
-    path('tenants/', include('tenants.urls', namespace='tenants')),  # Existing
-
-    # NEW: Register the DRF endpoints
+    path('assessments/', include('apps.assessments.urls')),
+    path('tenants/', include('tenants.urls', namespace='tenants')),
     path('api/assessments/', include('apps.assessments.api.urls')),  
     path('api/tenants/', include('tenants.api.urls')), 
-
     path('set-context/', views.set_context, name='set_context'),
 ]

@@ -39,6 +39,41 @@ class IRO(models.Model):
 
     class Meta:
         db_table = 'iro'
+    
+    @property
+    def title(self):
+        """Return the title from the current version of this IRO"""
+        if self.current_version_id:
+            try:
+                version = IROVersion.objects.get(version_id=self.current_version_id)
+                return version.title
+            except IROVersion.DoesNotExist:
+                pass
+        
+        # Fallback: try to get the latest version's title
+        latest_version = IROVersion.objects.filter(iro=self).order_by('-version_number').first()
+        if latest_version:
+            return latest_version.title
+        
+        return f"IRO #{self.iro_id}"  # Fallback title
+    
+    @property
+    def description(self):
+        """Return the description from the current version of this IRO"""
+        if self.current_version_id:
+            try:
+                version = IROVersion.objects.get(version_id=self.current_version_id)
+                return version.description
+            except IROVersion.DoesNotExist:
+                pass
+                
+        # Fallback: try to get the latest version's description
+        latest_version = IROVersion.objects.filter(iro=self).order_by('-version_number').first()
+        if latest_version:
+            return latest_version.description
+            
+        return ""  # Fallback description
+
 
 
 class IROVersion(models.Model):

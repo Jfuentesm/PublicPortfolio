@@ -1,60 +1,71 @@
 // static/js/dashboard.js
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize the materiality matrix chart if the canvas exists
-    const matrixCanvas = document.getElementById('materialityMatrix');
-    if (matrixCanvas) {
-        initializeMaterialityMatrix(matrixCanvas);
-    }
-
-    // Initialize IRO distribution chart if the canvas exists
-    const distributionCanvas = document.getElementById('iroDistributionChart');
-    if (distributionCanvas) {
-        initializeIRODistributionChart(distributionCanvas);
-    }
-
-    // Initialize assessment progress chart if the canvas exists
-    const progressCanvas = document.getElementById('assessmentProgressChart');
-    if (progressCanvas) {
-        initializeAssessmentProgressChart(progressCanvas);
-    }
-
+    // Initialize charts based on available data attributes
+    initializeCharts();
+    
     // Setup event listeners for dashboard filters
     setupFilterListeners();
-
+    
     // Initialize any tooltips
     initializeTooltips();
 });
 
 /**
+ * Initialize all charts if their canvases exist
+ */
+function initializeCharts() {
+    // Initialize the materiality matrix chart if the canvas exists
+    const matrixCanvas = document.getElementById('materialityMatrix');
+    if (matrixCanvas && matrixCanvas.hasAttribute('data-matrix-data')) {
+        try {
+            const matrixData = JSON.parse(matrixCanvas.getAttribute('data-matrix-data'));
+            initializeMaterialityMatrix(matrixCanvas, matrixData);
+        } catch (e) {
+            console.error('Error parsing matrix data:', e);
+        }
+    }
+
+    // Initialize IRO distribution chart if the canvas exists
+    const distributionCanvas = document.getElementById('iroDistributionChart');
+    if (distributionCanvas && distributionCanvas.hasAttribute('data-distribution')) {
+        try {
+            const distributionData = JSON.parse(distributionCanvas.getAttribute('data-distribution'));
+            initializeIRODistributionChart(distributionCanvas, distributionData);
+        } catch (e) {
+            console.error('Error parsing distribution data:', e);
+        }
+    }
+
+    // Initialize assessment progress chart if the canvas exists
+    const progressCanvas = document.getElementById('assessmentProgressChart');
+    if (progressCanvas && progressCanvas.hasAttribute('data-progress')) {
+        try {
+            const progressData = JSON.parse(progressCanvas.getAttribute('data-progress'));
+            initializeAssessmentProgressChart(progressCanvas, progressData);
+        } catch (e) {
+            console.error('Error parsing progress data:', e);
+        }
+    }
+}
+
+/**
  * Initializes the materiality matrix visualization
  * @param {HTMLCanvasElement} canvas - The canvas element for the chart
+ * @param {Array} iroData - Array of IRO data objects
  */
-function initializeMaterialityMatrix(canvas) {
-    // Sample data for the materiality matrix
-    const iroData = [
-        { id: 1, title: "Climate Transition Risk", x: 4.2, y: 4.5, type: "Risk", size: 12 },
-        { id: 2, title: "Water Scarcity", x: 3.8, y: 3.2, type: "Risk", size: 10 },
-        { id: 3, title: "Renewable Energy Adoption", x: 3.5, y: 4.0, type: "Opportunity", size: 11 },
-        { id: 4, title: "Supply Chain Emissions", x: 3.0, y: 2.8, type: "Impact", size: 9 },
-        { id: 5, title: "Biodiversity Loss", x: 2.5, y: 3.5, type: "Impact", size: 10 },
-        { id: 6, title: "Circular Economy", x: 3.2, y: 2.2, type: "Opportunity", size: 8 },
-        { id: 7, title: "Labor Rights", x: 4.0, y: 3.0, type: "Risk", size: 9 },
-        { id: 8, title: "Product Safety", x: 4.5, y: 3.8, type: "Risk", size: 11 },
-        { id: 9, title: "Digital Innovation", x: 2.8, y: 4.2, type: "Opportunity", size: 10 },
-        { id: 10, title: "Diversity & Inclusion", x: 2.0, y: 2.5, type: "Impact", size: 8 },
-        { id: 11, title: "Energy Efficiency", x: 3.0, y: 3.0, type: "Opportunity", size: 9 },
-        { id: 12, title: "Waste Management", x: 2.2, y: 2.0, type: "Impact", size: 7 }
-    ];
-
+function initializeMaterialityMatrix(canvas, iroData) {
+    // If no data provided, use empty array
+    if (!iroData) iroData = [];
+    
     // Create datasets for different IRO types with different colors
     const datasets = [
         {
             label: 'Risks',
             data: iroData.filter(item => item.type === 'Risk').map(item => ({
-                x: item.x,
-                y: item.y,
-                r: item.size,
+                x: item.impact_score,
+                y: item.financial_score,
+                r: 8, // Fixed radius for now
                 id: item.id,
                 title: item.title
             })),
@@ -64,9 +75,9 @@ function initializeMaterialityMatrix(canvas) {
         {
             label: 'Opportunities',
             data: iroData.filter(item => item.type === 'Opportunity').map(item => ({
-                x: item.x,
-                y: item.y,
-                r: item.size,
+                x: item.impact_score,
+                y: item.financial_score,
+                r: 8, // Fixed radius for now
                 id: item.id,
                 title: item.title
             })),
@@ -76,9 +87,9 @@ function initializeMaterialityMatrix(canvas) {
         {
             label: 'Impacts',
             data: iroData.filter(item => item.type === 'Impact').map(item => ({
-                x: item.x,
-                y: item.y,
-                r: item.size,
+                x: item.impact_score,
+                y: item.financial_score,
+                r: 8, // Fixed radius for now
                 id: item.id,
                 title: item.title
             })),
@@ -100,7 +111,7 @@ function initializeMaterialityMatrix(canvas) {
                 x: {
                     title: {
                         display: true,
-                        text: 'Financial Materiality',
+                        text: 'Impact Materiality',
                         font: {
                             weight: 'bold'
                         }
@@ -114,7 +125,7 @@ function initializeMaterialityMatrix(canvas) {
                 y: {
                     title: {
                         display: true,
-                        text: 'Impact Materiality',
+                        text: 'Financial Materiality',
                         font: {
                             weight: 'bold'
                         }
@@ -134,8 +145,8 @@ function initializeMaterialityMatrix(canvas) {
                             return [
                                 `ID: #${item.id}`,
                                 `Title: ${item.title}`,
-                                `Financial Materiality: ${item.x.toFixed(1)}`,
-                                `Impact Materiality: ${item.y.toFixed(1)}`
+                                `Impact Materiality: ${item.x.toFixed(1)}`,
+                                `Financial Materiality: ${item.y.toFixed(1)}`
                             ];
                         }
                     }
@@ -187,13 +198,19 @@ function initializeMaterialityMatrix(canvas) {
 /**
  * Initializes the IRO distribution chart
  * @param {HTMLCanvasElement} canvas - The canvas element for the chart
+ * @param {Object} distributionData - Object containing distribution data
  */
-function initializeIRODistributionChart(canvas) {
-    // Sample data for IRO distribution
+function initializeIRODistributionChart(canvas, distributionData) {
+    // If no data provided, use empty data
+    if (!distributionData) {
+        distributionData = {labels: [], counts: []};
+    }
+    
+    // Create the pie chart
     const data = {
-        labels: ['Risks', 'Opportunities', 'Impacts'],
+        labels: distributionData.labels || [],
         datasets: [{
-            data: [12, 8, 10],
+            data: distributionData.counts || [],
             backgroundColor: [
                 'rgba(239, 68, 68, 0.7)',
                 'rgba(34, 197, 94, 0.7)',
@@ -208,7 +225,6 @@ function initializeIRODistributionChart(canvas) {
         }]
     };
 
-    // Create the pie chart
     const distributionChart = new Chart(canvas, {
         type: 'doughnut',
         data: data,
@@ -238,14 +254,20 @@ function initializeIRODistributionChart(canvas) {
 /**
  * Initializes the assessment progress chart
  * @param {HTMLCanvasElement} canvas - The canvas element for the chart
+ * @param {Object} progressData - Object containing progress data
  */
-function initializeAssessmentProgressChart(canvas) {
-    // Sample data for assessment progress
+function initializeAssessmentProgressChart(canvas, progressData) {
+    // If no data provided, use empty data
+    if (!progressData) {
+        progressData = {labels: [], counts: []};
+    }
+    
+    // Create the bar chart
     const data = {
-        labels: ['Draft', 'In Review', 'Approved', 'Disclosed'],
+        labels: progressData.labels || [],
         datasets: [{
             label: 'Number of IROs',
-            data: [15, 8, 6, 5],
+            data: progressData.counts || [],
             backgroundColor: [
                 'rgba(156, 163, 175, 0.7)',
                 'rgba(234, 179, 8, 0.7)',
@@ -262,7 +284,6 @@ function initializeAssessmentProgressChart(canvas) {
         }]
     };
 
-    // Create the bar chart
     const progressChart = new Chart(canvas, {
         type: 'bar',
         data: data,
@@ -343,7 +364,7 @@ function updateMatrixData(period) {
     if (matrixCanvas) {
         const chart = Chart.getChart(matrixCanvas);
         if (chart) {
-            // Simulate data changes based on selected period
+            // Slightly modify the data points to simulate changes
             chart.data.datasets.forEach(dataset => {
                 dataset.data.forEach(point => {
                     // Slightly modify the data points to simulate changes
@@ -374,7 +395,7 @@ function filterDashboardByType(type) {
     if (iroTable && iroTable.tBodies[0]) {
         const rows = iroTable.tBodies[0].rows;
         for (let i = 0; i < rows.length; i++) {
-            const iroType = rows[i].cells[1].textContent.trim();
+            const iroType = rows[i].cells[2].querySelector('.badge')?.textContent.trim();
             if (type === 'All' || iroType === type) {
                 rows[i].style.display = '';
             } else {
@@ -396,8 +417,22 @@ function filterDashboardByStatus(status) {
     
     // Similar to filterDashboardByType, but filtering based on status
     
+    // Example: Update high-priority IROs table
+    const iroTable = document.getElementById('highPriorityIROsTable');
+    if (iroTable && iroTable.tBodies[0]) {
+        const rows = iroTable.tBodies[0].rows;
+        for (let i = 0; i < rows.length; i++) {
+            const iroStatus = rows[i].cells[5].querySelector('.status-badge')?.textContent.trim();
+            if (status === 'All' || iroStatus === status) {
+                rows[i].style.display = '';
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
+    }
+    
     // Example: Update recent activity timeline
-    const activityItems = document.querySelectorAll('.activity-item');
+    const activityItems = document.querySelectorAll('[data-status]');
     activityItems.forEach(item => {
         const itemStatus = item.getAttribute('data-status');
         if (status === 'All' || itemStatus === status) {
@@ -406,8 +441,6 @@ function filterDashboardByStatus(status) {
             item.style.display = 'none';
         }
     });
-    
-    // You would also update other dashboard components
 }
 
 /**

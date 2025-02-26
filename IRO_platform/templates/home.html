@@ -1,5 +1,6 @@
 <!-- templates/home.html -->
 {% extends "base.html" %}
+{% load assessment_filters %}
 
 {% block title %}Dashboard | DMA Platform{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
@@ -11,7 +12,7 @@
         <div class="card metric-card bg-white">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="metric-value">24</div>
+                    <div class="metric-value">{{ total_iros }}</div>
                     <div class="metric-label">Total IROs</div>
                 </div>
                 <div class="icon-shape rounded-circle bg-primary bg-opacity-10 p-2">
@@ -24,7 +25,7 @@
         <div class="card metric-card bg-white">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="metric-value">8</div>
+                    <div class="metric-value">{{ high_materiality_count }}</div>
                     <div class="metric-label">High Materiality</div>
                 </div>
                 <div class="icon-shape rounded-circle bg-danger bg-opacity-10 p-2">
@@ -37,7 +38,7 @@
         <div class="card metric-card bg-white">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="metric-value">12</div>
+                    <div class="metric-value">{{ pending_reviews_count }}</div>
                     <div class="metric-label">Pending Reviews</div>
                 </div>
                 <div class="icon-shape rounded-circle bg-warning bg-opacity-10 p-2">
@@ -50,7 +51,7 @@
         <div class="card metric-card bg-white">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="metric-value">5</div>
+                    <div class="metric-value">{{ completed_assessments_count }}</div>
                     <div class="metric-label">Completed Assessments</div>
                 </div>
                 <div class="icon-shape rounded-circle bg-success bg-opacity-10 p-2">
@@ -81,7 +82,7 @@
                 </div>
             </div>
             <div class="card-body">
-                <canvas id="materialityMatrix" style="height: 300px;"></canvas>
+                <canvas id="materialityMatrix" style="height: 300px;" data-matrix-data="{{ materiality_matrix_data }}"></canvas>
             </div>
         </div>
     </div>
@@ -94,50 +95,23 @@
             </div>
             <div class="card-body p-0">
                 <div class="list-group list-group-flush">
-                    <div class="list-group-item border-0 py-3">
+                    {% for activity in recent_activities %}
+                    <div class="list-group-item border-0 py-3" data-status="{{ activity.action }}">
                         <div class="d-flex align-items-center">
-                            <div class="bg-success rounded-circle p-2 me-3">
-                                <i class="fas fa-check text-white small"></i>
+                            <div class="bg-{{ activity.icon_color }} rounded-circle p-2 me-3">
+                                <i class="fas fa-{{ activity.icon }} text-white small"></i>
                             </div>
                             <div>
-                                <p class="mb-0 fw-medium">IRO #123 assessment approved</p>
-                                <p class="text-muted small mb-0">2 hours ago</p>
+                                <p class="mb-0 fw-medium">{{ activity.description }}</p>
+                                <p class="text-muted small mb-0">{{ activity.timestamp|timesince }} ago</p>
                             </div>
                         </div>
                     </div>
+                    {% empty %}
                     <div class="list-group-item border-0 py-3">
-                        <div class="d-flex align-items-center">
-                            <div class="bg-warning rounded-circle p-2 me-3">
-                                <i class="fas fa-edit text-white small"></i>
-                            </div>
-                            <div>
-                                <p class="mb-0 fw-medium">Risk Assessment #45 updated</p>
-                                <p class="text-muted small mb-0">4 hours ago</p>
-                            </div>
-                        </div>
+                        <p class="text-center text-muted my-3">No recent activity</p>
                     </div>
-                    <div class="list-group-item border-0 py-3">
-                        <div class="d-flex align-items-center">
-                            <div class="bg-info rounded-circle p-2 me-3">
-                                <i class="fas fa-plus text-white small"></i>
-                            </div>
-                            <div>
-                                <p class="mb-0 fw-medium">New IRO created: Climate Risk</p>
-                                <p class="text-muted small mb-0">Yesterday</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="list-group-item border-0 py-3">
-                        <div class="d-flex align-items-center">
-                            <div class="bg-primary rounded-circle p-2 me-3">
-                                <i class="fas fa-user-check text-white small"></i>
-                            </div>
-                            <div>
-                                <p class="mb-0 fw-medium">Review request assigned to you</p>
-                                <p class="text-muted small mb-0">2 days ago</p>
-                            </div>
-                        </div>
-                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
@@ -156,7 +130,7 @@
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0" id="highPriorityIROsTable">
                         <thead class="bg-light">
                             <tr>
                                 <th>IRO ID</th>
@@ -169,27 +143,32 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {% for iro in high_priority_iros %}
                             <tr>
-                                <td>#123</td>
-                                <td>Climate Change Transition</td>
-                                <td><span class="badge bg-danger">Risk</span></td>
+                                <td>#{{ iro.iro_id }}</td>
+                                <td>{{ iro.title }}</td>
+                                <td><span class="badge bg-{% if iro.type == 'Risk' %}danger{% elif iro.type == 'Opportunity' %}success{% else %}primary{% endif %}">{{ iro.type }}</span></td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <span class="me-2">4.2</span>
+                                        <span class="me-2">{{ iro.impact_score|floatformat:1 }}</span>
                                         <div class="progress" style="width: 60px; height: 5px;">
-                                            <div class="progress-bar bg-danger" style="width: 84%"></div>
+                                            <div class="progress-bar bg-{% if iro.impact_score > 3.5 %}danger{% elif iro.impact_score > 2.5 %}warning{% else %}success{% endif %}" 
+                                                style="width: {{ iro.impact_score|floatformat:1|stringformat:'s'|slice:'0:3'|floatformat:1|mul:20 }}%">
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <span class="me-2">3.8</span>
+                                        <span class="me-2">{{ iro.financial_score|floatformat:1 }}</span>
                                         <div class="progress" style="width: 60px; height: 5px;">
-                                            <div class="progress-bar bg-warning" style="width: 76%"></div>
+                                            <div class="progress-bar bg-{% if iro.financial_score > 3.5 %}danger{% elif iro.financial_score > 2.5 %}warning{% else %}success{% endif %}" 
+                                                style="width: {{ iro.financial_score|floatformat:1|stringformat:'s'|slice:'0:3'|floatformat:1|mul:20 }}%">
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
-                                <td><span class="status-badge status-review">In Review</span></td>
+                                <td><span class="status-badge status-{{ iro.current_stage|lower }}">{{ iro.current_stage|title }}</span></td>
                                 <td>
                                     <div class="dropdown">
                                         <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -197,80 +176,17 @@
                                         </button>
                                         <ul class="dropdown-menu">
                                             <li><a class="dropdown-item" href="#">View Details</a></li>
-                                            <li><a class="dropdown-item" href="#">Edit Assessment</a></li>
+                                            <li><a class="dropdown-item" href="{% url 'assessments:iro-edit' iro.iro_id %}">Edit Assessment</a></li>
                                             <li><a class="dropdown-item" href="#">Add Review</a></li>
                                         </ul>
                                     </div>
                                 </td>
                             </tr>
+                            {% empty %}
                             <tr>
-                                <td>#124</td>
-                                <td>Water Scarcity</td>
-                                <td><span class="badge bg-danger">Risk</span></td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <span class="me-2">3.9</span>
-                                        <div class="progress" style="width: 60px; height: 5px;">
-                                            <div class="progress-bar bg-warning" style="width: 78%"></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <span class="me-2">3.1</span>
-                                        <div class="progress" style="width: 60px; height: 5px;">
-                                            <div class="progress-bar bg-warning" style="width: 62%"></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td><span class="status-badge status-approved">Approved</span></td>
-                                <td>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                            Actions
-                                        </button>
-                                        <ul class="dropdown-menu">
-                                            <li><a class="dropdown-item" href="#">View Details</a></li>
-                                            <li><a class="dropdown-item" href="#">Edit Assessment</a></li>
-                                            <li><a class="dropdown-item" href="#">Add Review</a></li>
-                                        </ul>
-                                    </div>
-                                </td>
+                                <td colspan="7" class="text-center py-3">No high priority IROs found</td>
                             </tr>
-                            <tr>
-                                <td>#125</td>
-                                <td>Renewable Energy Adoption</td>
-                                <td><span class="badge bg-success">Opportunity</span></td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <span class="me-2">3.5</span>
-                                        <div class="progress" style="width: 60px; height: 5px;">
-                                            <div class="progress-bar bg-warning" style="width: 70%"></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <span class="me-2">4.3</span>
-                                        <div class="progress" style="width: 60px; height: 5px;">
-                                            <div class="progress-bar bg-danger" style="width: 86%"></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td><span class="status-badge status-draft">Draft</span></td>
-                                <td>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                            Actions
-                                        </button>
-                                        <ul class="dropdown-menu">
-                                            <li><a class="dropdown-item" href="#">View Details</a></li>
-                                            <li><a class="dropdown-item" href="#">Edit Assessment</a></li>
-                                            <li><a class="dropdown-item" href="#">Add Review</a></li>
-                                        </ul>
-                                    </div>
-                                </td>
-                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -281,38 +197,72 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Materiality matrix chart
-    const matrixCtx = document.getElementById('materialityMatrix').getContext('2d');
-    const matrixChart = new Chart(matrixCtx, {
+    // Initialize materiality matrix using data from database
+    const matrixCtx = document.getElementById('materialityMatrix');
+    const matrixData = JSON.parse(matrixCtx.getAttribute('data-matrix-data') || '[]');
+    
+    if (matrixData.length > 0) {
+        initializeMatrixChart(matrixCtx, matrixData);
+    } else {
+        matrixCtx.innerHTML = 'No data available for materiality matrix';
+    }
+});
+
+function initializeMatrixChart(canvas, data) {
+    // Process data into datasets grouped by type
+    const riskData = data.filter(item => item.type === 'Risk').map(d => ({
+        x: d.impact_score,
+        y: d.financial_score,
+        id: d.id,
+        title: d.title
+    }));
+    
+    const opportunityData = data.filter(item => item.type === 'Opportunity').map(d => ({
+        x: d.impact_score,
+        y: d.financial_score,
+        id: d.id,
+        title: d.title
+    }));
+    
+    const impactData = data.filter(item => item.type === 'Impact').map(d => ({
+        x: d.impact_score,
+        y: d.financial_score,
+        id: d.id,
+        title: d.title
+    }));
+    
+    const matrixChart = new Chart(canvas.getContext('2d'), {
         type: 'scatter',
         data: {
-            datasets: [{
-                label: 'Risks',
-                data: [
-                    { x: 4.2, y: 3.8, id: 123, title: 'Climate Change Transition' },
-                    { x: 3.9, y: 3.1, id: 124, title: 'Water Scarcity' },
-                    { x: 2.8, y: 2.2, id: 126, title: 'Labor Practices' },
-                    { x: 2.1, y: 1.9, id: 127, title: 'Product Safety' },
-                    { x: 1.5, y: 1.2, id: 128, title: 'Data Privacy' }
-                ],
-                backgroundColor: 'rgba(239, 68, 68, 0.7)',
-                borderColor: 'rgba(239, 68, 68, 1)',
-                borderWidth: 1,
-                pointRadius: 8,
-                pointHoverRadius: 10
-            }, {
-                label: 'Opportunities',
-                data: [
-                    { x: 3.5, y: 4.3, id: 125, title: 'Renewable Energy Adoption' },
-                    { x: 3.2, y: 3.7, id: 129, title: 'Circular Economy' },
-                    { x: 1.8, y: 2.6, id: 130, title: 'Sustainable Products' }
-                ],
-                backgroundColor: 'rgba(34, 197, 94, 0.7)',
-                borderColor: 'rgba(34, 197, 94, 1)',
-                borderWidth: 1,
-                pointRadius: 8,
-                pointHoverRadius: 10
-            }]
+            datasets: [
+                {
+                    label: 'Risks',
+                    data: riskData,
+                    backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                    borderColor: 'rgba(239, 68, 68, 1)',
+                    borderWidth: 1,
+                    pointRadius: 8,
+                    pointHoverRadius: 10
+                }, 
+                {
+                    label: 'Opportunities',
+                    data: opportunityData,
+                    backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                    borderColor: 'rgba(34, 197, 94, 1)',
+                    borderWidth: 1,
+                    pointRadius: 8,
+                    pointHoverRadius: 10
+                },
+                {
+                    label: 'Impacts',
+                    data: impactData,
+                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1,
+                    pointRadius: 8,
+                    pointHoverRadius: 10
+                }
+            ]
         },
         options: {
             responsive: true,
@@ -352,34 +302,10 @@ document.addEventListener('DOMContentLoaded', function () {
 Impact: ${point.x.toFixed(1)}, Financial: ${point.y.toFixed(1)}`;
                         }
                     }
-                },
-                annotation: {
-                    annotations: {
-                        quadrants: {
-                            type: 'line',
-                            xMin: 2.5,
-                            xMax: 2.5,
-                            yMin: 0,
-                            yMax: 5,
-                            borderColor: 'rgba(0, 0, 0, 0.2)',
-                            borderWidth: 1,
-                            borderDash: [5, 5]
-                        },
-                        horizontalLine: {
-                            type: 'line',
-                            yMin: 2.5,
-                            yMax: 2.5,
-                            xMin: 0,
-                            xMax: 5,
-                            borderColor: 'rgba(0, 0, 0, 0.2)',
-                            borderWidth: 1,
-                            borderDash: [5, 5]
-                        }
-                    }
                 }
             }
         }
     });
-});
+}
 </script>
 {% endblock %}

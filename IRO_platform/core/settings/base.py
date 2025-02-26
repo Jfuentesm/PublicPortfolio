@@ -67,15 +67,11 @@ DATABASE_ROUTERS = (
 
 MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
-    # The tenant middleware must appear near the top (before DB queries occur):
     'django_tenants.middleware.main.TenantMainMiddleware',
-    
-    # Add our custom context middleware
-    'core.middleware.context_middleware.ContextMiddleware',
-    
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',  # Authentication must run BEFORE our middleware
+    'core.middleware.context_middleware.ContextMiddleware',     # Now placed after authentication
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
