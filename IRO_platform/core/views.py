@@ -1,40 +1,60 @@
 # core/views.py
 from django.http import JsonResponse
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET
 from tenants.models import TenantConfig
-from apps.assessments.models import Assessment, IRO
-from django.shortcuts import render
-from django.db.models import Count, Avg, Q
-from apps.assessments.models import IRO, ImpactAssessment, RiskOppAssessment, AuditTrail, Review
+from apps.assessments.models import Assessment, IRO, ImpactAssessment, RiskOppAssessment, AuditTrail, Review
+from django_tenants.utils import schema_context
 import json
 
 def home_dashboard(request):
     # Get tenant from context middleware
     tenant = request.context.get('tenant')
     
-    # Base queryset - filter by tenant if one is selected
-    iro_queryset = IRO.objects.all()
+    # Import the utility function
+    from apps.assessments.utils import get_iros_for_tenant, get_all_tenant_iros
+    
+    # Get IROs based on tenant context
     if tenant:
-        iro_queryset = iro_queryset.filter(tenant=tenant)
+        iro_queryset = get_iros_for_tenant(tenant)
+    else:
+        # If no tenant selected, get IROs from all tenant schemas
+        iro_queryset = get_all_tenant_iros()
     
     # Calculate metrics for dashboard
-    total_iros = iro_queryset.count()
+    total_iros = len(iro_queryset)
     
     # Define high materiality as IROs with score > 3.5
-    high_materiality_count = iro_queryset.filter(last_assessment_score__gt=3.5).count()
+    high_materiality_count = sum(1 for iro in iro_queryset if iro.last_assessment_score and iro.last_assessment_score > 3.5)
     
     # Count pending reviews
-    pending_reviews_count = Review.objects.filter(status='In_Review')
     if tenant:
-        pending_reviews_count = pending_reviews_count.filter(tenant=tenant)
-    pending_reviews_count = pending_reviews_count.count()
+        with schema_context(tenant.schema_name):
+            pending_reviews_count = Review.objects.filter(status='In_Review', tenant=tenant).count()
+    else:
+        # Aggregate across all tenants
+        pending_reviews_count = 0
+        for t in TenantConfig.objects.all():
+            with schema_context(t.schema_name):
+                pending_reviews_count += Review.objects.filter(status='In_Review').count()
     
     # Count completed assessments (approved)
-    completed_assessments_count = iro_queryset.filter(current_stage='Approved').count()
+    completed_assessments_count = sum(1 for iro in iro_queryset if iro.current_stage == 'Approved')
     
     # Get recent activity from audit trail
-    recent_activities = AuditTrail.objects.all().order_by('-timestamp')[:5]
+    if tenant:
+        with schema_context(tenant.schema_name):
+            recent_activities = list(AuditTrail.objects.filter(tenant=tenant).order_by('-timestamp')[:5])
+    else:
+        # Aggregate across all tenants
+        recent_activities = []
+        for t in TenantConfig.objects.all():
+            with schema_context(t.schema_name):
+                tenant_activities = list(AuditTrail.objects.filter(tenant=t).order_by('-timestamp')[:5])
+                recent_activities.extend(tenant_activities)
+        # Re-sort combined list
+        recent_activities.sort(key=lambda x: x.timestamp, reverse=True)
+        recent_activities = recent_activities[:5]
     
     # Process activities to add color and icon information
     activity_data = []
@@ -66,13 +86,29 @@ def home_dashboard(request):
     
     # Get high priority IROs (highest scores)
     high_priority_iros = []
-    for iro in iro_queryset.order_by('-last_assessment_score')[:10]:
+    
+    # Sort IROs by last_assessment_score (if available)
+    sorted_iros = sorted(
+        [iro for iro in iro_queryset if iro.last_assessment_score], 
+        key=lambda x: x.last_assessment_score, 
+        reverse=True
+    )
+    
+    for iro in sorted_iros[:10]:
         # Get the latest impact and financial scores
-        impact_assessments = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on')
-        risk_opp_assessments = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on')
+        if tenant:
+            with schema_context(tenant.schema_name):
+                impact_assessments = list(ImpactAssessment.objects.filter(iro=iro).order_by('-created_on'))
+                risk_opp_assessments = list(RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on'))
+        else:
+            # Use the IRO's tenant schema
+            tenant_obj = iro.tenant
+            with schema_context(tenant_obj.schema_name):
+                impact_assessments = list(ImpactAssessment.objects.filter(iro=iro).order_by('-created_on'))
+                risk_opp_assessments = list(RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on'))
         
-        impact_score = impact_assessments.first().impact_materiality_score if impact_assessments.exists() else 0.0
-        financial_score = risk_opp_assessments.first().financial_materiality_score if risk_opp_assessments.exists() else 0.0
+        impact_score = impact_assessments[0].impact_materiality_score if impact_assessments else 0.0
+        financial_score = risk_opp_assessments[0].financial_materiality_score if risk_opp_assessments else 0.0
         
         high_priority_iros.append({
             'iro_id': iro.iro_id,
@@ -86,8 +122,16 @@ def home_dashboard(request):
     # Prepare data for materiality matrix
     matrix_data = []
     for iro in iro_queryset:
-        impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-        risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
+        if tenant:
+            with schema_context(tenant.schema_name):
+                impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
+                risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
+        else:
+            # Use the IRO's tenant schema
+            tenant_obj = iro.tenant
+            with schema_context(tenant_obj.schema_name):
+                impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
+                risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
         
         if impact_assessment and risk_opp_assessment:
             matrix_data.append({

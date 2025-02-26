@@ -3,8 +3,9 @@ from django.shortcuts import render, get_object_or_404
 from django.views.generic import ListView, CreateView, UpdateView
 from django.urls import reverse_lazy
 from django import forms
-from .models import Assessment, IRO
 from tenants.models import TenantConfig
+from django_tenants.utils import schema_context
+from apps.assessments.models import IRO, Assessment
 
 class ContextMixin:
     """
@@ -28,32 +29,60 @@ class ContextMixin:
         tenant = self.request.context.get('tenant')
         try:
             if tenant:
-                context['available_assessments'] = Assessment.objects.filter(tenant=tenant)
+                with schema_context(tenant.schema_name):
+                    context['available_assessments'] = list(Assessment.objects.filter(tenant=tenant))
             else:
-                context['available_assessments'] = Assessment.objects.all()
+                # If no tenant selected, try to get all assessments
+                context['available_assessments'] = []
+                for t in TenantConfig.objects.all():
+                    with schema_context(t.schema_name):
+                        tenant_assessments = list(Assessment.objects.filter(tenant=t))
+                        context['available_assessments'].extend(tenant_assessments)
         except Exception as e:
             # Fallback if filtering fails (e.g., missing tenant field)
-            context['available_assessments'] = Assessment.objects.all()
+            context['available_assessments'] = []
         
         # Filter IROs by assessment if an assessment is selected
         assessment = self.request.context.get('assessment')
         try:
-            if assessment:
-                # Assuming IROs can be linked to assessments
-                # Adjust this query based on your actual data model
-                context['available_iros'] = IRO.objects.filter(assessment=assessment)
-            elif tenant:
-                # If only tenant is selected, show all IROs for that tenant
-                context['available_iros'] = IRO.objects.filter(tenant=tenant)
+            from apps.assessments.utils import get_iros_for_tenant
+            
+            if tenant:
+                # Get IROs for this tenant (possibly filtered by assessment)
+                if assessment:
+                    with schema_context(tenant.schema_name):
+                        # Assuming IROs can be linked to assessments
+                        # Adjust this query based on your actual data model
+                        context['available_iros'] = list(IRO.objects.filter(tenant=tenant))
+                else:
+                    context['available_iros'] = get_iros_for_tenant(tenant)
             else:
-                context['available_iros'] = IRO.objects.all()
+                # If no tenant selected, get IROs from all tenant schemas
+                context['available_iros'] = []
+                for t in TenantConfig.objects.all():
+                    with schema_context(t.schema_name):
+                        tenant_iros = list(IRO.objects.filter(tenant=t))
+                        context['available_iros'].extend(tenant_iros)
         except Exception as e:
             # Fallback if filtering fails
-            context['available_iros'] = IRO.objects.all()
+            context['available_iros'] = []
             
         return context
     
     def get_queryset(self):
+        # Import the utility function
+        from apps.assessments.utils import get_iros_for_tenant, get_all_tenant_iros
+        
+        # For IRO models, we need special handling with schema context
+        if hasattr(self, 'model') and self.model == IRO:
+            tenant = self.request.context.get('tenant')
+            if tenant:
+                queryset = get_iros_for_tenant(tenant)
+            else:
+                queryset = get_all_tenant_iros()
+            return queryset
+        
+        # For other models, use the standard approach
         queryset = super().get_queryset()
         
         try:

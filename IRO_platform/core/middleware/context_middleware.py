@@ -1,6 +1,8 @@
 from django.urls import resolve
+from django.db import connection
 from tenants.models import TenantConfig
 from apps.assessments.models import Assessment, IRO
+from django_tenants.utils import schema_context
 
 class ContextMiddleware:
     """
@@ -33,6 +35,27 @@ class ContextMiddleware:
         # Fallback to request.tenant (set by django-tenants based on domain)
         elif hasattr(request, 'tenant'):
             request.context['tenant'] = request.tenant
+        # Final fallback: try to determine tenant from the current schema
+        elif connection.schema_name.startswith('tenant_'):
+            # Extract tenant name from schema_name (tenant_tenant1 -> tenant1)
+            tenant_name = connection.schema_name[7:]  # Remove 'tenant_' prefix
+            try:
+                tenant = TenantConfig.objects.get(tenant_name=tenant_name)
+                request.context['tenant'] = tenant
+            except TenantConfig.DoesNotExist:
+                pass
+
+        # If we still don't have a tenant and we're visiting the root domain,
+        # try to set a default tenant
+        if not request.context['tenant'] and request.get_host() in ('localhost', '127.0.0.1'):
+            try:
+                # Try to use the first tenant as default for the root domain
+                default_tenant = TenantConfig.objects.first()
+                if default_tenant:
+                    request.context['tenant'] = default_tenant
+                    request.session['tenant_id'] = default_tenant.tenant_id
+            except Exception:
+                pass
 
         # Check session for stored context values
         if 'assessment_id' in request.session:
@@ -47,8 +70,13 @@ class ContextMiddleware:
         if 'iro_id' in request.session:
             try:
                 iro_id = request.session['iro_id']
-                request.context['iro'] = IRO.objects.get(iro_id=iro_id)
-            except IRO.DoesNotExist:
+                # Only search for IRO if we have a tenant context
+                if request.context['tenant']:
+                    # We need to import here to avoid circular imports
+                    from apps.assessments.utils import get_iro_by_id
+                    iro = get_iro_by_id(iro_id, request.context['tenant'])
+                    request.context['iro'] = iro
+            except Exception:
                 # Clear invalid context
                 if 'iro_id' in request.session:
                     del request.session['iro_id']
@@ -78,10 +106,15 @@ class ContextMiddleware:
         if 'iro_id' in request.GET:
             try:
                 iro_id = int(request.GET.get('iro_id'))
-                iro = IRO.objects.get(iro_id=iro_id)
-                request.context['iro'] = iro
-                request.session['iro_id'] = iro_id
-            except (ValueError, IRO.DoesNotExist):
+                # Only search for IRO if we have a tenant context
+                if request.context['tenant']:
+                    # We need to import here to avoid circular imports
+                    from apps.assessments.utils import get_iro_by_id
+                    iro = get_iro_by_id(iro_id, request.context['tenant'])
+                    if iro:
+                        request.context['iro'] = iro
+                        request.session['iro_id'] = iro_id
+            except Exception:
                 pass
 
         # Process the request
