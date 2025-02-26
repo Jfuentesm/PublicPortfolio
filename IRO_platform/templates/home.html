@@ -1,47 +1,385 @@
+<!-- templates/home.html -->
 {% extends "base.html" %}
 
-{% block title %}Welcome to IRO Platform{% endblock %}
+{% block title %}Dashboard | DMA Platform{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="jumbotron">
-        <h1 class="display-4">Welcome to IRO Platform</h1>
-        <p class="lead">Manage your Impact, Risk, and Opportunity Assessments</p>
-        <hr class="my-4">
+<div class="row mb-4">
+    <!-- Key metrics cards -->
+    <div class="col-md-3">
+        <div class="card metric-card bg-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="metric-value">24</div>
+                    <div class="metric-label">Total IROs</div>
+                </div>
+                <div class="icon-shape rounded-circle bg-primary bg-opacity-10 p-2">
+                    <i class="fas fa-chart-line text-primary fs-4"></i>
+                </div>
+            </div>
+        </div>
     </div>
-
-    <div class="row mt-4">
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Assessments</h5>
-                    <p class="card-text">Create and manage your assessments</p>
-                    <a href="{% url 'assessments:list' %}" class="btn btn-primary">Go to Assessments</a>
+    <div class="col-md-3">
+        <div class="card metric-card bg-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="metric-value">8</div>
+                    <div class="metric-label">High Materiality</div>
+                </div>
+                <div class="icon-shape rounded-circle bg-danger bg-opacity-10 p-2">
+                    <i class="fas fa-exclamation-triangle text-danger fs-4"></i>
                 </div>
             </div>
         </div>
-        
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">IROs</h5>
-                    <p class="card-text">Manage Impact, Risk and Opportunity entries</p>
-                    <a href="{% url 'assessments:iro-list' %}" class="btn btn-primary">Go to IROs</a>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card bg-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="metric-value">12</div>
+                    <div class="metric-label">Pending Reviews</div>
+                </div>
+                <div class="icon-shape rounded-circle bg-warning bg-opacity-10 p-2">
+                    <i class="fas fa-hourglass-half text-warning fs-4"></i>
                 </div>
             </div>
         </div>
-
-        {% if user.is_staff %}
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Administration</h5>
-                    <p class="card-text">Access admin interface</p>
-                    <a href="{% url 'admin:index' %}" class="btn btn-primary">Go to Admin</a>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card bg-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="metric-value">5</div>
+                    <div class="metric-label">Completed Assessments</div>
+                </div>
+                <div class="icon-shape rounded-circle bg-success bg-opacity-10 p-2">
+                    <i class="fas fa-check-circle text-success fs-4"></i>
                 </div>
             </div>
         </div>
-        {% endif %}
     </div>
 </div>
+
+<div class="row mb-4">
+    <!-- Materiality matrix visualization -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Materiality Matrix</h5>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="matrixDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            Last 12 Months
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="matrixDropdown">
+                            <li><a class="dropdown-item" href="#">Last 6 Months</a></li>
+                            <li><a class="dropdown-item" href="#">Last 3 Months</a></li>
+                            <li><a class="dropdown-item" href="#">Custom Range</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="materialityMatrix" style="height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent activity timeline -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item border-0 py-3">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-success rounded-circle p-2 me-3">
+                                <i class="fas fa-check text-white small"></i>
+                            </div>
+                            <div>
+                                <p class="mb-0 fw-medium">IRO #123 assessment approved</p>
+                                <p class="text-muted small mb-0">2 hours ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-group-item border-0 py-3">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-warning rounded-circle p-2 me-3">
+                                <i class="fas fa-edit text-white small"></i>
+                            </div>
+                            <div>
+                                <p class="mb-0 fw-medium">Risk Assessment #45 updated</p>
+                                <p class="text-muted small mb-0">4 hours ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-group-item border-0 py-3">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-info rounded-circle p-2 me-3">
+                                <i class="fas fa-plus text-white small"></i>
+                            </div>
+                            <div>
+                                <p class="mb-0 fw-medium">New IRO created: Climate Risk</p>
+                                <p class="text-muted small mb-0">Yesterday</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-group-item border-0 py-3">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-primary rounded-circle p-2 me-3">
+                                <i class="fas fa-user-check text-white small"></i>
+                            </div>
+                            <div>
+                                <p class="mb-0 fw-medium">Review request assigned to you</p>
+                                <p class="text-muted small mb-0">2 days ago</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Top IROs table -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">High Priority IROs</h5>
+                    <a href="{% url 'assessments:iro-list' %}" class="btn btn-sm btn-outline-primary">View All IROs</a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>IRO ID</th>
+                                <th>Title</th>
+                                <th>Type</th>
+                                <th>Impact Score</th>
+                                <th>Financial Score</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>#123</td>
+                                <td>Climate Change Transition</td>
+                                <td><span class="badge bg-danger">Risk</span></td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">4.2</span>
+                                        <div class="progress" style="width: 60px; height: 5px;">
+                                            <div class="progress-bar bg-danger" style="width: 84%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">3.8</span>
+                                        <div class="progress" style="width: 60px; height: 5px;">
+                                            <div class="progress-bar bg-warning" style="width: 76%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="status-badge status-review">In Review</span></td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            Actions
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" href="#">View Details</a></li>
+                                            <li><a class="dropdown-item" href="#">Edit Assessment</a></li>
+                                            <li><a class="dropdown-item" href="#">Add Review</a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>#124</td>
+                                <td>Water Scarcity</td>
+                                <td><span class="badge bg-danger">Risk</span></td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">3.9</span>
+                                        <div class="progress" style="width: 60px; height: 5px;">
+                                            <div class="progress-bar bg-warning" style="width: 78%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">3.1</span>
+                                        <div class="progress" style="width: 60px; height: 5px;">
+                                            <div class="progress-bar bg-warning" style="width: 62%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="status-badge status-approved">Approved</span></td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            Actions
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" href="#">View Details</a></li>
+                                            <li><a class="dropdown-item" href="#">Edit Assessment</a></li>
+                                            <li><a class="dropdown-item" href="#">Add Review</a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>#125</td>
+                                <td>Renewable Energy Adoption</td>
+                                <td><span class="badge bg-success">Opportunity</span></td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">3.5</span>
+                                        <div class="progress" style="width: 60px; height: 5px;">
+                                            <div class="progress-bar bg-warning" style="width: 70%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">4.3</span>
+                                        <div class="progress" style="width: 60px; height: 5px;">
+                                            <div class="progress-bar bg-danger" style="width: 86%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="status-badge status-draft">Draft</span></td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            Actions
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" href="#">View Details</a></li>
+                                            <li><a class="dropdown-item" href="#">Edit Assessment</a></li>
+                                            <li><a class="dropdown-item" href="#">Add Review</a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Materiality matrix chart
+    const matrixCtx = document.getElementById('materialityMatrix').getContext('2d');
+    const matrixChart = new Chart(matrixCtx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Risks',
+                data: [
+                    { x: 4.2, y: 3.8, id: 123, title: 'Climate Change Transition' },
+                    { x: 3.9, y: 3.1, id: 124, title: 'Water Scarcity' },
+                    { x: 2.8, y: 2.2, id: 126, title: 'Labor Practices' },
+                    { x: 2.1, y: 1.9, id: 127, title: 'Product Safety' },
+                    { x: 1.5, y: 1.2, id: 128, title: 'Data Privacy' }
+                ],
+                backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                borderColor: 'rgba(239, 68, 68, 1)',
+                borderWidth: 1,
+                pointRadius: 8,
+                pointHoverRadius: 10
+            }, {
+                label: 'Opportunities',
+                data: [
+                    { x: 3.5, y: 4.3, id: 125, title: 'Renewable Energy Adoption' },
+                    { x: 3.2, y: 3.7, id: 129, title: 'Circular Economy' },
+                    { x: 1.8, y: 2.6, id: 130, title: 'Sustainable Products' }
+                ],
+                backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                borderColor: 'rgba(34, 197, 94, 1)',
+                borderWidth: 1,
+                pointRadius: 8,
+                pointHoverRadius: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Impact Materiality'
+                    },
+                    min: 0,
+                    max: 5,
+                    grid: {
+                        display: true,
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Financial Materiality'
+                    },
+                    min: 0,
+                    max: 5,
+                    grid: {
+                        display: true,
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const point = context.raw;
+                            return `${point.title} (ID: ${point.id})
+Impact: ${point.x.toFixed(1)}, Financial: ${point.y.toFixed(1)}`;
+                        }
+                    }
+                },
+                annotation: {
+                    annotations: {
+                        quadrants: {
+                            type: 'line',
+                            xMin: 2.5,
+                            xMax: 2.5,
+                            yMin: 0,
+                            yMax: 5,
+                            borderColor: 'rgba(0, 0, 0, 0.2)',
+                            borderWidth: 1,
+                            borderDash: [5, 5]
+                        },
+                        horizontalLine: {
+                            type: 'line',
+                            yMin: 2.5,
+                            yMax: 2.5,
+                            xMin: 0,
+                            xMax: 5,
+                            borderColor: 'rgba(0, 0, 0, 0.2)',
+                            borderWidth: 1,
+                            borderDash: [5, 5]
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
 {% endblock %}

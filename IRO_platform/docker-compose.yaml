@@ -19,6 +19,12 @@ services:
 
         # 3) Migrate the tenant schemas
         python manage.py migrate_schemas --tenant;
+        
+        # Check if tenant schemas have the iro table after migration
+        echo 'Listing tables in tenant_tenant1 schema...'
+        docker compose exec -T db psql -U dma_user -d dma_db -c \"\\dt tenant_tenant1.*\"
+        echo 'Listing tables in tenant_tenant2 schema...'
+        docker compose exec -T db psql -U dma_user -d dma_db -c \"\\dt tenant_tenant2.*\"
 
         # 4) Collect static files so admin CSS/JS are available
         python manage.py collectstatic --noinput;

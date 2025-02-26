@@ -1,18 +1,195 @@
 {% extends "base.html" %}
+{% load crispy_forms_tags %}
 
-{% block title %}
-    IRO Form
-{% endblock %}
+{% block title %}IRO Form | DMA Platform{% endblock %}
+{% block page_title %}{% if form.instance.pk %}Edit IRO{% else %}Create New IRO{% endif %}{% endblock %}
 
 {% block content %}
-<div class="section">
-    <h1>Create / Update IRO</h1>
-    <form method="POST" novalidate>
-        {% csrf_token %}
-        {{ form.as_p }}
-
-        <button type="submit" class="btn btn-success">Save</button>
-        <a href="{% url 'assessments:iro-list' %}" class="btn btn-secondary">Cancel</a>
-    </form>
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h5 class="card-title mb-0">
+                    {% if form.instance.pk %}
+                        Edit IRO #{{ form.instance.iro_id }}
+                    {% else %}
+                        Create New Impact, Risk, or Opportunity
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" novalidate id="iro-form">
+                    {% csrf_token %}
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <span>Complete all required fields to create a new IRO. You can edit additional details after creation.</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Basic Information Section -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Basic Information</h5>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            {{ form.tenant|as_crispy_field }}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            {{ form.type|as_crispy_field }}
+                        </div>
+                        
+                        <div class="col-md-12 mt-3">
+                            <div class="form-group">
+                                <label for="id_title">Title</label>
+                                <input type="text" name="title" class="form-control" id="id_title" placeholder="Enter a clear, descriptive title" required>
+                                <div class="form-text text-muted">
+                                    Provide a concise title that clearly identifies this IRO
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-12 mt-3">
+                            <div class="form-group">
+                                <label for="id_description">Description</label>
+                                <textarea name="description" class="form-control" id="id_description" rows="4" placeholder="Describe this IRO in detail"></textarea>
+                                <div class="form-text text-muted">
+                                    Include relevant context, scope, and potential implications
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Classification Section -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Classification</h5>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            {{ form.source_of_iro|as_crispy_field }}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            {{ form.esrs_standard|as_crispy_field }}
+                        </div>
+                        
+                        <div class="col-md-6 mt-3">
+                            <div class="form-group">
+                                <label for="id_sust_topic_level1">Sustainability Topic (Level 1)</label>
+                                <select name="sust_topic_level1" class="form-select" id="id_sust_topic_level1">
+                                    <option value="">Select a topic</option>
+                                    <option value="climate">Climate</option>
+                                    <option value="water">Water & Marine Resources</option>
+                                    <option value="biodiversity">Biodiversity & Ecosystems</option>
+                                    <option value="pollution">Pollution</option>
+                                    <option value="resources">Resources & Circular Economy</option>
+                                    <option value="workforce">Workforce</option>
+                                    <option value="communities">Communities</option>
+                                    <option value="consumers">Consumers & End-users</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mt-3">
+                            <div class="form-group">
+                                <label for="id_value_chain">Value Chain Position</label>
+                                <select name="value_chain" class="form-select" id="id_value_chain" multiple>
+                                    <option value="upstream">Upstream</option>
+                                    <option value="operations">Own Operations</option>
+                                    <option value="downstream">Downstream</option>
+                                </select>
+                                <div class="form-text text-muted">
+                                    Hold Ctrl/Cmd to select multiple options
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Status Section -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Status</h5>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            {{ form.current_stage|as_crispy_field }}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            {{ form.last_assessment_date|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <!-- Form Actions -->
+                    <div class="row">
+                        <div class="col-12 d-flex justify-content-between">
+                            <a href="{% url 'assessments:iro-list' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Cancel
+                            </a>
+                            <div>
+                                <button type="submit" name="save_draft" class="btn btn-outline-primary me-2">
+                                    <i class="fas fa-save me-1"></i> Save as Draft
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-check-circle me-1"></i> 
+                                    {% if form.instance.pk %}Update{% else %}Create{% endif %} IRO
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Form validation enhancement
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('iro-form');
+        
+        form.addEventListener('submit', function(event) {
+            let isValid = true;
+            const title = document.getElementById('id_title');
+            
+            if (!title.value.trim()) {
+                isValid = false;
+                title.classList.add('is-invalid');
+                
+                if (!title.nextElementSibling || !title.nextElementSibling.classList.contains('invalid-feedback')) {
+                    const feedback = document.createElement('div');
+                    feedback.classList.add('invalid-feedback');
+                    feedback.textContent = 'Title is required';
+                    title.parentNode.insertBefore(feedback, title.nextElementSibling);
+                }
+            } else {
+                title.classList.remove('is-invalid');
+                title.classList.add('is-valid');
+            }
+            
+            if (!isValid) {
+                event.preventDefault();
+            }
+        });
+        
+        // Dynamic topic selection
+        const topicLevel1 = document.getElementById('id_sust_topic_level1');
+        if (topicLevel1) {
+            topicLevel1.addEventListener('change', function() {
+                // Here you could load subtopics based on the selected level 1 topic
+                console.log('Selected topic:', this.value);
+                // This would typically trigger an AJAX call or use HTMX to load subtopics
+            });
+        }
+    });
+</script>
 {% endblock %}
