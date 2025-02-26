@@ -2,7 +2,6 @@
 
 {% load assessment_filters %}
 
-
 {% block title %}IROs | DMA Platform{% endblock %}
 {% block page_title %}IROs{% endblock %}
 
@@ -18,29 +17,131 @@
             <div class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">IROs Library</h5>
                 <div class="d-flex">
+                    <!-- Search input with HTMX -->
+                    <div class="me-2">
+                        <input type="text" 
+                               id="searchInput" 
+                               class="form-control" 
+                               placeholder="Search IROs..." 
+                               hx-post="{% url 'assessments:iro-search' %}"
+                               hx-trigger="keyup changed delay:500ms"
+                               hx-target="#iro-table-body"
+                               hx-indicator="#search-indicator">
+                    </div>
+                    
+                    <!-- Type filter dropdown with HTMX -->
                     <div class="dropdown me-2">
                         <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="typeFilterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                             Filter by Type
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="typeFilterDropdown">
-                            <li><a class="dropdown-item" href="#">All Types</a></li>
-                            <li><a class="dropdown-item" href="#">Risk</a></li>
-                            <li><a class="dropdown-item" href="#">Opportunity</a></li>
-                            <li><a class="dropdown-item" href="#">Impact</a></li>
+                            <li>
+                                <a class="dropdown-item" 
+                                   href="#" 
+                                   hx-get="{% url 'assessments:iro-filter' %}?type=all"
+                                   hx-target="#iro-table-body"
+                                   hx-indicator="#filter-indicator">
+                                    All Types
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" 
+                                   href="#" 
+                                   hx-get="{% url 'assessments:iro-filter' %}?type=Risk"
+                                   hx-target="#iro-table-body"
+                                   hx-indicator="#filter-indicator">
+                                    Risk
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" 
+                                   href="#" 
+                                   hx-get="{% url 'assessments:iro-filter' %}?type=Opportunity"
+                                   hx-target="#iro-table-body"
+                                   hx-indicator="#filter-indicator">
+                                    Opportunity
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" 
+                                   href="#" 
+                                   hx-get="{% url 'assessments:iro-filter' %}?type=Impact"
+                                   hx-target="#iro-table-body"
+                                   hx-indicator="#filter-indicator">
+                                    Impact
+                                </a>
+                            </li>
                         </ul>
                     </div>
+                    
+                    <!-- Status filter dropdown with HTMX -->
                     <div class="dropdown">
                         <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="statusFilterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                             Filter by Status
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="statusFilterDropdown">
-                            <li><a class="dropdown-item" href="#">All Statuses</a></li>
-                            <li><a class="dropdown-item" href="#">Draft</a></li>
-                            <li><a class="dropdown-item" href="#">In Review</a></li>
-                            <li><a class="dropdown-item" href="#">Approved</a></li>
-                            <li><a class="dropdown-item" href="#">Disclosed</a></li>
+                            <li>
+                                <a class="dropdown-item" 
+                                   href="#" 
+                                   hx-get="{% url 'assessments:iro-filter' %}?status=all"
+                                   hx-target="#iro-table-body"
+                                   hx-indicator="#filter-indicator">
+                                    All Statuses
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" 
+                                   href="#" 
+                                   hx-get="{% url 'assessments:iro-filter' %}?status=Draft"
+                                   hx-target="#iro-table-body"
+                                   hx-indicator="#filter-indicator">
+                                    Draft
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" 
+                                   href="#" 
+                                   hx-get="{% url 'assessments:iro-filter' %}?status=In_Review"
+                                   hx-target="#iro-table-body"
+                                   hx-indicator="#filter-indicator">
+                                    In Review
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" 
+                                   href="#" 
+                                   hx-get="{% url 'assessments:iro-filter' %}?status=Approved"
+                                   hx-target="#iro-table-body"
+                                   hx-indicator="#filter-indicator">
+                                    Approved
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" 
+                                   href="#" 
+                                   hx-get="{% url 'assessments:iro-filter' %}?status=Disclosed"
+                                   hx-target="#iro-table-body"
+                                   hx-indicator="#filter-indicator">
+                                    Disclosed
+                                </a>
+                            </li>
                         </ul>
                     </div>
+                </div>
+            </div>
+            <!-- HTMX Indicators -->
+            <div class="d-flex justify-content-end mt-2">
+                <div id="search-indicator" class="htmx-indicator me-2">
+                    <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                    <span>Searching...</span>
+                </div>
+                <div id="filter-indicator" class="htmx-indicator me-2">
+                    <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                    <span>Filtering...</span>
+                </div>
+                <div id="sort-indicator" class="htmx-indicator">
+                    <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                    <span>Sorting...</span>
                 </div>
             </div>
         </div>
@@ -52,131 +153,55 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light">
                         <tr>
-                            <th>IRO ID</th>
-                            <th>Title</th>
-                            <th>Type</th>
-                            <th>ESRS</th>
-                            <th>Impact Score</th>
+                            <th hx-get="{% url 'assessments:iro-sort' %}?sort=iro_id" 
+                                hx-target="#iro-table-body" 
+                                hx-indicator="#sort-indicator"
+                                role="button">
+                                IRO ID <i class="fas fa-sort text-muted"></i>
+                            </th>
+                            <th hx-get="{% url 'assessments:iro-sort' %}?sort=title" 
+                                hx-target="#iro-table-body" 
+                                hx-indicator="#sort-indicator"
+                                role="button">
+                                Title <i class="fas fa-sort text-muted"></i>
+                            </th>
+                            <th hx-get="{% url 'assessments:iro-sort' %}?sort=type" 
+                                hx-target="#iro-table-body" 
+                                hx-indicator="#sort-indicator"
+                                role="button">
+                                Type <i class="fas fa-sort text-muted"></i>
+                            </th>
+                            <th hx-get="{% url 'assessments:iro-sort' %}?sort=esrs_standard" 
+                                hx-target="#iro-table-body" 
+                                hx-indicator="#sort-indicator"
+                                role="button">
+                                ESRS <i class="fas fa-sort text-muted"></i>
+                            </th>
+                            <th hx-get="{% url 'assessments:iro-sort' %}?sort=last_assessment_score" 
+                                hx-target="#iro-table-body" 
+                                hx-indicator="#sort-indicator"
+                                role="button">
+                                Impact Score <i class="fas fa-sort text-muted"></i>
+                            </th>
                             <th>Financial Score</th>
-                            <th>Status</th>
+                            <th hx-get="{% url 'assessments:iro-sort' %}?sort=current_stage" 
+                                hx-target="#iro-table-body" 
+                                hx-indicator="#sort-indicator"
+                                role="button">
+                                Status <i class="fas fa-sort text-muted"></i>
+                            </th>
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% for item in iros %}
+                    <tbody id="iro-table-body" hx-trigger="load" hx-get="{% url 'assessments:iro-list-rows' %}">
+                        <!-- Rows will be loaded via HTMX -->
                         <tr>
-                            <td>#{{ item.iro_id }}</td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    {% if item.type == 'Risk' %}
-                                    <span class="badge bg-danger me-2">R</span>
-                                    {% elif item.type == 'Opportunity' %}
-                                    <span class="badge bg-success me-2">O</span>
-                                    {% else %}
-                                    <span class="badge bg-primary me-2">I</span>
-                                    {% endif %}
-                                    <div>
-                                        <div class="fw-medium">{{ item.title }}</div>
-                                        <small class="text-muted">{{ item.tenant.tenant_name }}</small>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                {% if item.type == 'Risk' %}
-                                Risk
-                                {% elif item.type == 'Opportunity' %}
-                                Opportunity
-                                {% else %}
-                                Impact
-                                {% endif %}
-                            </td>
-                            <td>{{ item.esrs_standard|default:"--" }}</td>
-                            <td>
-                                {% if item.last_assessment_score %}
-                                <div class="d-flex align-items-center">
-                                    <span class="me-2">{{ item.last_assessment_score }}</span>
-                                    <div class="progress" style="width: 60px; height: 5px;">
-                                        <div class="progress-bar {% if item.last_assessment_score > 3.5 %}bg-danger{% elif item.last_assessment_score > 2.5 %}bg-warning{% else %}bg-success{% endif %}" 
-                                            style="width: {{ item.last_assessment_score|floatformat:1|stringformat:'s'|slice:'0:3'|floatformat:1|mul:20 }}%">
-                                        </div>
-                                    </div>
-                                </div>
-                                {% else %}
-                                --
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if item.last_assessment_score %}
-                                <div class="d-flex align-items-center">
-                                    <span class="me-2">{{ item.last_assessment_score|add:"-0.2"|floatformat:1 }}</span>
-                                    <div class="progress" style="width: 60px; height: 5px;">
-                                        <div class="progress-bar {% if item.last_assessment_score > 3.5 %}bg-danger{% elif item.last_assessment_score > 2.5 %}bg-warning{% else %}bg-success{% endif %}" 
-                                            style="width: {{ item.last_assessment_score|add:'-0.2'|floatformat:1|stringformat:'s'|slice:'0:3'|floatformat:1|mul:20 }}%">
-                                        </div>
-                                    </div>
-                                </div>
-                                {% else %}
-                                --
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if item.current_stage == 'Draft' %}
-                                Draft
-                                {% elif item.current_stage == 'In_Review' %}
-                                In Review
-                                {% elif item.current_stage == 'Approved' %}
-                                Approved
-                                {% else %}
-                                Disclosed
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                        Actions
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        <li>
-                                            <a class="dropdown-item" href="{% url 'assessments:iro-edit' item.iro_id %}">
-                                                <i class="fas fa-edit me-1"></i> Edit
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="#">
-                                                <i class="fas fa-clipboard-check me-1"></i> Assess
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="#">
-                                                <i class="fas fa-eye me-1"></i> View Details
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <hr class="dropdown-divider">
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item text-danger" href="#">
-                                                <i class="fas fa-trash-alt me-1"></i> Delete
-                                            </a>
-                                        </li>
-                                    </ul>
+                            <td colspan="8" class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
                                 </div>
                             </td>
                         </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="8" class="text-center py-5">
-                                <div class="py-5">
-                                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
-                                    <h5>No IROs found</h5>
-                                    <p class="text-muted">Create your first IRO to begin the assessment process.</p>
-                                    <a href="{% url 'assessments:iro-create' %}" class="btn btn-primary mt-2">
-                                        <i class="fas fa-plus me-1"></i> Create New IRO
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
                     </tbody>
                 </table>
             </div>
@@ -185,9 +210,10 @@
     
     <div class="d-flex justify-content-between align-items-center">
         <div>
-            <p class="text-muted mb-0">Showing 1-10 of {{ iros|length }} items</p>
+            <p class="text-muted mb-0">Showing <span id="iro-count">{{ iros|length }}</span> items</p>
         </div>
-        <div>
+        <div id="pagination-container">
+            <!-- Pagination will be updated via HTMX when filtering/sorting -->
             <nav aria-label="Page navigation">
                 <ul class="pagination mb-0">
                     <li class="page-item disabled">
@@ -203,4 +229,27 @@
             </nav>
         </div>
     </div>
+
+    <!-- HTMX CSS styling for indicators -->
+    <style>
+        .htmx-indicator {
+            display: none;
+        }
+        
+        .htmx-request .htmx-indicator {
+            display: inline-block;
+        }
+        
+        .htmx-request.htmx-indicator {
+            display: inline-block;
+        }
+        
+        th[role="button"] {
+            cursor: pointer;
+        }
+        
+        th[role="button"]:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+    </style>
 {% endblock %}

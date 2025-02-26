@@ -1,0 +1,24 @@
+<form hx-post="{% url 'assessments:iro-update-title' iro.iro_id %}" 
+      hx-target="this" 
+      hx-swap="outerHTML"
+      class="fw-medium">
+    <input type="text" 
+           name="title" 
+           value="{{ iro.title }}" 
+           class="form-control form-control-sm"
+           hx-get="{% url 'assessments:iro-validate-title' %}"
+           hx-trigger="keyup changed delay:500ms"
+           hx-target="next .invalid-feedback"
+           hx-swap="innerHTML">
+    <div class="invalid-feedback"></div>
+    <div class="mt-1">
+        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        <button type="button" 
+                class="btn btn-sm btn-outline-secondary"
+                hx-get="{% url 'assessments:iro-cancel-edit-title' iro.iro_id %}"
+                hx-target="closest form"
+                hx-swap="outerHTML">
+            Cancel
+        </button>
+    </div>
+</form>

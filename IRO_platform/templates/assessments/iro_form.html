@@ -18,7 +18,11 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form method="POST" novalidate id="iro-form">
+                <form method="POST" novalidate id="iro-form"
+                      hx-post="{{ request.path }}"
+                      hx-trigger="submit"
+                      hx-indicator="#form-indicator"
+                      hx-swap="outerHTML">
                     {% csrf_token %}
                     
                     <div class="row mb-4">
@@ -41,15 +45,43 @@
                         </div>
                         
                         <div class="col-md-6">
-                            {{ form.type|as_crispy_field }}
+                            <div class="form-group">
+                                <label for="id_type">Type</label>
+                                <select name="type" id="id_type" class="form-select"
+                                        hx-get="{% url 'assessments:iro-type-changed' %}"
+                                        hx-target="#typeSpecificFields"
+                                        hx-trigger="change"
+                                        hx-indicator="#type-indicator">
+                                    <option value="">Select Type</option>
+                                    <option value="Risk" {% if form.instance.type == 'Risk' %}selected{% endif %}>Risk</option>
+                                    <option value="Opportunity" {% if form.instance.type == 'Opportunity' %}selected{% endif %}>Opportunity</option>
+                                    <option value="Impact" {% if form.instance.type == 'Impact' %}selected{% endif %}>Impact</option>
+                                </select>
+                                <div id="type-indicator" class="htmx-indicator">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="col-md-12 mt-3">
                             <div class="form-group">
                                 <label for="id_title">Title</label>
-                                <input type="text" name="title" class="form-control" id="id_title" placeholder="Enter a clear, descriptive title" required>
-                                <div class="form-text text-muted">
+                                <input type="text" name="title" class="form-control" id="id_title"
+                                       placeholder="Enter a clear, descriptive title" required
+                                       hx-post="{% url 'assessments:validate-title' %}"
+                                       hx-trigger="keyup changed delay:500ms"
+                                       hx-target="#title-feedback"
+                                       hx-indicator="#title-indicator"
+                                       value="{{ form.instance.title|default:'' }}">
+                                <div id="title-feedback" class="form-text text-muted">
                                     Provide a concise title that clearly identifies this IRO
+                                </div>
+                                <div id="title-indicator" class="htmx-indicator">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -57,9 +89,19 @@
                         <div class="col-md-12 mt-3">
                             <div class="form-group">
                                 <label for="id_description">Description</label>
-                                <textarea name="description" class="form-control" id="id_description" rows="4" placeholder="Describe this IRO in detail"></textarea>
-                                <div class="form-text text-muted">
+                                <textarea name="description" class="form-control" id="id_description" rows="4" 
+                                          placeholder="Describe this IRO in detail"
+                                          hx-post="{% url 'assessments:validate-description' %}"
+                                          hx-trigger="keyup changed delay:800ms"
+                                          hx-target="#description-feedback"
+                                          hx-indicator="#description-indicator">{{ form.instance.description|default:'' }}</textarea>
+                                <div id="description-feedback" class="form-text text-muted">
                                     Include relevant context, scope, and potential implications
+                                </div>
+                                <div id="description-indicator" class="htmx-indicator">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -72,34 +114,63 @@
                         </div>
                         
                         <div class="col-md-6">
-                            {{ form.source_of_iro|as_crispy_field }}
+                            <div id="source-of-iro-container">
+                                {{ form.source_of_iro|as_crispy_field }}
+                                <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+                                        hx-get="{% url 'assessments:inline-edit' %}?field=source_of_iro&value={{ form.instance.source_of_iro|default:'' }}"
+                                        hx-target="#source-of-iro-container"
+                                        hx-swap="outerHTML">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </div>
                         </div>
                         
                         <div class="col-md-6">
-                            {{ form.esrs_standard|as_crispy_field }}
+                            <div id="esrs-standard-container">
+                                {{ form.esrs_standard|as_crispy_field }}
+                                <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+                                        hx-get="{% url 'assessments:inline-edit' %}?field=esrs_standard&value={{ form.instance.esrs_standard|default:'' }}"
+                                        hx-target="#esrs-standard-container"
+                                        hx-swap="outerHTML">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </div>
                         </div>
                         
                         <div class="col-md-6 mt-3">
                             <div class="form-group">
                                 <label for="id_sust_topic_level1">Sustainability Topic (Level 1)</label>
-                                <select name="sust_topic_level1" class="form-select" id="id_sust_topic_level1">
+                                <select name="sust_topic_level1" class="form-select" id="id_sust_topic_level1"
+                                        hx-get="{% url 'assessments:get-subtopics' %}"
+                                        hx-target="#id_sust_topic_level2"
+                                        hx-trigger="change">
                                     <option value="">Select a topic</option>
-                                    <option value="climate">Climate</option>
-                                    <option value="water">Water & Marine Resources</option>
-                                    <option value="biodiversity">Biodiversity & Ecosystems</option>
-                                    <option value="pollution">Pollution</option>
-                                    <option value="resources">Resources & Circular Economy</option>
-                                    <option value="workforce">Workforce</option>
-                                    <option value="communities">Communities</option>
-                                    <option value="consumers">Consumers & End-users</option>
+                                    <option value="climate" {% if iro_version.sust_topic_level1 == 'climate' %}selected{% endif %}>Climate</option>
+                                    <option value="water" {% if iro_version.sust_topic_level1 == 'water' %}selected{% endif %}>Water & Marine Resources</option>
+                                    <option value="biodiversity" {% if iro_version.sust_topic_level1 == 'biodiversity' %}selected{% endif %}>Biodiversity & Ecosystems</option>
+                                    <option value="pollution" {% if iro_version.sust_topic_level1 == 'pollution' %}selected{% endif %}>Pollution</option>
+                                    <option value="resources" {% if iro_version.sust_topic_level1 == 'resources' %}selected{% endif %}>Resources & Circular Economy</option>
+                                    <option value="workforce" {% if iro_version.sust_topic_level1 == 'workforce' %}selected{% endif %}>Workforce</option>
+                                    <option value="communities" {% if iro_version.sust_topic_level1 == 'communities' %}selected{% endif %}>Communities</option>
+                                    <option value="consumers" {% if iro_version.sust_topic_level1 == 'consumers' %}selected{% endif %}>Consumers & End-users</option>
                                 </select>
                             </div>
                         </div>
                         
                         <div class="col-md-6 mt-3">
                             <div class="form-group">
+                                <label for="id_sust_topic_level2">Sustainability Topic (Level 2)</label>
+                                <select name="sust_topic_level2" class="form-select" id="id_sust_topic_level2" disabled>
+                                    <option value="">Select level 1 topic first</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mt-3">
+                            <div x-data="{ selected: [] }" class="form-group">
                                 <label for="id_value_chain">Value Chain Position</label>
-                                <select name="value_chain" class="form-select" id="id_value_chain" multiple>
+                                <select name="value_chain" class="form-select" id="id_value_chain" multiple
+                                        x-model="selected">
                                     <option value="upstream">Upstream</option>
                                     <option value="operations">Own Operations</option>
                                     <option value="downstream">Downstream</option>
@@ -107,8 +178,22 @@
                                 <div class="form-text text-muted">
                                     Hold Ctrl/Cmd to select multiple options
                                 </div>
+                                <div class="mt-2">
+                                    <template x-for="(item, index) in selected" :key="index">
+                                        <span class="badge bg-primary me-1 mb-1">
+                                            <span x-text="item"></span>
+                                            <button type="button" class="btn-close btn-close-white ms-1" aria-label="Remove"
+                                                   @click="selected = selected.filter(i => i !== item)"></button>
+                                        </span>
+                                    </template>
+                                </div>
                             </div>
                         </div>
+                    </div>
+                    
+                    <!-- Type-specific fields will load here -->
+                    <div id="typeSpecificFields">
+                        <!-- This section will be populated via HTMX based on type selection -->
                     </div>
                     
                     <!-- Status Section -->
@@ -118,7 +203,15 @@
                         </div>
                         
                         <div class="col-md-6">
-                            {{ form.current_stage|as_crispy_field }}
+                            <div id="current-stage-container">
+                                {{ form.current_stage|as_crispy_field }}
+                                <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+                                        hx-get="{% url 'assessments:inline-edit' %}?field=current_stage&value={{ form.instance.current_stage|default:'Draft' }}"
+                                        hx-target="#current-stage-container"
+                                        hx-swap="outerHTML">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </div>
                         </div>
                         
                         <div class="col-md-6">
@@ -133,7 +226,11 @@
                                 <i class="fas fa-arrow-left me-1"></i> Cancel
                             </a>
                             <div>
-                                <button type="submit" name="save_draft" class="btn btn-outline-primary me-2">
+                                <button type="button" class="btn btn-outline-primary me-2"
+                                        hx-post="{% url 'assessments:save-draft' %}"
+                                        hx-include="#iro-form"
+                                        hx-target="#save-feedback"
+                                        hx-swap="innerHTML">
                                     <i class="fas fa-save me-1"></i> Save as Draft
                                 </button>
                                 <button type="submit" class="btn btn-primary">
@@ -141,6 +238,13 @@
                                     {% if form.instance.pk %}Update{% else %}Create{% endif %} IRO
                                 </button>
                             </div>
+                        </div>
+                        <div id="save-feedback" class="col-12 mt-3"></div>
+                        <div id="form-indicator" class="htmx-indicator text-center mt-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Saving...</span>
+                            </div>
+                            <p>Processing your request...</p>
                         </div>
                     </div>
                 </form>
@@ -153,10 +257,42 @@
 
 {% block extra_js %}
 <script>
+    // Initialize Alpine.js components when DOM is loaded
+    document.addEventListener('alpine:init', () => {
+        // Add any Alpine.js component initialization here
+    });
+
+    // HTMX event handlers
+    document.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.successful && evt.detail.target.id === 'save-feedback') {
+            // Flash effect for the feedback message
+            const feedbackEl = evt.detail.target;
+            feedbackEl.classList.add('bg-success', 'text-white', 'p-3', 'rounded');
+            setTimeout(() => {
+                feedbackEl.classList.remove('bg-success', 'text-white', 'p-3', 'rounded');
+            }, 3000);
+        }
+    });
+    
+    // For fields that need both HTML5 validation and HTMX validation
+    document.addEventListener('htmx:validation:validate', function(evt) {
+        const field = evt.detail.elt;
+        
+        // Title validation
+        if (field.id === 'id_title' && !field.value.trim()) {
+            evt.detail.issueMessages.push("Title is required");
+            field.classList.add('is-invalid');
+            return;
+        }
+        
+        // Add more validations as needed
+    });
+    
     // Form validation enhancement
     document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('iro-form');
         
+        // Handle form validation errors not caught by HTMX
         form.addEventListener('submit', function(event) {
             let isValid = true;
             const title = document.getElementById('id_title');
@@ -178,18 +314,9 @@
             
             if (!isValid) {
                 event.preventDefault();
+                event.stopPropagation();
             }
         });
-        
-        // Dynamic topic selection
-        const topicLevel1 = document.getElementById('id_sust_topic_level1');
-        if (topicLevel1) {
-            topicLevel1.addEventListener('change', function() {
-                // Here you could load subtopics based on the selected level 1 topic
-                console.log('Selected topic:', this.value);
-                // This would typically trigger an AJAX call or use HTMX to load subtopics
-            });
-        }
     });
 </script>
 {% endblock %}
