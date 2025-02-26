@@ -20,13 +20,16 @@ services:
         # 3) Migrate the tenant schemas
         python manage.py migrate_schemas --tenant;
         
+        # 4) Initialize sample data for testing
+        python manage.py init_sample_data;
+        
         # Check if tenant schemas have the iro table after migration
         echo 'Listing tables in tenant_tenant1 schema...'
-        docker compose exec -T db psql -U dma_user -d dma_db -c \"\\dt tenant_tenant1.*\"
+        PGPASSWORD=password psql -h db -U dma_user -d dma_db -c \"\\dt tenant_tenant1.*\"
         echo 'Listing tables in tenant_tenant2 schema...'
-        docker compose exec -T db psql -U dma_user -d dma_db -c \"\\dt tenant_tenant2.*\"
+        PGPASSWORD=password psql -h db -U dma_user -d dma_db -c \"\\dt tenant_tenant2.*\"
 
-        # 4) Collect static files so admin CSS/JS are available
+        # 5) Collect static files so admin CSS/JS are available
         python manage.py collectstatic --noinput;
 
         # Finally start Gunicorn
@@ -39,12 +42,13 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings.local
       - DATABASE_URL=postgres://dma_user:password@db:5432/dma_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
       - PYTHONUNBUFFERED=1
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     logging:
       driver: "json-file"
       options:
@@ -92,6 +96,7 @@ services:
 
   worker:
     build: .
+    user: appuser  # Use the non-root user
     command: celery -A core worker --loglevel=info
     volumes:
       - .:/app

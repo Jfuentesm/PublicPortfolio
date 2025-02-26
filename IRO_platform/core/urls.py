@@ -2,7 +2,8 @@
 from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import path, include
-from django.views.generic import TemplateView  # Add this import
+from django.views.generic import TemplateView
+from . import views  # Add this import to reference the core/views.py module
 
 def home(request):
     return HttpResponse("Welcome to the IRO Platform!")
@@ -16,4 +17,6 @@ urlpatterns = [
     # NEW: Register the DRF endpoints
     path('api/assessments/', include('apps.assessments.api.urls')),  
     path('api/tenants/', include('tenants.api.urls')), 
+
+    path('set-context/', views.set_context, name='set_context'),
 ]

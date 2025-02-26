@@ -1,0 +1,168 @@
+<!-- templates/components/context_selector.html -->
+<div class="context-selector border rounded p-3 mb-4 bg-light">
+    <h5 class="mb-3">Current Context</h5>
+    
+    <div class="row">
+        <!-- Tenant Context -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Tenant</h6>
+                </div>
+                <div class="card-body">
+                    {% if request.context.tenant %}
+                        <p class="mb-1 fw-bold">{{ request.context.tenant.tenant_name }}</p>
+                    {% else %}
+                        <p class="text-muted mb-1">No tenant selected</p>
+                    {% endif %}
+                    
+                    {% if request.user.is_staff %}
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" 
+                                data-bs-toggle="modal" data-bs-target="#tenantSelectorModal">
+                            Change
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Assessment Context -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Assessment</h6>
+                </div>
+                <div class="card-body">
+                    {% if request.context.assessment %}
+                        <p class="mb-1 fw-bold">{{ request.context.assessment.name }}</p>
+                        <p class="small text-muted">{{ request.context.assessment.description|truncatechars:50 }}</p>
+                    {% else %}
+                        <p class="text-muted mb-1">No assessment selected</p>
+                    {% endif %}
+                    
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                data-bs-toggle="modal" data-bs-target="#assessmentSelectorModal">
+                            {% if request.context.assessment %}Change{% else %}Select{% endif %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- IRO Context -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">IRO</h6>
+                </div>
+                <div class="card-body">
+                    {% if request.context.iro %}
+                        <p class="mb-1 fw-bold">{{ request.context.iro.title }}</p>
+                        <div class="badge bg-{% if request.context.iro.type == 'Risk' %}danger{% elif request.context.iro.type == 'Opportunity' %}success{% else %}primary{% endif %}">
+                            {{ request.context.iro.type }}
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-1">No IRO selected</p>
+                    {% endif %}
+                    
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" 
+                                {% if not request.context.assessment %}disabled{% endif %}
+                                data-bs-toggle="modal" data-bs-target="#iroSelectorModal">
+                            {% if request.context.iro %}Change{% else %}Select{% endif %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tenant Selector Modal -->
+<div class="modal fade" id="tenantSelectorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Tenant</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group">
+                    {% for tenant in available_tenants %}
+                    <a href="{% url 'set_context' %}?tenant_id={{ tenant.tenant_id }}&next={{ request.path }}" 
+                       class="list-group-item list-group-item-action {% if request.context.tenant == tenant %}active{% endif %}">
+                        {{ tenant.tenant_name }}
+                    </a>
+                    {% empty %}
+                    <div class="alert alert-info">No tenants available.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assessment Selector Modal -->
+<div class="modal fade" id="assessmentSelectorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Assessment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group">
+                    {% for assessment in available_assessments %}
+                    <a href="{% url 'set_context' %}?assessment_id={{ assessment.id }}&next={{ request.path }}" 
+                       class="list-group-item list-group-item-action {% if request.context.assessment == assessment %}active{% endif %}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ assessment.name }}</h6>
+                            <small>{{ assessment.created_on|date }}</small>
+                        </div>
+                        <p class="mb-1 small">{{ assessment.description|truncatechars:100 }}</p>
+                    </a>
+                    {% empty %}
+                    <div class="alert alert-info">No assessments available.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- IRO Selector Modal -->
+<div class="modal fade" id="iroSelectorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select IRO</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if request.context.assessment %}
+                <div class="list-group">
+                    {% for iro in available_iros %}
+                    <a href="{% url 'set_context' %}?iro_id={{ iro.iro_id }}&next={{ request.path }}" 
+                       class="list-group-item list-group-item-action {% if request.context.iro == iro %}active{% endif %}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ iro.title }}</h6>
+                            <span class="badge bg-{% if iro.type == 'Risk' %}danger{% elif iro.type == 'Opportunity' %}success{% else %}primary{% endif %}">
+                                {{ iro.type }}
+                            </span>
+                        </div>
+                        <p class="mb-1 small">{{ iro.description|truncatechars:100 }}</p>
+                    </a>
+                    {% empty %}
+                    <div class="alert alert-info">No IROs available for this assessment.</div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning">Please select an assessment first.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

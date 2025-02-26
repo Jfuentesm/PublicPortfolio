@@ -63,18 +63,22 @@ DATABASE_ROUTERS = (
 # END DJANGO-TENANTS   #
 ########################
 
+# core/settings/base.py - update MIDDLEWARE list
+
 MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     # The tenant middleware must appear near the top (before DB queries occur):
     'django_tenants.middleware.main.TenantMainMiddleware',
-
+    
+    # Add our custom context middleware
+    'core.middleware.context_middleware.ContextMiddleware',
+    
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
 ########################
 # NEW: Guardian & Auth #
 ########################

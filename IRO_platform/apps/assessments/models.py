@@ -9,6 +9,7 @@ class Assessment(models.Model):
     (Kept from your original code, in case you still need a top-level
      Assessment model. You can remove it if it's no longer used.)
     """
+    tenant = models.ForeignKey(TenantConfig, on_delete=models.CASCADE, db_column="tenant_id", null=True, blank=True)
     name = models.CharField(max_length=200, help_text="Name of the assessment")
     description = models.TextField(blank=True, help_text="Optional description")
     created_on = models.DateTimeField(auto_now_add=True)

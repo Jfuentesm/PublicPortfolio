@@ -17,6 +17,16 @@ docker compose up -d
 echo "Waiting for the web container to finish startup..."
 sleep 5
 
+# First check if migrations are needed
+echo "Checking if migrations are needed..."
+if ! docker compose exec -T web python manage.py makemigrations --check; then
+    echo "Migrations are needed. Creating migrations with default value for tenant field..."
+    # Simulate selecting option 1 (one-off default) and providing default value 1
+    docker compose exec -T web bash -c "echo -e \"1\n1\n\" | python manage.py makemigrations assessments"
+else
+    echo "No migrations needed."
+fi
+
 echo "Running shared migrations..."
 docker compose exec -T web python manage.py migrate_schemas --shared
 

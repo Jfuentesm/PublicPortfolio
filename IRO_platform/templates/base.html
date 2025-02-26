@@ -175,6 +175,8 @@
             
             <!-- Main content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+                <!-- templates/base.html - add after the header section -->
+
                 <!-- Header with user info -->
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">{% block page_title %}Dashboard{% endblock %}</h1>
@@ -190,7 +192,10 @@
                         </ul>
                     </div>
                 </div>
-                
+
+                <!-- Context Selector -->
+                {% include 'components/context_selector.html' %}
+
                 <!-- Content container -->
                 <div class="container-fluid">
                     {% block content %}{% endblock %}
