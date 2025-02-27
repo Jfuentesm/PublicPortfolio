@@ -114,8 +114,8 @@ def home_dashboard(request):
             'iro_id': iro.iro_id,
             'title': iro.title,
             'type': iro.type,
-            'impact_score': impact_score,
-            'financial_score': financial_score,
+            'impact_score': float(impact_score) if impact_score else 0.0,
+            'financial_score': float(financial_score) if financial_score else 0.0,
             'current_stage': iro.current_stage,
         })
     
@@ -149,12 +149,12 @@ def home_dashboard(request):
         'completed_assessments_count': completed_assessments_count,
         'recent_activities': activity_data,
         'high_priority_iros': high_priority_iros,
+        'high_priority_iros_json': json.dumps(high_priority_iros),  # Add JSON serialized data for Handsontable
         'materiality_matrix_data': json.dumps(matrix_data),
     }
     
-    # Add available tenants to context for the tenant selector
-    if request.user.is_staff:
-        context['available_tenants'] = TenantConfig.objects.all()
+    # Always add available tenants to context for the tenant selector, not just for staff users
+    context['available_tenants'] = TenantConfig.objects.all()
     
     return render(request, 'home.html', context)
 
