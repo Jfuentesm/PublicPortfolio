@@ -1,0 +1,1315 @@
+openapi: 3.0.3
+info:
+  title: Beneficial Ownership Information Report (BOIR) System-to-System API User Guide
+  version: 1.0.1
+  description: |-
+    # **1.  BOIR System-to-System Filing Introduction**
+    The Beneficial Ownership Information Report (BOIR) collects information about the beneficial owner(s) and company applicant(s) associated with a reporting company. FinCEN supports two primary methods of filing when it comes to the BOIR: (1) “Form” based data collection via PDF BOIR or Online BOIR (which require very minimal setup to use), and (2) “System-to-System” based data collection via a REST API. This guide focuses on the System-to-System API filing method, specifically how to access the BOI E-Filing API and submit your BOIR information to FinCEN, interpret the submission response JSON, and understand what data validations and potential system processing errors may occur during the filing process. 
+    
+    # **2. BOIR BOIR API Access**
+    To obtain access to the BOI E-Filing API, contact FinCEN via the following contact us form to request access: https://www.fincen.gov/contact. Please be sure to include the following in your inquiry:  
+
+    1. Select the topic associated with the Beneficial Ownership (BO) / Corporate Transparency Act (CTA) 
+
+    2. Select the subject associated with API requests.  
+
+    3. Indicate in the message body that you are requesting API access credentials to connect to the BOI E-Filing API. 
+
+    This will prompt FinCEN to reach out to you directly to coordinate the creation of your access credentials (i.e., clientId and secret) to use with the BOI E-Filing API. FinCEN also provides access credentials to use with its BOI E-Filing *SANDBOX* API, which allows you to test the submission process before submitting live data in production. Credentials will be provided if access is approved by FinCEN. Note the following hostnames associated with the BOI E-Filing *Sandbox*t and *Production* APIs: 
+    
+    <table border="2" width="100%">
+      <caption>Table 1 - BOI E-Filing API URLs: Sanbox & Production</caption> 
+      <colgroup>
+        <col span="1" width="30%" />
+        <col span="1" width="45%" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="tg-0lax">Environment</th>
+          <th class="tg-0lax">URL to use in API request</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="tg-0lax">BOI E-Filing *Sandbox* API</td>
+          <td class="tg-0lax">https://boiefiling-api.user-test.fincen.gov/preprod</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">BOI E-Filing API: Production</td>
+          <td class="tg-0lax">https://boiefiling-api.fincen.gov/prod</td>
+        </tr>
+      </tbody>
+    </table>
+      
+    After access credentials are obtained and you are ready to submit a BOIR, the user’s system will need to retrieve an access token to access the API. The token will be valid for one hour after retrieval and can be used for multiple API requests across multiple different submissions. The HTTP request to obtain the token is as such: 
+    
+    <table border="2" width="100%">
+      <caption>Table 2 - HTTP request to obtain access token </caption> 
+      <colgroup>
+        <col span="1" width="10%" />
+        <col span="1" width="15%" />
+        <col span="1" width="30%" />
+        <col span="1" width="45%" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="tg-0lax"></th>
+          <th class="tg-0lax"></th>
+          <th class="tg-0lax"></th>
+          <th class="tg-0lax">Comments</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="tg-0lax"><strong>Endpoint</strong></td>
+          <td class="tg-0lax">POST</td>
+          <td class="tg-0lax">https://iam.fincen.gov/am/oauth2/realms/root/realms/Finance/access_token</td>
+          <td class="tg-0lax"></td>
+        </tr>
+        <tr>
+          <td class="tg-0lax"><strong>Request Headers</strong></td>
+          <td class="tg-0lax">Authorization</td>
+          <td class="tg-0lax">"Basic &lt;credentials&gt;"</td>
+          <td class="tg-0lax">&lt;credentials&gt; is the base64-encoded value of “clientId:secret” (without the quotes)</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax" rowspan="2"><strong>Request Body</strong></td>
+          <td class="tg-0lax"></td>
+          <td class="tg-0lax">grant_type: client_credentials<br/>scope: &lt;scope&gt;</td>
+          <td class="tg-0lax">&lt;scope&gt; is “BOSS-EFILE-SANDBOX” for User Test or “BOSS-EFILE” for Production (without the quotes)</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">Content-Type</td>
+          <td class="tg-0lax">application/x-www-form-urlencoded</td>
+          <td class="tg-0lax"></td>
+        </tr>
+        <tr>
+          <td class="tg-0lax"><strong>Response</strong></td>
+          <td class="tg-0lax"></td>
+          <td class="tg-0lax">
+          { <br/>
+              &emsp;"access_token": "<access_token>", <br/>
+              &emsp;"scope": "BOSS-EFILE", <br/>
+              &emsp;"token_type": "Bearer", <br/>
+              &emsp;"expires_in": 3599 <br/>
+          }
+          </td>
+          <td class="tg-0lax">&lt;access_token&gt; will be used in the Authorization header for all BOI E-Filing API requests</td>
+        </tr>
+      </tbody>
+    </table>
+      
+    # **3.  BOIR Submission & Tracking Process**
+    As noted above, before you can begin the filing process, you must obtain an access token from FinCEN’s system by presenting your valid clientId and secret (see above section “BOIR API Access” for details) via a REST API call. Once the access token is retrieved, it must be included in the request header throughout the BOIR filing process which can be used for multiple BOIR filings as long as it is no later than one hour after retrieval.  
+
+    The following is an overview of the BOIR filing processing via API:  
+    1. **Initiate BOIR Submission via /processId:** To initiate the BOIR filing process, the user’s system sends a GET request to the /processId resource, resulting in a process ID returned (e.g., “BOIR230921650c447660”). 
+
+    2. **Upload Identifying Document Image(s) via /attachments:** User’s system uploads the identifying document image for each Company Applicant and Beneficial Owner reported in the BOIR via the /attachments resource, resulting in an upload status returned (e.g., “upload_success”). If no Company Applicant and/or Beneficial Owner are being reported in the BOIR, then skip this step. 
+      <br/> <br /> 
+      **NOTE:** The filenames for each image attachment in the BOIR must be unique and referenced in the associated BOIR XML under the element “OriginalAttachmentFileName” for each Company Applicant and Beneficial Owner being reported. 
+
+    3. **Upload BOIR XML via /upload:** User’s system uploads a single BOIR as an XML file binary via the /upload resource, returning a submission status for the process ID (e.g., “submission_initiated”) 
+
+    4. **Track Submission Status via /submissionStatus:** User’s system begins querying the status of the submission via the /submissionStatus resource (e.g., “submission_accepted”).  
+
+    5. **Retrieve the BOIR Transcript via /transcript:** If a status of “submission_accepted” or “submission_rejected” is returned, filer’s system retrieves the transcript PDF of the BOIR as binary data via the /transcript resource. The /transcript resource also produces the status of the submission. 
+      <br/> <br /> 
+      **NOTE:** The binary data for the transcript is base64-encoded. As an example, in JavaScript, to create the PDF file, the binary data will need to be decoded from base64 and then downloaded as a blob with the mime-type “application/pdf”. 
+
+    The final status of your BOIR filing is either “submission_accepted”, “submission_rejected”, or “submission_failed”. If you receive a status with “failed” or “rejected” in the value, this means that FinCEN could NOT process your BOIR submission and you should take steps to resolve the reason for the failure/rejection (refer to the list of common response codes and errors later in this guide for additional information). 
+
+    # 3.  Error Codes List
+    The following list of errors will result in a final status of submission_rejected. This means that your BOIR submission could not be assigned a BOIR ID by FinCEN and you must take action to fix the error and resubmit. As stated in the Error Descriptions below, if the problem (error) persists, please contact FinCEN’s support desk for further assistance:
+
+    <table border="2" width="100%" cellspacing="20" padding="20px" cellPadding="20">
+      
+      <caption>Error Codes</caption> 
+      
+      <colgroup>
+        <col span="1" width="5%"  />
+        <col span="1" width="30%" />
+        <col span="1" width="15%" />
+        <col span="1" width="15%" />
+        <col span="1" width="35%" />
+      </colgroup>
+      <tbody>
+        <tr>
+          <td><strong>Error Code</strong></td>
+          <td><strong>Error description</strong></td>
+          <td><strong>Type of filing</strong></td>
+          <td><strong>Asscoiated party</strong></td>
+          <td><strong>How you should respond...</strong></td>
+        </tr>
+        <tr>
+          <td></strong>SBE01</strong></td>
+          <td>BOIR could not be processed by FinCEN at this time. Please try again. If this problem persists, please contact the FinCEN Contact Center for assistance.</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>Resubmit the BOIR as-is.</td>
+        </tr>
+        <tr>
+          <td></strong>SBE02</strong></td>
+          <td>Initial BOIR already has been filed for the reporting company recorded in the initial BOIR filing. Please try again. If this problem persists, please contact the FinCEN Contact Center for assistance.</td>
+          <td>Initial report</td>
+          <td>Reporting Company</td>
+          <td>
+            Resubmit the BOIR after the following: 
+            <div>
+              <ul>
+                <li>If you are attempting to file an initial report, ensure the name and TIN for the Reporting Company (Part I) is correct.</li>
+                <li>If you are not attempting to file an initial report, ensure the correct filing type is indicated.</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td></strong>SBE03</strong></td>
+          <td>FinCEN ID entered for a Company Applicant or Beneficial Owner cannot be matched to an existing FinCEN ID. Please try again. If this problem persists, please contact the FinCEN Contact Center for assistance. </td>
+          <td>Initial report</td>
+          <td>
+            <div>
+              <dl>
+                <dt>Company Applicant</dt>
+                <dt>Beneficial Owner</dt>
+              </dl>
+            </div>
+          </td>
+          <td>
+            Resubmit the BOIR after the following: 
+            <div>
+              <ul>
+                <li>Ensure that the FinCEN ID(s) recorded in the BOIR are correct.</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            </strong>SBE04</strong>
+          </td>
+          <td>Reporting Company information entered in Type of filing Items 1(e)-(h) cannot be matched to an existing Reporting Company. Please try again. If this problem persists, please contact the FinCEN Contact Center for assistance. </td>
+          <td>
+            <div>
+              <dl>
+                <dt>Update prior report</dt>
+                <dt>Correct prior report</dt>
+                <dt>Newly exempt entity</dt>
+              </dl>
+            </div>
+          </td>
+          <td>
+            <div>
+              <dl>
+                <dt>Reporting Company</dt>
+              </dl>
+            </div>
+          </td>
+          <td>
+            Resubmit the BOIR after the following: 
+            <div>
+              <ul>
+                <li>
+                  Ensure the name and TIN recorded for Item 1 (Type of filing) for the Reporting Company matches the Reporting Company name and TIN for the most recent BOIR filing. 
+                </li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td></strong>SBE05</strong></td>
+          <td>Reporting Company information recorded in Type of filing Items 1(e)-(h) cannot be matched to a prior BOIR filing. Please try again. If this problem persists, please contact the FinCEN Contact Center for assistance. <td>
+            <div>
+              <dl>
+                <dt>Update prior report</dt>
+                <dt>Correct prior report</dt>
+                <dt>Newly exempt entity</dt>
+              </dl>
+            </div>
+          </td>
+          <td>
+            <div>
+              <dl>
+                <dt>Reporting Company</dt>
+              </dl>
+            </div>
+          </td>
+          <td>
+            Resubmit the BOIR after the following: 
+            <div>
+              <ul>
+                <li>Ensure the name and TIN recorded for Item 1 (Type of filing) for the Reporting Company matches the Reporting Company name and TIN for the most recent BOIR filing.</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td></strong>SBE06</strong></td>
+          <td>FinCEN ID entered for a Company Applicant or Beneficial Owner cannot be matched to an existing FinCEN ID. Please try again. If this problem persists, please contact the FinCEN Contact Center for assistance. <td>
+            <div>
+              <dl>
+                <dt>Update prior report</dt>
+                <dt>Correct prior report</dt>
+                <dt>Newly exempt entity</dt>
+              </dl>
+            </div>
+          </td>
+          <td>
+            <div>
+              <dl>
+                <dt>Complany Applicant</dt>
+                <dt>Beneficial Owner</dt>
+              </dl>
+            </div>
+          </td>
+          <td>
+            Resubmit the BOIR after the following: 
+            <div>
+              <ul>
+                <li>Ensure that the FinCEN ID(s) recorded in the BOIR are correct.</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <table border="2" width="100%">
+      
+      <caption>Error Codes</caption> 
+      
+      <colgroup>
+        <col span="1" width="10%"  />
+        <col span="1" width="45%" />
+        <col span="1" width="45%" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="tg-0lax">Response Code</th>
+          <th class="tg-0lax">Description</th>
+          <th class="tg-0lax">Comments</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="tg-0lax">200</td>
+          <td class="tg-0lax">Successful API call</td>
+          <td class="tg-0lax">(none)</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">400</td>
+          <td class="tg-0lax">Validation Failure</td>
+          <td class="tg-0lax">Initial validation failed</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">401</td>
+          <td class="tg-0lax">Authentication</td>
+          <td class="tg-0lax">Unauthorized</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">403</td>
+          <td class="tg-0lax">Authorization</td>
+          <td class="tg-0lax">Forbidden</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">404</td>
+          <td class="tg-0lax">Not Found</td>
+          <td class="tg-0lax">Unable to retrieve status/transcript</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">413</td>
+          <td class="tg-0lax">Payload Too Large</td>
+          <td class="tg-0lax">Image attachment file exceeds 4MB</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">415</td>
+          <td class="tg-0lax">Unsupported Media Type</td>
+          <td class="tg-0lax">Image attachment file type is not supported</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">429</td>
+          <td class="tg-0lax">Throttling</td>
+          <td class="tg-0lax">Too many requests</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">502/504</td>
+          <td class="tg-0lax">Dependency Issues</td>
+          <td class="tg-0lax">Bad Gateway/Gateway Timeout</td>
+        </tr>
+        <tr>
+          <td class="tg-0lax">500/503</td>
+          <td class="tg-0lax">Unhandled Errors</td>
+          <td class="tg-0lax">Internal Server Error, Service unavailable</td>
+        </tr>
+      </tbody>
+      </table>
+servers:
+  - url: https://boiefiling-api.fincen.gov/prod
+  - url: https://boiefiling-api.user-test.fincen.gov/preprod
+paths:
+  /processId:
+    get:
+      tags:
+        - Initiate BOIR Submission
+      description: | 
+        <table border="1" cellspacing="10" cellpadding="10" width="100%">
+          <colgroup>
+            <col span="1" width="7%"  />
+            <col span="1" width="7%" />
+            <col span="1" width="43%" />
+            <col span="1" width="43%" />
+          </colgroup>
+          <tbody>
+              <tr>
+                  <td />
+                  <td />
+                  <td />
+                  <td><strong>Comments</strong></td>
+              </tr>
+              <tr>
+                  <td><strong>Endpoint</strong></td>
+                  <td>GET</td>
+                  <td>/processId</td>
+                  <td>Retrieves a processId</td>
+              </tr>
+              <tr>
+                  <td><strong>Path Parameters</strong></td>
+                  <td></td>
+                  <td>N/A</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td><strong>Request Headers</strong></td>
+                  <td>
+                      Authorization
+                  </td>
+                  <td>"Bearer &lt;access_token&gt;"</p></td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td><strong>Request Body</strong></td>
+                  <td></td>
+                  <td>N/A</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td rowspan="2"><strong>Response</strong></td>
+                  <td>Content-Type</td>
+                  <td>application/json</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td>Body</td>
+                  <td>
+                    <div>
+                      JSON payload for a succesful request: 
+                      <dl>
+                        <dt>{ processId: &ltprocessId&gt; }</dt>
+                      </dl>
+                    </div>
+                  </td>
+                  <td></td>
+              </tr>
+          </tbody>
+        </table>
+      operationId: processId
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/processId' 
+        '500':
+          description: Unexpected error
+      security:
+        - TokenAuth: []
+
+  /attachments/{processId}/{fileName}:
+    post:
+      tags:
+        - Upload Identifying Document Image(s)
+      description: | 
+       <table border="1" cellspacing="10" cellpadding="10" width="100%">
+          <colgroup>
+            <col span="1" width="7%"  />
+            <col span="1" width="7%" />
+            <col span="1" width="43%" />
+            <col span="1" width="43%" />
+          </colgroup>
+          <tbody>
+              <tr>
+                  <td />
+                  <td />
+                  <td />
+                  <td><strong>Comments</strong></td>
+              </tr>
+              <tr>
+                  <td><strong>Endpoint</strong></td>
+                  <td>POST</td>
+                  <td>/attachments/{processId}/{fileName}</td>
+                  <td>
+                    Upload a single image file
+                      <br/><br/>
+                      <strong>Note</strong>: uploading another image file with same fileName will replace the previous one
+                  </td>
+              </tr>
+              <tr>
+                  <td rowspan="2"><strong>Path Parameters</strong></td>
+                  <td>processId</td>
+                  <td>processId from /processId</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td>fileName</td>
+                  <td>Image filename, with extension (must match a value recorded for the OriginalAttachmentFileName element in the BOIR XML)</dt></dl></td>
+                  <td>
+                    File name for the image must end in .jpg, .jpeg, .png, or .pdf and must be URI encoded. 
+                    <br/><br/>
+                    Filename limitations: Letters, numbers, _ ! @ # $ % ( ) = + [ ] { } | ; ~ -
+                  </td>
+              </tr>
+              <tr>
+                  <td  rowspan="2" >
+                      <strong>Request Headers</strong> <strong></strong>
+                      <strong></strong>
+                  </td>
+                  <td>Content-Type</td>
+                  <td>application/binary</td>
+                  <td/>
+              </tr>
+              <tr>
+                  <td>
+                      Authorization
+                  </td>
+                  <td>"Bearer &lt;access_token&gt;"</p></td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td><strong>Request Body</strong></td>
+                  <td></td>
+                  <td>Image file's binary data</td>
+                  <td>Image file should be no greater than 4MB in file size</td>
+              </tr>
+              <tr>
+                  <td rowspan="2"><strong>Response</strong></td>
+                  <td>Content-Type</td>
+                  <td>application/json</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td>Body</td>
+                  <td>
+                    <div>
+                      JSON payload: 
+                      <dl>
+                        <dt>{ status: &ltupload_status&gt, message: &ltAdditional details&gt }</dt>
+                      </dl>
+                    </div>
+                  </td>
+                  <td>
+                    Upload status values:
+                    <ul>
+                      <li>upload_succcess</li>
+                      <li>upload_failed</li>
+                    </ul>
+                  </td>
+              </tr>
+          </tbody>
+        </table>
+      operationId: attachments
+      parameters:
+        - name: processId
+          in: path
+          description: processId from /processId
+          required: true
+          example: BOIR230928X6515f3081
+          schema:
+            type: string
+            example: 
+              - BOIR230928X6515f3081            
+        - name: fileName
+          in: path
+          description: |
+            Image filename, with extension (must match a value recorded for the OriginalAttachmentFileName element in the BOIR XML) 
+            <br/> File name for the image must end in .jpg, .jpeg, .png, or .pdf and must be URI encoded. 
+            <br/> Filename limitations\: Letters, numbers, \_ ! @ # $ % ( ) = + [ ] { } | ; ~ - 
+          required: true
+          example: bill_spencer.jpg
+          schema:
+            type: string
+            example: 
+              - bill_spencer.gif 
+      requestBody:
+        description: Image file's binary data
+        content:
+          application/octet-stream:
+            schema:
+              description: Image file should be no greater than 5MB in file size
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachments'
+        '400':
+          description: Invalid attachment file type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentsError'
+        '413':
+          description: Attachment file size is too large
+        '415':
+          description: Unsupported file type
+        '500':
+          description: Unexpected error
+      security:
+        - TokenAuth: []
+
+  /upload/BOIR/{processId}/{xmlFileName}:
+    post:
+      tags:
+        - Upload BOIR XML
+      description: |
+        <table border="1" cellspacing="10" cellpadding="10" width="100%">
+          <colgroup>
+            <col span="1" width="7%"  />
+            <col span="1" width="7%" />
+            <col span="1" width="43%" />
+            <col span="1" width="43%" />
+          </colgroup>
+          <tbody>
+              <tr>
+                  <td />
+                  <td />
+                  <td />
+                  <td><strong>Comments</strong></td>
+              </tr>
+              <tr>
+                  <td><strong>Endpoint</strong></td>
+                  <td>GET</td>
+                  <td>/upload/BOIR/{processId}/{xmlFileName}</td>
+                  <td>Upload and submit the BOIR XML</td>
+              </tr>
+              <tr>
+                  <td rowspan="2"><strong>Path Parameters</strong></td>
+                  <td>processId</td>
+                  <td>processId from /processId</td>
+                  <td/>
+                  <td/>
+              </tr>
+              <tr>
+                  <td>xmlFileName</td>
+                  <td>XML file name</td>
+                  <td>
+                    File name for the XML file must end in .xml and must be URI encoded. 
+                    <br/><br/>
+                    Filename limitations: Letters, numbers, _ ! @ # $ % ( ) = + [ ] { } | ; ~ -
+                  </td>
+              </tr>
+              <tr>
+                  <td  rowspan="2" >
+                      <strong>Request Headers</strong> <strong></strong>
+                      <strong></strong>
+                  </td>
+                  <td>Content-Type</td>
+                  <td>application/xml</td>
+                  <td/>
+              </tr>
+              <tr>
+                  <td>
+                      Authorization
+                  </td>
+                  <td>"Bearer &lt;access_token&gt;"</p></td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td><strong>Request Body</strong></td>
+                  <td></td>
+                  <td>XML file binary data</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td rowspan="2"><strong>Response</strong></td>
+                  <td>Content-Type</td>
+                  <td>application/json</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td>Body</td>
+                  <td>
+                    <div>
+                      JSON payload for successful upload: 
+                      <dl>
+                        <dt>{ processId: &ltprocessId&gt, status: "submission_initiated" }</dt>
+                      </dl>
+                    </div>
+                  </td>
+                  <td></td>
+              </tr>
+          </tbody>
+        </table>
+      operationId: upload
+      parameters:
+        - name: processId
+          in: path
+          description: processId from /processId
+          required: true
+          example: BOIR230928X6515f3081
+          schema: 
+            type: string
+        - name: xmlFileName
+          in: path
+          description: |
+            XML file name 
+            <br/> File name for the XML file must end in .xml and must be URI encoded. 
+            <br/> Filename limitations\: Letters, numbers, \_ ! @ # $ % ( ) = + [ ] { } | ; ~ - 
+          required: true
+          example: BOIR.xml
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                anyOf: 
+                  - $ref: '#/components/schemas/upload-success'
+              examples:
+                success:
+                  summary: Upload Success - BOIR XML file upload
+                  value:
+                    processId: BOIR230928X6515f3081
+                    submissionStatus: "submission_initiated"
+        '400':
+          description: Invalid request data/parameters
+          content:
+            application/json:
+              schema:
+                anyOf: 
+                  - $ref: '#/components/schemas/upload-error'
+              examples:
+                error:
+                  summary: Upload Error - Invalid/Incomplete submitter information
+                  value:
+                    error: 
+                      code: "submitter_info_invalid"
+                      message: "Invalid Submitter information: Email, first name, last name, and processId are required"
+                      details: "Please validate the submitter information in the XML."
+                      help: "Refer to the provided API documentation from FinCEN for guidance."
+        '500':
+          description: Unexpected error
+      security:
+        - TokenAuth: []
+
+  /submissionStatus/{processId}:
+    get:
+      tags:
+        - Track Submission Status 
+      description: | 
+        <table border="1" cellspacing="10" cellpadding="10" width="100%">
+          <colgroup>
+            <col span="1" width="7%"  />
+            <col span="1" width="7%" />
+            <col span="1" width="43%" />
+            <col span="1" width="43%" />
+          </colgroup>
+          <tbody>
+              <tr>
+                  <td />
+                  <td />
+                  <td />
+                  <td><strong>Comments</strong></td>
+              </tr>
+              <tr>
+                  <td><strong>Endpoint</strong></td>
+                  <td>GET</td>
+                  <td>/submissionStatus/{processId}</td>
+                  <td>Check the status of a submitted BOIR</td>
+              </tr>
+              <tr>
+                  <td><strong>Path Parameters</strong></td>
+                  <td>processId</td>
+                  <td>processId from /processId</td>
+                  <td/>
+              </tr>
+              <tr>
+                  <td>
+                      <strong>Request Headers</strong> <strong></strong>
+                      <strong></strong>
+                  </td>
+                  <td>
+                      Authorization
+                  </td>
+                  <td>"Bearer &lt;access_token&gt;"</p></td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td><strong>Request Body</strong></td>
+                  <td></td>
+                  <td>N/A</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td rowspan="2"><strong>Response</strong></td>
+                  <td>Content-Type</td>
+                  <td>application/json</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td>Body
+                  </td>
+                  <td>JSON payload - submission status </td>
+                  <td>
+                    <div>
+                      Status values:
+                      <ul>
+                        <li>submission_initiated</li>
+                        <li>submission_processing</li>
+                        <li>submission_validation_passed</li>
+                        <li>submission_validation_failed</li>
+                        <li>submission_accepted</li>
+                        <li>submission_rejected</li>
+                        <li>submission_failed</li>
+                      </ul>
+                    </div>
+                  </td>
+              </tr>
+          </tbody>
+        </table>
+
+        
+      operationId: submissionStatus
+      parameters:
+        - name: processId
+          in: path
+          description: processId from /processId
+          required: true
+          example: BOIR230928X6515f3081
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                anyOf: 
+                  - $ref: '#/components/schemas/submission-status'
+                  - $ref: '#/components/schemas/submission-rejected'
+                  - $ref: '#/components/schemas/submission-validation-failed'
+                  - $ref: '#/components/schemas/submission-accepted'
+                  - $ref: '#/components/schemas/submission-incorrect-processId'
+              examples:
+                submission-validation-passed:
+                  summary: Submission Validation Passed
+                  value:
+                    processId: BOIR230928X6515f3081
+                    submissionStatus: submission_validation_passed
+                submission-rejected:
+                  summary: Submission Rejected
+                  value:
+                    processId: BOIR230928X6515f3081
+                    submissionStatus: submission_rejected
+                    BOIRID: ""
+                    fincenID: ""
+                    errors:
+                      ErrorElementName: FinCENID
+                      ErrorContextText: "Party[PartySeqNum=4, DocumentSeqNum=2, BORXmlSubmissionSeqNum=1]"
+                      ErrorLevelText: FATAL
+                      ErrorText: "Initial BOIR already has been filed for the reporting company recorded in the initial BOIR filing. Please try again. If this problem persists, please contact the FinCEN Contact Center for assistance."
+                      ErrorCode: SBE02
+                      ErrorTypeCode: SBE02
+                    initiatedTimestamp: "2023-09-28T21:56:58Z"
+                    firstName: Test
+                    lastName: Tester
+                    email: test@test.net
+                submission-validation-failed:
+                  summary: Submission Validation Failed (attachments not uploaded)
+                  value:
+                    processId: " BOIR2309286515f80dD0"
+                    submissionStatus: submission_validation_failed
+                    validationErrors:
+                      - errorMessage: Unable to find joe_hamilton.jpg in uploaded attachments.
+                      - errorMessage: Unable to find bill_spencer.jpg in uploaded attachments.
+                submission-accepted:
+                  summary: Submission Accepted
+                  value:
+                    processId: BOIR2309286515fa4eY0
+                    submissionStatus: submission_accepted
+                    BOIRID: "50000000003688"
+                    fincenID: "200000000843"
+                    errors:
+                      - ErrorElementName: ""
+                        ErrorContextText: ""
+                        ErrorLevelText: ""
+                        ErrorText: ""
+                        ErrorCode: ""
+                        ErrorTypeCode: ""
+                    initiatedTimestamp: '2023-09-28T22:12:48Z'
+                    firstName: Test
+                    lastName: Tester
+                    email: test@test.net
+        '400':
+          description: Invalid request data/parameters
+          content:
+            application/json:
+              schema:
+                anyOf: 
+                  - $ref: '#/components/schemas/upload-error'
+              examples:
+                submission-incorrect-processId:
+                  summary: Submission Incorrect Process ID
+                  value:
+                    error:
+                      code: not_found
+                      message: Unable to retrieve a status for the provided processId
+                      details: The latest submission status associated with the provided processId and client could not be found. Please verify the processId and that the submission was initiated by this client.
+                      help: Refer to the provided API documentation from FinCEN for guidance.
+        '404':
+          description: Unable to retrieve status
+        '500':
+          description: Unexpected error
+      security:
+        - TokenAuth: []
+  /transcript/{processId}:
+    get:
+      tags:
+        - Retrieve the BOIR Transcript
+      description: | 
+        <table border="1" cellspacing="10" cellpadding="10" width="100%">
+          <colgroup>
+            <col span="1" width="7%"  />
+            <col span="1" width="7%" />
+            <col span="1" width="43%" />
+            <col span="1" width="43%" />
+          </colgroup>
+          <tbody>
+              <tr>
+                  <td />
+                  <td />
+                  <td />
+                  <td><strong>Comments</strong></td>
+              </tr>
+              <tr>
+                  <td><strong>Endpoint</strong></td>
+                  <td>GET</td>
+                  <td>/transcript/{processId}</td>
+                  <td>Retrieve the transcript (and status) of a submitted BOIR</td>
+              </tr>
+              <tr>
+                  <td><strong>Path Parameters</strong></td>
+                  <td>processId</td>
+                  <td>processId from /processId</td>
+                  <td/>
+              </tr>
+              <tr>
+                  <td>
+                      <strong>Request Headers</strong> <strong></strong>
+                      <strong></strong>
+                  </td>
+                  <td>
+                      Authorization
+                  </td>
+                  <td>"Bearer &lt;access_token&gt;"</p></td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td><strong>Request Body</strong></td>
+                  <td></td>
+                  <td>N/A</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td rowspan="2"><strong>Response</strong></td>
+                  <td>Content-Type</td>
+                  <td>application/json</td>
+                  <td></td>
+              </tr>
+              <tr>
+                  <td>Body
+                  </td>
+                  <td>
+                      <p>
+                          submission status: { status: &lt;status&gt; }
+                      <p>
+                          OR
+                      </p>
+                      <p>
+                          submission status + PDF file binary: <br/>
+                          { status: &lt;status&gt;, pdfBinary: &lt;PDF binary&gt; }
+                  </td>
+                  <td>
+                  </td>
+              </tr>
+          </tbody>
+        </table>
+      operationId: transcript
+      parameters:
+        - name: processId
+          in: path
+          description: processId from /processId
+          required: true
+          example: BOIR230928X6515f3081
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                anyOf: 
+                  - $ref: '#/components/schemas/transcript' 
+              examples:
+                transcript-submission_accepted:
+                  summary: Submission Accepted 
+                  value:
+                    status:
+                      processId: BOIR230928X6515f3081
+                      submissionStatus: submission_accepted
+                      BOIRID: '50000000003688'
+                      fincenID: '200000000843'
+                      errors:
+                        - ErrorElementName: 
+                          ErrorContextText: 
+                          ErrorLevelText: 
+                          ErrorText: 
+                          ErrorCode: 
+                          ErrorTypeCode: 
+                      initiatedTimestamp: "2023-09-28T21:56:58Z"
+                      firstName: Test
+                      lastName: Tester
+                      email: test@test.net
+                    pdfBinary: JVBERi0xLjcKJf////8KOCAwIG9iago8PAovVHlwZSAvRXh0R1N0YXRlCi9jYSAxCj4...
+                transcript-submission_rejected:
+                  summary: Submission Rejected (Initial filing exists for this entity)
+                  value:
+                    status:
+                      processId: BOIR230928X6515f3081
+                      submissionStatus: submission_rejected
+                      BOIRID: ''
+                      fincenID: ''
+                      errors:
+                        - ErrorElementName: FinCENID
+                          ErrorContextText: Party[PartySeqNum=4, DocumentSeqNum=2, BORXmlSubmissionSeqNum=1]
+                          ErrorLevelText: FATAL
+                          ErrorText: Initial filing exists for this entity. Please contact FinCEN’s support
+                            desk for further assistance.
+                          ErrorCode: SBE02
+                          ErrorTypeCode: SBE02
+                      initiatedTimestamp: "2023-09-28T21:56:58Z"
+                      firstName: Test
+                      lastName: Tester
+                      email: test@test.net
+                    pdfBinary: JVBERi0xLjcKJf////8KOCAwIG9iago8PAovVHlwZSAvRXh0R1N0YXRlCi9jYSAxCj4...
+        '400':
+          description: Invalid request data/parameters
+        '404':
+          description: Unable to retrieve data to generate transcript
+        '500':
+          description: Unexpected error
+      security:
+        - TokenAuth: []
+components:
+  schemas:
+    Attachments:
+      type: object
+      properties:
+        message:
+          type: string
+          example: bill_spencer.jpg has been successfully uploaded.
+        status:
+          type: string
+          description: Upload Status
+          example: upload_success
+          enum:
+            - upload_success
+            - upload_failed
+    AttachmentsError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties: 
+            code:
+              type: string
+              example: file_name_invalid
+            message:
+              type: string
+              example: "Invalid file name: bill_spencer.gif"
+            details:
+              type: string
+              example: "The file name provided is invalid. Allowed characters: alphanumeric ! @ # $ % ( ) _ - = + [ ] { } | ; ~ and space."
+            help:
+              type: string
+              example: Refer to the provided API documentation from FinCEN for guidance.
+    processId:
+      required:
+        - processId
+      type: object
+      properties:
+        processId:
+          type: string
+          example: BOIR230928X6515f3081
+    upload-success:
+      type: object
+      properties:
+        processId:
+          type: string
+          example: BOIR230928X6515f3081
+        status:
+          type: string
+          description: Upload Status
+          example: submission_initiated
+          enum:
+            - submission_initiated
+            - submission_failed
+    upload-error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties: 
+            code:
+              type: string
+              example: submitter_info_invalid
+            message:
+              type: string
+              example: "Invalid Submitter information: Email, first name, last name, and processId are required"
+            details:
+              type: string
+              example: "Please validate the submitter information in the XML."
+            help:
+              type: string
+              example: Refer to the provided API documentation from FinCEN for guidance.
+    
+    submission-status:
+      type: object
+      properties:
+        processId:
+          type: string
+          example: BOIR230928X6515f3081
+        status:
+          type: string
+          description: Submission Status
+          example: submission_validation_passed
+          enum:
+            - submission_initiated
+            - submission_processing
+            - submission_validation_passed
+            - submission_validation_failed
+            - submission_accepted
+            - submission_rejected
+            - submission_failed
+            
+    submission-rejected:
+      type: object
+      properties:
+        processId:
+          type: string
+          example: BOIR230928X6515f3081
+        submissionStatus:
+          type: string
+          example: submission_accepted
+        BOIRID:
+          type: string
+          example: 50000000003688
+        fincenID:
+          type: string
+          example: 200000000843
+        errors:
+          type: array
+          items:
+            type: object
+            properties: 
+              ErrorElementName:
+                type: string
+                example: "FinCENID"
+              ErrorContextText:
+                type: string
+                example: "Party[PartySeqNum=4, DocumentSeqNum=2, BORXmlSubmissionSeqNum=1]"
+              ErrorLevelText:
+                type: string
+                example: "FATAL"
+              ErrorText:
+                type: string
+                example: "Initial BOIR already has been filed for the reporting company recorded in the initial BOIR filing. Please try again. If this problem persists, please contact the FinCEN Contact Center for assistance."
+              ErrorCode:
+                type: string
+                example: "SBE02"
+              ErrorTypeCode:
+                type: string
+                example: "SBE02"
+        initiatedTimestamp:
+          type: string
+          example: "2023-09-28T22:12:48Z"
+        firstName:
+          type: string
+          example: Test
+        lastName:
+          type: string
+          example: Tester
+        email:
+          type: string
+          example: "test@test.net"
+
+    submission-validation-failed:
+      type: object
+      properties:
+        processId:
+          type: string
+          example: BOIR230928X6515f3081
+        submissionStatus:
+          type: string
+          example: submission_validation_failed
+        validationErrors:
+          type: array
+          items: 
+            type: object
+            properties:
+              errorMessage:
+                type: string
+                example: "Unable to find joe_hamilton.jpg in uploaded attachments."
+          
+    submission-accepted:
+      type: object
+      properties:
+        processId:
+          type: string
+          example: BOIR230928X6515f3081
+        submissionStatus:
+          type: string
+          example: submission_accepted
+        BOIRID:
+          type: string
+          example: 50000000003688
+        fincenID:
+          type: string
+          example: 200000000843
+        errors:
+          type: array
+          items:
+            type: object
+            properties: 
+              ErrorElementName:
+                type: string
+                example: ""
+              ErrorContextText:
+                type: string
+                example: ""
+              ErrorLevelText:
+                type: string
+                example: ""
+              ErrorText:
+                type: string
+                example: ""
+              ErrorCode:
+                type: string
+                example: ""
+              ErrorTypeCode:
+                type: string
+                example: ""
+        initiatedTimestamp:
+          type: string
+          example: "2023-09-28T22:12:48Z"
+        firstName:
+          type: string
+          example: Test
+        lastName:
+          type: string
+          example: Tester
+        email:
+          type: string
+          example: "test@test.net"
+    submission-incorrect-processId:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: not_found
+            message:
+              type: string
+              example: "Unable to retrieve a status for the provided processId"
+            details:
+              type: string
+              example: "The latest submission status associated with the provided processId and client could not be found. Please verify the processId and that the submission was initiated by this client."
+            help:
+              type: string
+              example: Refer to the provided API documentation from FinCEN for guidance.
+    transcript:
+      type: object
+      properties:
+        status:
+          type: object
+          properties: 
+            processId:
+              type: string
+              example: BOIR230928X6515f3081
+            submissionStatus:
+              type: string
+              example: submission_rejected
+            BOIRID:
+              type: string
+              example: 50000000003688
+            fincenID:
+              type: string
+              example: 200000000843
+            errors:
+              type: array
+              items:
+                type: object
+                properties: 
+                  ErrorElementName:
+                    type: string
+                    example: "FinCENID"
+                  ErrorContextText:
+                    type: string
+                    example: "Party[PartySeqNum=4, DocumentSeqNum=2, BORXmlSubmissionSeqNum=1]"
+                  ErrorLevelText:
+                    type: string
+                    example: "FATAL"
+                  ErrorText:
+                    type: string
+                    example: "Initial BOIR already has been filed for the reporting company recorded in the initial BOIR filing. Please try again. If this problem persists, please contact the FinCEN Contact Center for assistance."
+                  ErrorCode:
+                    type: string
+                    example: "SBE02"
+                  ErrorTypeCode:
+                    type: string
+                    example: "SBE02"
+            initiatedTimestamp:
+              type: string
+              example: "2023-09-28T22:12:48Z"
+            firstName:
+              type: string
+              example: Test
+            lastName:
+              type: string
+              example: Tester
+            email:
+              type: string
+              example: "test@test.net"
+        pdfBinary:
+          type: string
+          example: "JVBERi0xLjcKJf////8KOCAwIG9iago8PAovVHlwZSAvRXh0R1N0YXRlCi9jYSAxCj4..."
+    
+
+  securitySchemes:
+    TokenAuth:
+      type: http
+      scheme: bearer
