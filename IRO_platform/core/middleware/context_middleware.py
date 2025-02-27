@@ -38,7 +38,7 @@ class ContextMiddleware:
         # Final fallback: try to determine tenant from the current schema
         elif connection.schema_name.startswith('tenant_'):
             # Extract tenant name from schema_name (tenant_tenant1 -> tenant1)
-            tenant_name = connection.schema_name[7:]  # Remove 'tenant_' prefix
+            tenant_name = connection.schema_name[7:]
             try:
                 tenant = TenantConfig.objects.get(tenant_name=tenant_name)
                 request.context['tenant'] = tenant
@@ -70,22 +70,18 @@ class ContextMiddleware:
         if 'iro_id' in request.session:
             try:
                 iro_id = request.session['iro_id']
-                # Only search for IRO if we have a tenant context
                 if request.context['tenant']:
-                    # We need to import here to avoid circular imports
                     from apps.assessments.utils import get_iro_by_id
                     iro = get_iro_by_id(iro_id, request.context['tenant'])
                     request.context['iro'] = iro
             except Exception:
-                # Clear invalid context
                 if 'iro_id' in request.session:
                     del request.session['iro_id']
 
-        # Check URL parameters for context overrides
-        # Safely check if user is authenticated and staff
-        is_staff = hasattr(request, 'user') and request.user.is_authenticated and request.user.is_staff
-        
-        if 'tenant_id' in request.GET and is_staff:
+        # ----------------------------------------------------------------
+        # Removed "and is_staff" so that any user can switch tenants freely
+        # ----------------------------------------------------------------
+        if 'tenant_id' in request.GET: 
             try:
                 tenant_id = int(request.GET.get('tenant_id'))
                 tenant = TenantConfig.objects.get(tenant_id=tenant_id)
@@ -100,15 +96,16 @@ class ContextMiddleware:
                 assessment = Assessment.objects.get(id=assessment_id)
                 request.context['assessment'] = assessment
                 request.session['assessment_id'] = assessment_id
+                # Clear IRO when assessment changes
+                if 'iro_id' in request.session:
+                    del request.session['iro_id']
             except (ValueError, Assessment.DoesNotExist):
                 pass
 
         if 'iro_id' in request.GET:
             try:
                 iro_id = int(request.GET.get('iro_id'))
-                # Only search for IRO if we have a tenant context
                 if request.context['tenant']:
-                    # We need to import here to avoid circular imports
                     from apps.assessments.utils import get_iro_by_id
                     iro = get_iro_by_id(iro_id, request.context['tenant'])
                     if iro:
