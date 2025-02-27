@@ -1,0 +1,24 @@
+<form hx-post="{% url 'assessments:iro-update-type' iro.iro_id %}" 
+      hx-target="this" 
+      hx-swap="outerHTML">
+    <select name="type" class="form-select form-select-sm" 
+            hx-get="{% url 'assessments:iro-validate-type' %}"
+            hx-trigger="change"
+            hx-target="next .invalid-feedback"
+            hx-swap="innerHTML">
+        <option value="Risk" {% if iro.type == 'Risk' %}selected{% endif %}>Risk</option>
+        <option value="Opportunity" {% if iro.type == 'Opportunity' %}selected{% endif %}>Opportunity</option>
+        <option value="Impact" {% if iro.type == 'Impact' %}selected{% endif %}>Impact</option>
+    </select>
+    <div class="invalid-feedback"></div>
+    <div class="mt-1">
+        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        <button type="button" 
+                class="btn btn-sm btn-outline-secondary"
+                hx-get="{% url 'assessments:iro-cancel-edit-type' iro.iro_id %}"
+                hx-target="closest form"
+                hx-swap="outerHTML">
+            Cancel
+        </button>
+    </div>
+</form>

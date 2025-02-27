@@ -1,0 +1,27 @@
+<form hx-post="{% url 'assessments:iro-update-esrs' iro.iro_id %}" 
+      hx-target="this" 
+      hx-swap="outerHTML">
+    <select name="esrs_standard" class="form-select form-select-sm">
+        <option value="" {% if not iro.esrs_standard %}selected{% endif %}>-- Select Standard --</option>
+        <option value="ESRS E1" {% if iro.esrs_standard == 'ESRS E1' %}selected{% endif %}>ESRS E1 - Climate</option>
+        <option value="ESRS E2" {% if iro.esrs_standard == 'ESRS E2' %}selected{% endif %}>ESRS E2 - Pollution</option>
+        <option value="ESRS E3" {% if iro.esrs_standard == 'ESRS E3' %}selected{% endif %}>ESRS E3 - Water & Marine Resources</option>
+        <option value="ESRS E4" {% if iro.esrs_standard == 'ESRS E4' %}selected{% endif %}>ESRS E4 - Biodiversity & Ecosystems</option>
+        <option value="ESRS E5" {% if iro.esrs_standard == 'ESRS E5' %}selected{% endif %}>ESRS E5 - Resource Use & Circular Economy</option>
+        <option value="ESRS S1" {% if iro.esrs_standard == 'ESRS S1' %}selected{% endif %}>ESRS S1 - Own Workforce</option>
+        <option value="ESRS S2" {% if iro.esrs_standard == 'ESRS S2' %}selected{% endif %}>ESRS S2 - Workers in Value Chain</option>
+        <option value="ESRS S3" {% if iro.esrs_standard == 'ESRS S3' %}selected{% endif %}>ESRS S3 - Affected Communities</option>
+        <option value="ESRS S4" {% if iro.esrs_standard == 'ESRS S4' %}selected{% endif %}>ESRS S4 - Consumers & End-users</option>
+        <option value="ESRS G1" {% if iro.esrs_standard == 'ESRS G1' %}selected{% endif %}>ESRS G1 - Business Conduct</option>
+    </select>
+    <div class="mt-1">
+        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        <button type="button" 
+                class="btn btn-sm btn-outline-secondary"
+                hx-get="{% url 'assessments:iro-cancel-edit-esrs' iro.iro_id %}"
+                hx-target="closest form"
+                hx-swap="outerHTML">
+            Cancel
+        </button>
+    </div>
+</form>

@@ -1,51 +1,208 @@
+<!-- templates/assessments/iro_list.html -->
 {% extends "base.html" %}
 
-{% block title %}
-    IROs List
-{% endblock %}
+{% load assessment_filters %}
+
+{% block title %}IROs | DMA Platform{% endblock %}
+{% block page_title %}IROs{% endblock %}
 
 {% block content %}
-<div class="section">
-    <h1>All IROs</h1>
-    <p>
-        <a href="{% url 'assessments:iro-create' %}" class="btn btn-primary">Create New IRO</a>
-    </p>
+    <div class="mb-4">
+        <a href="{% url 'assessments:iro-create' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Create New IRO
+        </a>
+    </div>
+    
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">IROs Library</h5>
+                <div class="d-flex">
+                    <!-- Search input -->
+                    <div class="me-2">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search IROs...">
+                    </div>
+                    
+                    <!-- Type filter dropdown -->
+                    <div class="dropdown me-2">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="typeFilterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            Filter by Type
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="typeFilterDropdown">
+                            <li><a class="dropdown-item filter-option" data-filter="type" data-value="all" href="#">All Types</a></li>
+                            <li><a class="dropdown-item filter-option" data-filter="type" data-value="Risk" href="#">Risk</a></li>
+                            <li><a class="dropdown-item filter-option" data-filter="type" data-value="Opportunity" href="#">Opportunity</a></li>
+                            <li><a class="dropdown-item filter-option" data-filter="type" data-value="Impact" href="#">Impact</a></li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Status filter dropdown -->
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="statusFilterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            Filter by Status
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="statusFilterDropdown">
+                            <li><a class="dropdown-item filter-option" data-filter="status" data-value="all" href="#">All Statuses</a></li>
+                            <li><a class="dropdown-item filter-option" data-filter="status" data-value="Draft" href="#">Draft</a></li>
+                            <li><a class="dropdown-item filter-option" data-filter="status" data-value="In_Review" href="#">In Review</a></li>
+                            <li><a class="dropdown-item filter-option" data-filter="status" data-value="Approved" href="#">Approved</a></li>
+                            <li><a class="dropdown-item filter-option" data-filter="status" data-value="Disclosed" href="#">Disclosed</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Handsontable Container -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body p-3">
+            <div id="iro-table-container" data-save-url="{% url 'assessments:iro-save' %}" style="height: 500px; overflow: hidden;"></div>
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <p class="text-muted mb-0">Showing <span id="iro-count">{{ iros|length }}</span> items</p>
+        </div>
+    </div>
+{% endblock %}
 
-    {% if iros %}
-      <table class="table table-bordered table-striped">
-        <thead>
-          <tr>
-            <th>IRO ID</th>
-            <th>Type</th>
-            <th>Tenant</th>
-            <th>Stage</th>
-            <th>Last Assessment Date</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-        {% for item in iros %}
-          <tr>
-            <td>{{ item.iro_id }}</td>
-            <td>{{ item.type }}</td>
-            <td>{{ item.tenant.tenant_name }}</td>
-            <td>{{ item.current_stage }}</td>
-            <td>
-              {% if item.last_assessment_date %}
-                {{ item.last_assessment_date|date:"Y-m-d H:i" }}
-              {% else %}
-                --
-              {% endif %}
-            </td>
-            <td>
-              <a href="{% url 'assessments:iro-edit' item.pk %}" class="btn btn-sm btn-info">Edit</a>
-            </td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p>No IROs have been created yet.</p>
-    {% endif %}
-</div>
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get IRO data from the server
+    fetch('{% url "assessments:iro-data" %}')
+        .then(response => response.json())
+        .then(data => {
+            // Configure columns
+            const columnDefs = [
+                { data: 'iro_id', title: 'IRO ID', readOnly: true, width: 80 },
+                { data: 'title', title: 'Title' },
+                { 
+                    data: 'type', 
+                    title: 'Type',
+                    type: 'dropdown',
+                    source: ['Risk', 'Opportunity', 'Impact'],
+                    editor: 'select'
+                },
+                { data: 'esrs_standard', title: 'ESRS Standard' },
+                { 
+                    data: 'impact_score', 
+                    title: 'Impact Score', 
+                    type: 'numeric',
+                    numericFormat: {
+                        pattern: '0.0'
+                    },
+                    readOnly: true,
+                    className: function(row, col, prop) {
+                        const value = data[row]?.impact_score || 0;
+                        if (value > 3.5) return 'bg-danger bg-opacity-25';
+                        if (value > 2.5) return 'bg-warning bg-opacity-25';
+                        return 'bg-success bg-opacity-25';
+                    }
+                },
+                { 
+                    data: 'financial_score', 
+                    title: 'Financial Score', 
+                    type: 'numeric',
+                    numericFormat: {
+                        pattern: '0.0'
+                    },
+                    readOnly: true,
+                    className: function(row, col, prop) {
+                        const value = data[row]?.financial_score || 0;
+                        if (value > 3.5) return 'bg-danger bg-opacity-25';
+                        if (value > 2.5) return 'bg-warning bg-opacity-25';
+                        return 'bg-success bg-opacity-25';
+                    }
+                },
+                { 
+                    data: 'current_stage', 
+                    title: 'Status',
+                    type: 'dropdown',
+                    source: ['Draft', 'In_Review', 'Approved', 'Disclosed'],
+                    editor: 'select'
+                }
+            ];
+            
+            // Initialize Handsontable
+            const contextData = {
+                tenant: {{ request.context.tenant.tenant_id|default:"null" }},
+                assessment: {{ request.context.assessment.id|default:"null" }}
+            };
+            
+            const hot = window.handsonTableManager.initTable('iro-table-container', {
+                colHeaders: columnDefs.map(col => col.title),
+                columns: columnDefs,
+                filters: true,
+                dropdownMenu: true,
+                contextMenu: ['row_above', 'row_below', 'remove_row', '---------', 'undo', 'redo'],
+                rowHeaders: true,
+                height: 'auto',
+                licenseKey: 'non-commercial-and-evaluation'
+            }, data, contextData);
+            
+            // Update row count
+            document.getElementById('iro-count').textContent = data.length;
+            
+            // Handle search
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('keyup', function() {
+                const query = this.value.toLowerCase();
+                
+                if (hot) {
+                    const search = hot.getPlugin('search');
+                    hot.getPlugin('search').query(query);
+                    hot.render();
+                    
+                    // Count visible rows
+                    let visibleRows = 0;
+                    for (let i = 0; i < hot.countRows(); i++) {
+                        if (!hot.rowIndexMapper.getValueAtIndex(i)) {
+                            visibleRows++;
+                        }
+                    }
+                    document.getElementById('iro-count').textContent = visibleRows;
+                }
+            });
+            
+            // Handle filter dropdown options
+            const filterOptions = document.querySelectorAll('.filter-option');
+            filterOptions.forEach(option => {
+                option.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const filterType = this.dataset.filter;
+                    const filterValue = this.dataset.value;
+                    
+                    if (hot) {
+                        const filters = hot.getPlugin('filters');
+                        
+                        // Get column index based on filter type
+                        const columnIndex = filterType === 'type' ? 2 : (filterType === 'status' ? 6 : -1);
+                        
+                        if (columnIndex >= 0) {
+                            filters.clearConditions(columnIndex);
+                            
+                            if (filterValue !== 'all') {
+                                filters.addCondition(columnIndex, 'eq', [filterValue]);
+                            }
+                            
+                            filters.filter();
+                            
+                            // Update row count
+                            document.getElementById('iro-count').textContent = hot.countRows() - hot.countEmptyRows();
+                        }
+                    }
+                });
+            });
+        })
+        .catch(error => {
+            console.error('Error loading IRO data:', error);
+            document.getElementById('iro-table-container').innerHTML = 
+                '<div class="alert alert-danger">Error loading IRO data. Please try refreshing the page.</div>';
+        });
+});
+</script>
 {% endblock %}

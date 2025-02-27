@@ -9,6 +9,7 @@ class Assessment(models.Model):
     (Kept from your original code, in case you still need a top-level
      Assessment model. You can remove it if it's no longer used.)
     """
+    tenant = models.ForeignKey(TenantConfig, on_delete=models.CASCADE, db_column="tenant_id", null=True, blank=True)
     name = models.CharField(max_length=200, help_text="Name of the assessment")
     description = models.TextField(blank=True, help_text="Optional description")
     created_on = models.DateTimeField(auto_now_add=True)
@@ -38,6 +39,41 @@ class IRO(models.Model):
 
     class Meta:
         db_table = 'iro'
+    
+    @property
+    def title(self):
+        """Return the title from the current version of this IRO"""
+        if self.current_version_id:
+            try:
+                version = IROVersion.objects.get(version_id=self.current_version_id)
+                return version.title
+            except IROVersion.DoesNotExist:
+                pass
+        
+        # Fallback: try to get the latest version's title
+        latest_version = IROVersion.objects.filter(iro=self).order_by('-version_number').first()
+        if latest_version:
+            return latest_version.title
+        
+        return f"IRO #{self.iro_id}"  # Fallback title
+    
+    @property
+    def description(self):
+        """Return the description from the current version of this IRO"""
+        if self.current_version_id:
+            try:
+                version = IROVersion.objects.get(version_id=self.current_version_id)
+                return version.description
+            except IROVersion.DoesNotExist:
+                pass
+                
+        # Fallback: try to get the latest version's description
+        latest_version = IROVersion.objects.filter(iro=self).order_by('-version_number').first()
+        if latest_version:
+            return latest_version.description
+            
+        return ""  # Fallback description
+
 
 
 class IROVersion(models.Model):

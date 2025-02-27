@@ -2,8 +2,9 @@
 from rest_framework import viewsets, permissions
 from ..models import IRO
 from .serializers import IROSerializer
+from ..views import ContextMixin  # Import the ContextMixin
 
-class IROViewSet(viewsets.ModelViewSet):
+class IROViewSet(ContextMixin, viewsets.ModelViewSet):
     """
     A ViewSet for viewing and editing IRO instances.
     """

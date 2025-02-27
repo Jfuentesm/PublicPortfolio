@@ -59,12 +59,9 @@ def main():
 
     with open(output_file, 'w', encoding='utf-8') as f:
         # Add goal and output instruction template
-        f.write('<issue to solve>\n\n\n')
-        f.write('</issue to solve>\n\n\n')
-        f.write('<output instruction>\n')
-        f.write('1) Reflect on 5-7 different possible sources of the problem, distill those down to the most likely root cause \n')
-        f.write('2) Give me the COMPLETE UPDATED VERSION of each script that needs to be updated\n')
-        f.write('</output instruction>\n\n')
+        f.write('<issue>\n\n\n')
+        f.write('</issue>\n\n\n')
+        f.write('<task>Reflect on 5-7 different possible sources of the problem, distill those down to 1-2 most likely sources, and then add logs to validate your assumptions before we move onto implementing the actual code fix</task>')
         f.write('\n')
 
         # Write file tree section

@@ -63,18 +63,19 @@ DATABASE_ROUTERS = (
 # END DJANGO-TENANTS   #
 ########################
 
+# core/settings/base.py - update MIDDLEWARE list
+
 MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
-    # The tenant middleware must appear near the top (before DB queries occur):
     'django_tenants.middleware.main.TenantMainMiddleware',
-
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',  # Authentication must run BEFORE our middleware
+    'core.middleware.context_middleware.ContextMiddleware',     # Now placed after authentication
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
 ########################
 # NEW: Guardian & Auth #
 ########################
@@ -136,6 +137,11 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR.parent, 'static'),
+]
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
