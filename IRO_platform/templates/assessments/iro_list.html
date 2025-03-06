@@ -77,20 +77,20 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Get IRO data from the server
     fetch('{% url "assessments:iro-data" %}')
-        .then(response => {
+        .then(function(response) {
             if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
+                throw new Error('HTTP error! Status: ' + response.status);
             }
             return response.json();
         })
-        .then(data => {
+        .then(function(data) {
             // Check if data is valid
             if (!Array.isArray(data)) {
                 throw new Error('Invalid data format. Expected an array.');
             }
             
             // Validate and normalize data to prevent JavaScript errors
-            const validatedData = data.map(item => {
+            var validatedData = data.map(function(item) {
                 return {
                     iro_id: item.iro_id || 0,
                     title: item.title || 'Untitled',
@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             // Configure columns      
-            const columnDefs = [
+            var columnDefs = [
                 { data: 'iro_id', title: 'IRO ID', readOnly: true, width: 80 },
                 { data: 'title', title: 'Title' },
                 { 
@@ -126,9 +126,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     readOnly: true,
                     className: function(row, col, prop, cellProperties, value) {
                         // Use the cell value directly instead of accessing data array
-                        const score = parseFloat(value || 0);
-                        if (score > 3.5) return 'bg-danger bg-opacity-25';
-                        if (score > 2.5) return 'bg-warning bg-opacity-25';
+                        var score = parseFloat(value || 0);
+                        if (score > 3.5) {
+                            return 'bg-danger bg-opacity-25';
+                        }
+                        if (score > 2.5) {
+                            return 'bg-warning bg-opacity-25';
+                        }
                         return 'bg-success bg-opacity-25';
                     }
                 },
@@ -142,9 +146,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     readOnly: true,
                     className: function(row, col, prop, cellProperties, value) {
                         // Use the cell value directly instead of accessing data array
-                        const score = parseFloat(value || 0);
-                        if (score > 3.5) return 'bg-danger bg-opacity-25';
-                        if (score > 2.5) return 'bg-warning bg-opacity-25';
+                        var score = parseFloat(value || 0);
+                        if (score > 3.5) {
+                            return 'bg-danger bg-opacity-25';
+                        }
+                        if (score > 2.5) {
+                            return 'bg-warning bg-opacity-25';
+                        }
                         return 'bg-success bg-opacity-25';
                     }
                 },
@@ -171,13 +179,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Initialize Handsontable
-            const contextData = {
+            var contextData = {
                 tenant: {{ request.context.tenant.tenant_id|default:"null" }},
                 assessment: {{ request.context.assessment.id|default:"null" }}
             };
             
-            const hot = window.handsonTableManager.initTable('iro-table-container', {
-                colHeaders: columnDefs.map(col => col.title),
+            var hot = window.handsonTableManager.initTable('iro-table-container', {
+                colHeaders: columnDefs.map(function(col) { return col.title; }),
                 columns: columnDefs,
                 filters: true,
                 dropdownMenu: true,
@@ -191,19 +199,19 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('iro-count').textContent = validatedData.length;
             
             // Handle search
-            const searchInput = document.getElementById('searchInput');
+            var searchInput = document.getElementById('searchInput');
             if (searchInput) {
                 searchInput.addEventListener('keyup', function() {
-                    const query = this.value.toLowerCase();
+                    var query = this.value.toLowerCase();
                     
                     if (hot) {
-                        const search = hot.getPlugin('search');
+                        var search = hot.getPlugin('search');
                         hot.getPlugin('search').query(query);
                         hot.render();
                         
                         // Count visible rows
-                        let visibleRows = 0;
-                        for (let i = 0; i < hot.countRows(); i++) {
+                        var visibleRows = 0;
+                        for (var i = 0; i < hot.countRows(); i++) {
                             if (!hot.rowIndexMapper.getValueAtIndex(i)) {
                                 visibleRows++;
                             }
@@ -214,19 +222,19 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Handle filter dropdown options
-            const filterOptions = document.querySelectorAll('.filter-option');
-            filterOptions.forEach(option => {
+            var filterOptions = document.querySelectorAll('.filter-option');
+            filterOptions.forEach(function(option) {
                 option.addEventListener('click', function(e) {
                     e.preventDefault();
                     
-                    const filterType = this.dataset.filter;
-                    const filterValue = this.dataset.value;
+                    var filterType = this.dataset.filter;
+                    var filterValue = this.dataset.value;
                     
                     if (hot) {
-                        const filters = hot.getPlugin('filters');
+                        var filters = hot.getPlugin('filters');
                         
                         // Get column index based on filter type
-                        const columnIndex = filterType === 'type' ? 2 : (filterType === 'status' ? 6 : -1);
+                        var columnIndex = filterType === 'type' ? 2 : (filterType === 'status' ? 6 : -1);
                         
                         if (columnIndex >= 0) {
                             filters.clearConditions(columnIndex);
@@ -244,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
         })
-        .catch(error => {
+        .catch(function(error) {
             console.error('Error loading IRO data:', error);
             document.getElementById('iro-table-container').innerHTML = 
                 '<div class="alert alert-danger">' +

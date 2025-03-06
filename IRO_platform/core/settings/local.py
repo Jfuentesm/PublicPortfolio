@@ -28,4 +28,13 @@ AUTH_PASSWORD_VALIDATORS = []
 # Point Celery broker to Redis, or default to local Redis container
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 
-# Any additional local-only settings or logging can remain here
+# Override the log level in development to see more details
+LOGGING['loggers']['django']['level'] = 'DEBUG'
+LOGGING['loggers']['apps']['level'] = 'DEBUG'
+LOGGING['loggers']['tenants']['level'] = 'DEBUG'
+LOGGING['loggers']['frontend']['level'] = 'DEBUG'
+
+# Also log to the console in development
+for logger_name in LOGGING['loggers']:
+    if 'console' not in LOGGING['loggers'][logger_name]['handlers']:
+        LOGGING['loggers'][logger_name]['handlers'].append('console')

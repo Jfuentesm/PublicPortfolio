@@ -6,6 +6,10 @@ from tenants.models import TenantConfig
 from apps.assessments.models import Assessment, IRO, ImpactAssessment, RiskOppAssessment, AuditTrail, Review
 from django_tenants.utils import schema_context
 import json
+import logging
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
 
 def home_dashboard(request):
     # Get tenant from context middleware
@@ -289,3 +293,55 @@ def set_context(request):
     else:
         # For non-AJAX requests, redirect to the specified next URL
         return redirect(redirect_url)
+    
+
+# Get the frontend logger
+frontend_logger = logging.getLogger('frontend')
+
+@require_POST
+@csrf_exempt  # In production, you should use proper CSRF protection
+def frontend_log(request):
+    """
+    Endpoint to receive logs from the frontend
+    """
+    try:
+        data = json.loads(request.body)
+        logs = data.get('logs', [])
+        
+        for log_entry in logs:
+            level = log_entry.get('level', 'INFO').upper()
+            message = log_entry.get('message', '')
+            context = log_entry.get('context', {})
+            
+            # Add request metadata
+            meta = {
+                'ip': request.META.get('REMOTE_ADDR'),
+                'user_agent': log_entry.get('userAgent'),
+                'url': log_entry.get('url'),
+                'user': str(request.user) if request.user.is_authenticated else 'anonymous',
+                'session_id': log_entry.get('sessionId'),
+            }
+            
+            # Combine context with metadata
+            extra = {'meta': meta, 'context': context}
+            
+            # Log with appropriate level
+            if level == 'DEBUG':
+                frontend_logger.debug(message, extra=extra)
+            elif level == 'INFO':
+                frontend_logger.info(message, extra=extra)
+            elif level == 'WARNING':
+                frontend_logger.warning(message, extra=extra)
+            elif level == 'ERROR':
+                frontend_logger.error(message, extra=extra)
+            elif level == 'CRITICAL':
+                frontend_logger.critical(message, extra=extra)
+            else:
+                frontend_logger.info(message, extra=extra)
+        
+        return JsonResponse({'success': True, 'count': len(logs)})
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

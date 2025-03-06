@@ -2,6 +2,8 @@
 
 import os
 from pathlib import Path
+import logging
+from datetime import datetime
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -72,7 +74,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',  # Authentication must run BEFORE our middleware
-    'core.middleware.context_middleware.ContextMiddleware',     # Now placed after authentication
+    'core.middleware.context_middleware.ContextMiddleware',     # Context middleware
+    'core.middleware.logging_middleware.LoggingMiddleware',     # Add logging middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -142,8 +145,104 @@ STATICFILES_DIRS = [
 ]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Example Celery or other global settings can remain here
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+
+########################
+# LOGGING CONFIGURATION #
+########################
+
+# Create logs directory if it doesn't exist
+LOG_DIR = os.path.join(BASE_DIR.parent, 'logs')
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Get the current datetime for the log filename
+log_datetime = datetime.now().strftime('%Y%m%d_%H%M%S')
+LOG_FILENAME = f'app_{log_datetime}.log'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {asctime} {message}',
+            'style': '{',
+        },
+        'tenant_aware': {
+            'format': '{levelname} {asctime} {module} [TENANT:{tenant}] {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, LOG_FILENAME),
+            'formatter': 'verbose',
+        },
+        'tenant_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, LOG_FILENAME),
+            'formatter': 'tenant_aware',
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'class': 'django.utils.log.AdminEmailHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django.server': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console', 'tenant_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'tenants': {
+            'handlers': ['console', 'tenant_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'frontend': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'core': {
+            'handlers': ['console', 'tenant_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    }
+}

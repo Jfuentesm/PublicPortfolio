@@ -1,7 +1,11 @@
 # core/settings/production.py
 import os
 import dj_database_url
+import datetime  # Add this import
 from .base import *
+
+# Define APP_RUN_TIMESTAMP for unique log file names
+APP_RUN_TIMESTAMP = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
 # Disable debug mode
 DEBUG = False
@@ -32,25 +36,25 @@ DATABASES = {
 # Celery configuration
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
 
-# Logging configuration
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
-    },
+# Production logging
+# Adjust log paths for production environment
+log_dir = os.getenv('LOG_DIR', '/var/log/dma')
+os.makedirs(log_dir, exist_ok=True)
+
+# Update log file locations for production - now using the defined APP_RUN_TIMESTAMP
+LOGGING['handlers']['file_backend']['filename'] = os.path.join(log_dir, f'backend_{APP_RUN_TIMESTAMP}.log')
+LOGGING['handlers']['file_frontend']['filename'] = os.path.join(log_dir, f'frontend_{APP_RUN_TIMESTAMP}.log')
+
+# Increase max log file size
+LOGGING['handlers']['file_backend']['maxBytes'] = 1024*1024*50  # 50 MB
+LOGGING['handlers']['file_frontend']['maxBytes'] = 1024*1024*50  # 50 MB
+
+# Add email handler for errors in production
+LOGGING['handlers']['mail_admins'] = {
+    'level': 'ERROR',
+    'filters': ['require_debug_false'],
+    'class': 'django.utils.log.AdminEmailHandler',
+    'include_html': True,
 }
+
+LOGGING['loggers']['django']['handlers'].append('mail_admins')
