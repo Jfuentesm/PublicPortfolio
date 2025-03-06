@@ -3,136 +3,105 @@ from django.db import connection
 from tenants.models import TenantConfig
 from apps.assessments.models import Assessment, IRO
 from django_tenants.utils import schema_context
+import logging
+
+logger = logging.getLogger('core')
 
 class ContextMiddleware:
     """
-    Middleware to manage hierarchical context:
-    - tenant (company)
-    - assessment (first time vs refresh)
-    - IRO (specific IRO being assessed)
+    Middleware to manage hierarchical context: tenant, assessment, IRO.
+    Ensures tenant context is set and logged.
     """
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # Initialize context attributes
-        request.context = {
-            'tenant': None,
-            'assessment': None,
-            'iro': None
-        }
+        request.context = {'tenant': None, 'assessment': None, 'iro': None}
 
-        # Check for tenant in session first (manually selected tenant)
+        # Log initial context setup
+        logger.debug("Initializing context for request: %s", request.path)
+
+        # Check session for tenant
         if 'tenant_id' in request.session:
             try:
                 tenant_id = request.session['tenant_id']
-                # Always query TenantConfig from public schema
                 with schema_context('public'):
                     tenant = TenantConfig.objects.get(tenant_id=tenant_id)
-                    # Verify tenant has a valid schema_name
-                    if not hasattr(tenant, 'schema_name') or not tenant.schema_name:
-                        print(f"Warning: Tenant {tenant_id} has invalid schema_name")
+                    if not tenant.schema_name:
+                        logger.warning("Tenant %s has no schema_name", tenant_id)
                         del request.session['tenant_id']
-                        request.context['tenant'] = None
                     else:
                         request.context['tenant'] = tenant
+                        logger.info("Tenant set from session: %s", tenant.tenant_name)
             except TenantConfig.DoesNotExist:
-                # Clear invalid tenant from session
+                logger.warning("Tenant ID %s not found, clearing session", request.session.get('tenant_id'))
                 if 'tenant_id' in request.session:
                     del request.session['tenant_id']
 
-        # Fallback to request.tenant (set by django-tenants based on domain)
+        # Fallback to request.tenant from django-tenants
         elif hasattr(request, 'tenant'):
             request.context['tenant'] = request.tenant
-        # Final fallback: try to determine tenant from the current schema
+            logger.info("Tenant set from request.tenant: %s", request.tenant.tenant_name)
+        # Fallback to current schema
         elif connection.schema_name.startswith('tenant_'):
-            # Extract tenant name from schema_name (tenant_tenant1 -> tenant1)
             tenant_name = connection.schema_name[7:]
-            # Always query TenantConfig from public schema
             with schema_context('public'):
                 try:
                     tenant = TenantConfig.objects.get(tenant_name=tenant_name)
                     request.context['tenant'] = tenant
+                    logger.info("Tenant inferred from schema: %s", tenant_name)
                 except TenantConfig.DoesNotExist:
-                    pass
+                    logger.warning("No tenant found for schema: %s", connection.schema_name)
 
-        # If we still don't have a tenant and we're visiting the root domain,
-        # try to set a default tenant
+        # Default tenant for root domain
         if not request.context['tenant'] and request.get_host() in ('localhost', '127.0.0.1'):
-            try:
-                # Always query TenantConfig from public schema
-                with schema_context('public'):
-                    # Try to use the first tenant as default for the root domain
-                    default_tenant = TenantConfig.objects.first()
-                    if default_tenant:
-                        request.context['tenant'] = default_tenant
-                        request.session['tenant_id'] = default_tenant.tenant_id
-            except Exception:
-                pass
+            with schema_context('public'):
+                tenant = TenantConfig.objects.first()
+                if tenant:
+                    request.context['tenant'] = tenant
+                    request.session['tenant_id'] = tenant.tenant_id
+                    logger.info("Set default tenant: %s", tenant.tenant_name)
 
-        # Check session for stored context values
-        if 'assessment_id' in request.session:
-            tenant = request.context['tenant']
-            if tenant:
-                try:
-                    assessment_id = request.session['assessment_id']
-                    with schema_context(tenant.schema_name):
-                        request.context['assessment'] = Assessment.objects.get(id=assessment_id)
-                except Assessment.DoesNotExist:
-                    # Clear invalid context
-                    if 'assessment_id' in request.session:
-                        del request.session['assessment_id']
-
-        if 'iro_id' in request.session:
+        # Assessment context
+        if 'assessment_id' in request.session and request.context['tenant']:
             try:
-                iro_id = request.session['iro_id']
-                if request.context['tenant']:
-                    from apps.assessments.utils import get_iro_by_id
-                    iro = get_iro_by_id(iro_id, request.context['tenant'])
-                    request.context['iro'] = iro
-            except Exception:
+                with schema_context(request.context['tenant'].schema_name):
+                    assessment = Assessment.objects.get(id=request.session['assessment_id'])
+                    request.context['assessment'] = assessment
+                    logger.debug("Assessment set: %s", assessment.name)
+            except Assessment.DoesNotExist:
+                logger.warning("Assessment ID %s not found", request.session.get('assessment_id'))
+                if 'assessment_id' in request.session:
+                    del request.session['assessment_id']
+
+        # IRO context
+        if 'iro_id' in request.session and request.context['tenant']:
+            try:
+                from apps.assessments.utils import get_iro_by_id
+                iro = get_iro_by_id(request.session['iro_id'], request.context['tenant'])
+                request.context['iro'] = iro
+                logger.debug("IRO set: %s", iro.title if iro else "None")
+            except Exception as e:
+                logger.warning("Error setting IRO: %s", str(e))
                 if 'iro_id' in request.session:
                     del request.session['iro_id']
 
-        # Handle context updates from GET parameters
-        if 'tenant_id' in request.GET: 
+        # Handle GET parameters
+        if 'tenant_id' in request.GET:
             try:
-                tenant_id = int(request.GET.get('tenant_id'))
-                # Always query TenantConfig from public schema
+                tenant_id = int(request.GET['tenant_id'])
                 with schema_context('public'):
                     tenant = TenantConfig.objects.get(tenant_id=tenant_id)
-                request.context['tenant'] = tenant
-                request.session['tenant_id'] = tenant_id
+                    request.context['tenant'] = tenant
+                    request.session['tenant_id'] = tenant_id
+                    logger.info("Tenant updated via GET: %s", tenant.tenant_name)
             except (ValueError, TenantConfig.DoesNotExist):
-                pass
+                logger.warning("Invalid tenant_id in GET: %s", request.GET['tenant_id'])
 
-        if 'assessment_id' in request.GET:
-            tenant = request.context['tenant']
-            if tenant:
-                try:
-                    assessment_id = int(request.GET.get('assessment_id'))
-                    with schema_context(tenant.schema_name):
-                        assessment = Assessment.objects.get(id=assessment_id)
-                    request.context['assessment'] = assessment
-                    request.session['assessment_id'] = assessment_id
-                    # Clear IRO when assessment changes
-                    if 'iro_id' in request.session:
-                        del request.session['iro_id']
-                except (ValueError, Assessment.DoesNotExist):
-                    pass
-
-        if 'iro_id' in request.GET:
-            try:
-                iro_id = int(request.GET.get('iro_id'))
-                if request.context['tenant']:
-                    from apps.assessments.utils import get_iro_by_id
-                    iro = get_iro_by_id(iro_id, request.context['tenant'])
-                    if iro:
-                        request.context['iro'] = iro
-                        request.session['iro_id'] = iro_id
-            except Exception:
-                pass
-
-        # Process the request
+        # Process request
         response = self.get_response(request)
+        logger.debug("Context after processing: tenant=%s, assessment=%s, iro=%s",
+                     request.context['tenant'].tenant_name if request.context['tenant'] else None,
+                     request.context['assessment'].name if request.context['assessment'] else None,
+                     request.context['iro'].title if request.context['iro'] else None)
         return response
