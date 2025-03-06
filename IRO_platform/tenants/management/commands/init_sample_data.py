@@ -1,5 +1,3 @@
-# tenants/management/commands/init_sample_data.py
-
 from django.core.management.base import BaseCommand
 from django.db import transaction, connection
 from django.utils import timezone
@@ -58,10 +56,11 @@ class Command(BaseCommand):
                 )
             
             # 2) For each tenant, create assessments
-            self.create_assessments(tenant)
+            assessments = self.create_assessments(tenant)
             
-            # 3) For each tenant, create IROs with appropriate assessments
-            self.create_iros_with_appropriate_assessments(tenant)
+            # 3) For each tenant and each assessment, create unique IROs
+            for assessment in assessments:
+                self.create_iros_for_assessment(tenant, assessment)
 
     @transaction.atomic
     def create_assessments(self, tenant):
@@ -69,6 +68,7 @@ class Command(BaseCommand):
         current_schema = connection.schema_name
         self.stdout.write(self.style.NOTICE(f"Current schema before assessment creation: {current_schema}"))
 
+        created_assessments = []
         # Important: Switch to the tenant's schema before querying or creating tenant models.
         with schema_context(tenant.schema_name):
             # Create assessments (first time and refresh)
@@ -108,43 +108,53 @@ class Command(BaseCommand):
                             f'Created assessment "{assessment_data["name"]}" for tenant {tenant.tenant_name}.'
                         )
                     )
+                created_assessments.append(assessment)
+        
+        return created_assessments
 
     @transaction.atomic
-    def create_iros_with_appropriate_assessments(self, tenant):
+    def create_iros_for_assessment(self, tenant, assessment):
         # Log the current schema that Django is using
         current_schema = connection.schema_name
-        self.stdout.write(self.style.NOTICE(f"Current schema before IRO creation: {current_schema}"))
+        self.stdout.write(self.style.NOTICE(f"Current schema before IRO creation for assessment {assessment.name}: {current_schema}"))
 
         # Important: Switch to the tenant's schema before querying or creating tenant models.
         with schema_context(tenant.schema_name):
-            # If the tenant already has 5 or more IROs, skip creation to avoid duplicates.
-            existing_count = IRO.objects.filter(tenant=tenant).count()
+            # Generate a title prefix for this tenant and assessment
+            assessment_name_for_title = assessment.name.replace(" ", "_")
+            title_prefix = f"{tenant.tenant_name}_{assessment_name_for_title}_"
+            
+            # Count IROs with titles starting with our prefix (via their current version)
+            existing_count = IROVersion.objects.filter(
+                title__startswith=title_prefix
+            ).count()
+            
             self.stdout.write(self.style.NOTICE(
-                f"Found {existing_count} existing IROs for tenant {tenant.tenant_name}"
+                f"Found {existing_count} existing IROs with titles starting with '{title_prefix}'"
             ))
             
             if existing_count >= 5:
                 self.stdout.write(
                     self.style.WARNING(
-                        f'Tenant "{tenant.tenant_name}" already has {existing_count} IRO(s). Skipping creation.'
+                        f'Already found {existing_count} IRO(s) for assessment "{assessment.name}" in tenant "{tenant.tenant_name}". Skipping creation.'
                     )
                 )
                 return
 
             # Sample sets of data for demonstration.  
             iro_data = [
-                {"type": "Risk", "title": "Climate Transition Risk", "description": "Risk related to climate transition requirements"},
-                {"type": "Opportunity", "title": "Sustainable Product Development", "description": "Opportunity for new sustainable products"},
-                {"type": "Impact", "title": "Carbon Emissions", "description": "Impact from carbon emissions"},
-                {"type": "Risk", "title": "Water Scarcity Risk", "description": "Risk from increasing water scarcity"},
-                {"type": "Opportunity", "title": "Energy Efficiency", "description": "Opportunity for energy efficiency improvements"}
+                {"type": "Risk", "description": "Risk related to climate transition requirements"},
+                {"type": "Opportunity", "description": "Opportunity for new sustainable products"},
+                {"type": "Impact", "description": "Impact from carbon emissions"},
+                {"type": "Risk", "description": "Risk from increasing water scarcity"},
+                {"type": "Opportunity", "description": "Energy efficiency improvements"}
             ]
             
             for idx, data in enumerate(iro_data):
                 # Check schema again before each IRO creation to ensure it's consistent
                 current_schema = connection.schema_name
                 self.stdout.write(self.style.NOTICE(
-                    f"Current schema before creating IRO #{idx+1}: {current_schema}"
+                    f"Current schema before creating IRO #{idx+1} for assessment {assessment.name}: {current_schema}"
                 ))
                 
                 # Create the IRO
@@ -158,12 +168,15 @@ class Command(BaseCommand):
                     last_assessment_score=3.5 + (idx * 0.3),  # Just an example
                 )
                 
+                # Format the title according to the pattern [tenant]_[assessment]_[iro id]
+                formatted_title = f"{tenant.tenant_name}_{assessment_name_for_title}_{iro_obj.iro_id}"
+                
                 # Create an IRO version for this IRO
                 iro_version = IROVersion.objects.create(
                     iro=iro_obj,
                     tenant=tenant,
                     version_number=1,
-                    title=data["title"],
+                    title=formatted_title,
                     description=data["description"],
                     status='Approved',
                     created_by=1,  # Default user ID
@@ -174,7 +187,7 @@ class Command(BaseCommand):
                 iro_obj.save()
                 
                 self.stdout.write(self.style.NOTICE(
-                    f"Created IRO with ID: {iro_obj.iro_id}, type: {data['type']} in schema: {current_schema}"
+                    f"Created IRO with ID: {iro_obj.iro_id}, title: {formatted_title}, type: {data['type']} in schema: {current_schema}"
                 ))
                 
                 # Create the appropriate assessment based on IRO type
@@ -191,7 +204,7 @@ class Command(BaseCommand):
                         likelihood_score=4,
                         severity_score=3.8,
                         impact_materiality_score=3.8,
-                        overall_rationale=f'Impact rationale for {data["title"]}',
+                        overall_rationale=f'Impact rationale for {formatted_title}',
                     )
                     
                     self.stdout.write(self.style.NOTICE(
@@ -209,7 +222,7 @@ class Command(BaseCommand):
                         likelihood_score=3,
                         financial_magnitude_score=2.5,
                         financial_materiality_score=2.9,
-                        overall_rationale=f'Financial rationale for {data["title"]}',
+                        overall_rationale=f'Financial rationale for {formatted_title}',
                     )
                     
                     self.stdout.write(self.style.NOTICE(
@@ -218,6 +231,6 @@ class Command(BaseCommand):
                 
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f'Created IRO #{iro_obj.iro_id} ({data["title"]}) of type {data["type"]} and its appropriate assessment for tenant: {tenant.tenant_name}'
+                        f'Created IRO #{iro_obj.iro_id} ({formatted_title}) of type {data["type"]} for assessment "{assessment.name}" and tenant: {tenant.tenant_name}'
                     )
                 )

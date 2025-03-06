@@ -156,6 +156,20 @@ def home_dashboard(request):
     # Always add available tenants to context for the tenant selector, not just for staff users
     context['available_tenants'] = TenantConfig.objects.all()
     
+    # ADD THIS SECTION: Fetch available assessments for the selected tenant
+    available_assessments = []
+    if tenant:
+        with schema_context(tenant.schema_name):
+            available_assessments = list(Assessment.objects.filter(tenant=tenant))
+    context['available_assessments'] = available_assessments
+    
+    # If we have a tenant but no IROs selected yet, prepare available IROs list
+    available_iros = []
+    if tenant:
+        with schema_context(tenant.schema_name):
+            available_iros = list(IRO.objects.filter(tenant=tenant))
+    context['available_iros'] = available_iros
+    
     return render(request, 'home.html', context)
 
 @require_GET
@@ -164,6 +178,8 @@ def set_context(request):
     View to handle setting context values and redirecting.
     Can be called via AJAX or as a normal GET request.
     """
+    from django_tenants.utils import schema_context
+    
     redirect_url = request.GET.get('next', '/')
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     
@@ -174,8 +190,10 @@ def set_context(request):
     if 'tenant_id' in request.GET and is_staff:
         try:
             tenant_id = int(request.GET.get('tenant_id'))
-            tenant = TenantConfig.objects.get(tenant_id=tenant_id)
-            request.session['tenant_id'] = tenant_id
+            # Always query TenantConfig from public schema
+            with schema_context('public'):
+                tenant = TenantConfig.objects.get(tenant_id=tenant_id)
+                request.session['tenant_id'] = tenant_id
         except (ValueError, TenantConfig.DoesNotExist):
             pass
     
@@ -184,11 +202,14 @@ def set_context(request):
     if 'assessment_id' in request.GET:
         try:
             assessment_id = int(request.GET.get('assessment_id'))
-            assessment = Assessment.objects.get(id=assessment_id)
-            request.session['assessment_id'] = assessment_id
-            # Clear IRO when assessment changes
-            if 'iro_id' in request.session:
-                del request.session['iro_id']
+            tenant = request.context.get('tenant')
+            if tenant:
+                with schema_context(tenant.schema_name):
+                    assessment = Assessment.objects.get(id=assessment_id)
+                    request.session['assessment_id'] = assessment_id
+                    # Clear IRO when assessment changes
+                    if 'iro_id' in request.session:
+                        del request.session['iro_id']
         except (ValueError, Assessment.DoesNotExist):
             pass
     
@@ -196,9 +217,12 @@ def set_context(request):
     if 'iro_id' in request.GET:
         try:
             iro_id = int(request.GET.get('iro_id'))
-            iro = IRO.objects.get(iro_id=iro_id)
-            request.session['iro_id'] = iro_id
-        except (ValueError, IRO.DoesNotExist):
+            if request.context.get('tenant'):
+                from apps.assessments.utils import get_iro_by_id
+                iro = get_iro_by_id(iro_id, request.context.get('tenant'))
+                if iro:
+                    request.session['iro_id'] = iro_id
+        except ValueError:
             pass
     
     if is_ajax:
@@ -212,34 +236,49 @@ def set_context(request):
         # Populate context based on session values
         if 'tenant_id' in request.session:
             try:
-                tenant = TenantConfig.objects.get(tenant_id=request.session['tenant_id'])
-                context['tenant'] = {
-                    'tenant_id': tenant.tenant_id,
-                    'tenant_name': tenant.tenant_name
-                }
+                # Always query TenantConfig from public schema
+                with schema_context('public'):
+                    tenant = TenantConfig.objects.get(tenant_id=request.session['tenant_id'])
+                    context['tenant'] = {
+                        'tenant_id': tenant.tenant_id,
+                        'tenant_name': tenant.tenant_name
+                    }
             except TenantConfig.DoesNotExist:
                 pass
         
-        if 'assessment_id' in request.session:
+        if 'assessment_id' in request.session and 'tenant_id' in request.session:
             try:
-                assessment = Assessment.objects.get(id=request.session['assessment_id'])
-                context['assessment'] = {
-                    'id': assessment.id,
-                    'name': assessment.name,
-                    'description': assessment.description
-                }
-            except Assessment.DoesNotExist:
+                # Get tenant for schema context
+                with schema_context('public'):
+                    tenant = TenantConfig.objects.get(tenant_id=request.session['tenant_id'])
+                
+                # Get assessment using tenant's schema
+                with schema_context(tenant.schema_name):
+                    assessment = Assessment.objects.get(id=request.session['assessment_id'])
+                    context['assessment'] = {
+                        'id': assessment.id,
+                        'name': assessment.name,
+                        'description': assessment.description
+                    }
+            except (TenantConfig.DoesNotExist, Assessment.DoesNotExist):
                 pass
         
-        if 'iro_id' in request.session:
+        if 'iro_id' in request.session and 'tenant_id' in request.session:
             try:
-                iro = IRO.objects.get(iro_id=request.session['iro_id'])
-                context['iro'] = {
-                    'iro_id': iro.iro_id,
-                    'title': iro.title if hasattr(iro, 'title') else f"IRO #{iro.iro_id}",
-                    'type': iro.type
-                }
-            except IRO.DoesNotExist:
+                # Get tenant for schema context
+                with schema_context('public'):
+                    tenant = TenantConfig.objects.get(tenant_id=request.session['tenant_id'])
+                
+                # Get IRO using tenant's schema
+                from apps.assessments.utils import get_iro_by_id
+                iro = get_iro_by_id(request.session['iro_id'], tenant)
+                if iro:
+                    context['iro'] = {
+                        'iro_id': iro.iro_id,
+                        'title': iro.title if hasattr(iro, 'title') else f"IRO #{iro.iro_id}",
+                        'type': iro.type
+                    }
+            except TenantConfig.DoesNotExist:
                 pass
         
         return JsonResponse({

@@ -1,9 +1,11 @@
-# Add these imports at the top if not already present
+# apps/assessments/views.py
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView, CreateView, UpdateView
 from django.urls import reverse_lazy
 import json
+from django_tenants.utils import schema_context
+import tenants.models
 
 from .models import Assessment, IRO
 
@@ -48,6 +50,30 @@ class IROListView(ListView):
         if tenant:
             return IRO.objects.filter(tenant=tenant)
         return IRO.objects.all()
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Add available tenants to context
+        context['available_tenants'] = tenants.models.TenantConfig.objects.all()
+        
+        # Add available assessments for the selected tenant
+        if self.request.context.get('tenant'):
+            tenant = self.request.context.get('tenant')
+            with schema_context(tenant.schema_name):
+                context['available_assessments'] = list(Assessment.objects.filter(tenant=tenant))
+        else:
+            context['available_assessments'] = []
+        
+        # Add available IROs for the selected tenant
+        if self.request.context.get('tenant'):
+            tenant = self.request.context.get('tenant')
+            with schema_context(tenant.schema_name):
+                context['available_iros'] = list(IRO.objects.filter(tenant=tenant))
+        else:
+            context['available_iros'] = []
+        
+        return context
 
 class IROCreateView(CreateView):
     model = IRO
@@ -59,6 +85,30 @@ class IROCreateView(CreateView):
         # Set tenant from context
         form.instance.tenant = self.request.context.get('tenant')
         return super().form_valid(form)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Add available tenants to context
+        context['available_tenants'] = tenants.models.TenantConfig.objects.all()
+        
+        # Add available assessments for the selected tenant
+        if self.request.context.get('tenant'):
+            tenant = self.request.context.get('tenant')
+            with schema_context(tenant.schema_name):
+                context['available_assessments'] = list(Assessment.objects.filter(tenant=tenant))
+        else:
+            context['available_assessments'] = []
+        
+        # Add available IROs for the selected tenant
+        if self.request.context.get('tenant'):
+            tenant = self.request.context.get('tenant')
+            with schema_context(tenant.schema_name):
+                context['available_iros'] = list(IRO.objects.filter(tenant=tenant))
+        else:
+            context['available_iros'] = []
+        
+        return context
 
 class IROUpdateView(UpdateView):
     model = IRO
@@ -71,6 +121,26 @@ class IROUpdateView(UpdateView):
         # Add latest version information
         iro = self.get_object()
         context['latest_version'] = iro.iroversion_set.order_by('-version_number').first()
+        
+        # Add available tenants to context
+        context['available_tenants'] = tenants.models.TenantConfig.objects.all()
+        
+        # Add available assessments for the selected tenant
+        if self.request.context.get('tenant'):
+            tenant = self.request.context.get('tenant')
+            with schema_context(tenant.schema_name):
+                context['available_assessments'] = list(Assessment.objects.filter(tenant=tenant))
+        else:
+            context['available_assessments'] = []
+        
+        # Add available IROs for the selected tenant
+        if self.request.context.get('tenant'):
+            tenant = self.request.context.get('tenant')
+            with schema_context(tenant.schema_name):
+                context['available_iros'] = list(IRO.objects.filter(tenant=tenant))
+        else:
+            context['available_iros'] = []
+        
         return context
 
 # ContextMixin needed for API views
@@ -234,57 +304,177 @@ def iro_data(request):
     """
     API view to return IRO data for Handsontable.
     """
-    iros = []
-    
     try:
         # Get the tenant from context
         tenant = request.context.get('tenant')
         
+        # Early validation for tenant
+        if tenant:
+            # Verify tenant exists and has a valid schema_name
+            if not hasattr(tenant, 'schema_name') or not tenant.schema_name:
+                # Return empty array with status 200 instead of error
+                print("No valid schema_name found for tenant")
+                return JsonResponse([], safe=False)
+        
         # Get IROs from utility function
         from apps.assessments.utils import get_iros_for_tenant, get_all_tenant_iros
         
-        if tenant:
-            iro_queryset = get_iros_for_tenant(tenant)
-        else:
-            iro_queryset = get_all_tenant_iros()
+        iros = []
+        iro_queryset = []
+        
+        # Get the IRO queryset based on tenant context
+        try:
+            if tenant:
+                print(f"Getting IROs for tenant: {tenant.tenant_name}")
+                iro_queryset = get_iros_for_tenant(tenant)
+            else:
+                print("Getting IROs for all tenants")
+                iro_queryset = get_all_tenant_iros()
+        except Exception as e:
+            import traceback
+            print(f"Error getting IRO queryset: {str(e)}")
+            print(traceback.format_exc())
+            # Return empty array with status 200 instead of error
+            return JsonResponse([], safe=False)
             
         # Prepare data for each IRO
         for iro in iro_queryset:
             try:
-                # Get the impact and financial scores
+                # Initialize values with safe defaults
                 impact_score = 0.0
                 financial_score = 0.0
+                title = f"IRO #{getattr(iro, 'iro_id', 'unknown')}"  # Safe default
                 
-                # Use the tenant from the IRO if we don't have one
-                tenant_to_use = tenant or iro.tenant
+                # Ensure we have a valid tenant for this IRO
+                tenant_to_use = None
+                try:
+                    # First try to use the current context tenant
+                    if tenant and hasattr(tenant, 'schema_name') and tenant.schema_name:
+                        tenant_to_use = tenant
+                    # If not available, try to use the IRO's tenant
+                    elif hasattr(iro, 'tenant') and iro.tenant and hasattr(iro.tenant, 'schema_name') and iro.tenant.schema_name:
+                        tenant_to_use = iro.tenant
+                except Exception as tenant_err:
+                    print(f"Error determining tenant for IRO {getattr(iro, 'iro_id', 'unknown')}: {str(tenant_err)}")
                 
-                from django_tenants.utils import schema_context
-                with schema_context(tenant_to_use.schema_name):
-                    from apps.assessments.models import ImpactAssessment, RiskOppAssessment
+                # Only proceed with valid tenant and schema_name
+                if tenant_to_use and tenant_to_use.schema_name:
+                    from django_tenants.utils import schema_context
                     
-                    impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-                    if impact_assessment and impact_assessment.impact_materiality_score:
-                        impact_score = float(impact_assessment.impact_materiality_score)
-                        
-                    risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-                    if risk_opp_assessment and risk_opp_assessment.financial_materiality_score:
-                        financial_score = float(risk_opp_assessment.financial_materiality_score)
+                    # Get impact and financial scores
+                    try:
+                        with schema_context(tenant_to_use.schema_name):
+                            from apps.assessments.models import ImpactAssessment, RiskOppAssessment
+                            
+                            impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
+                            if impact_assessment and impact_assessment.impact_materiality_score:
+                                try:
+                                    impact_score = float(impact_assessment.impact_materiality_score)
+                                except (ValueError, TypeError):
+                                    impact_score = 0.0
+                                
+                            risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
+                            if risk_opp_assessment and risk_opp_assessment.financial_materiality_score:
+                                try:
+                                    financial_score = float(risk_opp_assessment.financial_materiality_score)
+                                except (ValueError, TypeError):
+                                    financial_score = 0.0
+                    except Exception as score_err:
+                        print(f"Error getting assessment scores for IRO {getattr(iro, 'iro_id', 'unknown')}: {str(score_err)}")
+                    
+                    # Get the title safely
+                    try:
+                        # Try using the property method first
+                        if hasattr(iro, 'title'):
+                            title = str(iro.title) if iro.title is not None else title
+                        else:
+                            # If no title property, fetch title manually
+                            from apps.assessments.models import IROVersion
+                            with schema_context(tenant_to_use.schema_name):
+                                version = None
+                                if hasattr(iro, 'current_version_id') and iro.current_version_id:
+                                    version = IROVersion.objects.filter(version_id=iro.current_version_id).first()
+                                if not version and hasattr(iro, 'iro_id'):
+                                    version = IROVersion.objects.filter(iro=iro).order_by('-version_number').first()
+                                if version and version.title:
+                                    title = str(version.title)
+                    except Exception as title_err:
+                        print(f"Error getting title for IRO {getattr(iro, 'iro_id', 'unknown')}: {str(title_err)}")
                 
-                iros.append({
-                    'iro_id': iro.iro_id,
-                    'type': iro.type,
-                    'title': iro.title,
-                    'esrs_standard': iro.esrs_standard or '',
-                    'current_stage': iro.current_stage,
+                # Safely get last_assessment_date
+                last_assessment_date = ''
+                if hasattr(iro, 'last_assessment_date') and iro.last_assessment_date:
+                    try:
+                        last_assessment_date = iro.last_assessment_date.strftime('%Y-%m-%d')
+                    except Exception as date_err:
+                        print(f"Error formatting last_assessment_date for IRO {getattr(iro, 'iro_id', 'unknown')}: {str(date_err)}")
+                
+                # Get iro_id safely
+                iro_id = getattr(iro, 'iro_id', 0)
+                # Make sure iro_id is an integer or a string representation of an integer
+                if not isinstance(iro_id, (int, str)) or (isinstance(iro_id, str) and not iro_id.isdigit()):
+                    iro_id = 0  # Default to 0 if not valid
+                    print(f"WARNING: Invalid iro_id type: {type(iro_id)}, value: {iro_id}. Defaulting to 0.")
+                
+                # Get other fields safely with explicit string conversion and validation
+                # Ensure type is one of the expected values
+                raw_type = getattr(iro, 'type', '')
+                if raw_type in ['Risk', 'Opportunity', 'Impact']:
+                    iro_type = str(raw_type)
+                else:
+                    # Default to 'Risk' if not one of the expected values
+                    iro_type = 'Risk'
+                    print(f"WARNING: Invalid type for IRO {iro_id}: {raw_type}. Defaulting to 'Risk'.")
+                
+                # Normalize esrs_standard
+                esrs_standard = str(getattr(iro, 'esrs_standard', '') or '')
+                
+                # Ensure current_stage is one of the expected values
+                raw_stage = getattr(iro, 'current_stage', '')
+                valid_stages = ['Draft', 'In_Review', 'Approved', 'Disclosed']
+                if raw_stage in valid_stages:
+                    current_stage = str(raw_stage)
+                else:
+                    # Default to 'Draft' if not one of the expected values
+                    current_stage = 'Draft'
+                    print(f"WARNING: Invalid current_stage for IRO {iro_id}: {raw_stage}. Defaulting to 'Draft'.")
+                
+                # Build the IRO data dictionary with safe defaults for all fields
+                iro_data = {
+                    'iro_id': iro_id,
+                    'type': iro_type,
+                    'title': title,
+                    'esrs_standard': esrs_standard,
+                    'current_stage': current_stage,
                     'impact_score': impact_score,
                     'financial_score': financial_score,
-                    'last_assessment_date': iro.last_assessment_date.strftime('%Y-%m-%d') if iro.last_assessment_date else '',
-                })
+                    'last_assessment_date': last_assessment_date,
+                }
+                
+                # Debug log to help identify issues
+                print(f"DEBUG: Prepared IRO data for IRO {iro_id}: type={iro_type}, stage={current_stage}")
+                
+                iros.append(iro_data)
             except Exception as e:
                 # Log error but continue with other IROs
                 import traceback
-                print(f"Error processing IRO {iro.iro_id}: {str(e)}")
+                print(f"Error processing IRO {getattr(iro, 'iro_id', 'unknown')}: {str(e)}")
                 print(traceback.format_exc())
+                
+                # Add a placeholder entry so the table isn't completely empty
+                iros.append({
+                    'iro_id': getattr(iro, 'iro_id', 'unknown'),
+                    'type': 'Risk',  # Default to a valid value
+                    'title': f"Error loading IRO #{getattr(iro, 'iro_id', 'unknown')}",
+                    'esrs_standard': '',
+                    'current_stage': 'Draft',  # Default to a valid value
+                    'impact_score': 0.0,
+                    'financial_score': 0.0,
+                    'last_assessment_date': '',
+                })
+        
+        # Always return status 200 with the data we have
+        return JsonResponse(iros, safe=False)
                 
     except Exception as e:
         # Log the exception for debugging
@@ -292,4 +482,5 @@ def iro_data(request):
         print(f"Error in iro_data view: {str(e)}")
         print(traceback.format_exc())
         
-    return JsonResponse(iros, safe=False)
+        # Return an empty array with status 200 instead of error
+        return JsonResponse([], safe=False)

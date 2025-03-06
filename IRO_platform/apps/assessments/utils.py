@@ -8,13 +8,45 @@ def get_iros_for_tenant(tenant=None):
     """
     from apps.assessments.models import IRO  # Import here to avoid circular imports
     
-    if tenant:
-        # If a tenant is specified, use its schema
-        with schema_context(tenant.schema_name):
-            return list(IRO.objects.filter(tenant=tenant))
-    else:
-        # If no tenant, use the current schema
-        return list(IRO.objects.all())
+    try:
+        if tenant and hasattr(tenant, 'schema_name') and tenant.schema_name:
+            # If a tenant is specified, use its schema
+            from django_tenants.utils import schema_context
+            try:
+                with schema_context(tenant.schema_name):
+                    try:
+                        # Try to get all IROs for this tenant
+                        iros = list(IRO.objects.filter(tenant=tenant))
+                        return iros
+                    except Exception as inner_e:
+                        print(f"Error querying IROs in tenant schema {tenant.schema_name}: {str(inner_e)}")
+                        return []
+            except Exception as schema_e:
+                print(f"Error switching to schema {tenant.schema_name}: {str(schema_e)}")
+                return []
+        else:
+            # If no valid tenant, use the current schema but be careful about filtering
+            try:
+                from django.db import connection
+                current_schema = connection.schema_name
+                if current_schema and current_schema.startswith('tenant_'):
+                    # We're in a tenant schema, get all IROs for this schema
+                    try:
+                        return list(IRO.objects.all())
+                    except Exception as query_e:
+                        print(f"Error querying IROs in current schema {current_schema}: {str(query_e)}")
+                        return []
+                else:
+                    # We're in the public schema, we can't get IROs directly
+                    return []
+            except Exception as conn_e:
+                print(f"Error determining current schema: {str(conn_e)}")
+                return []
+    except Exception as e:
+        import traceback
+        print(f"Error in get_iros_for_tenant: {str(e)}")
+        print(traceback.format_exc())
+        return []
 
 def get_iro_by_id(iro_id, tenant=None):
     """
@@ -30,9 +62,16 @@ def get_iro_by_id(iro_id, tenant=None):
             except IRO.DoesNotExist:
                 return None
     else:
-        try:
-            return IRO.objects.get(iro_id=iro_id)
-        except IRO.DoesNotExist:
+        # If no tenant, use the current schema
+        current_schema = connection.schema_name
+        if current_schema.startswith('tenant_'):
+            # We're in a tenant schema, try to get the IRO
+            try:
+                return IRO.objects.get(iro_id=iro_id)
+            except IRO.DoesNotExist:
+                return None
+        else:
+            # We're in the public schema, we can't get IROs directly
             return None
 
 def get_all_tenant_iros():

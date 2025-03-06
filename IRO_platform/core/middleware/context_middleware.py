@@ -26,12 +26,21 @@ class ContextMiddleware:
         if 'tenant_id' in request.session:
             try:
                 tenant_id = request.session['tenant_id']
-                tenant = TenantConfig.objects.get(tenant_id=tenant_id)
-                request.context['tenant'] = tenant
+                # Always query TenantConfig from public schema
+                with schema_context('public'):
+                    tenant = TenantConfig.objects.get(tenant_id=tenant_id)
+                    # Verify tenant has a valid schema_name
+                    if not hasattr(tenant, 'schema_name') or not tenant.schema_name:
+                        print(f"Warning: Tenant {tenant_id} has invalid schema_name")
+                        del request.session['tenant_id']
+                        request.context['tenant'] = None
+                    else:
+                        request.context['tenant'] = tenant
             except TenantConfig.DoesNotExist:
                 # Clear invalid tenant from session
                 if 'tenant_id' in request.session:
                     del request.session['tenant_id']
+
         # Fallback to request.tenant (set by django-tenants based on domain)
         elif hasattr(request, 'tenant'):
             request.context['tenant'] = request.tenant
@@ -39,33 +48,40 @@ class ContextMiddleware:
         elif connection.schema_name.startswith('tenant_'):
             # Extract tenant name from schema_name (tenant_tenant1 -> tenant1)
             tenant_name = connection.schema_name[7:]
-            try:
-                tenant = TenantConfig.objects.get(tenant_name=tenant_name)
-                request.context['tenant'] = tenant
-            except TenantConfig.DoesNotExist:
-                pass
+            # Always query TenantConfig from public schema
+            with schema_context('public'):
+                try:
+                    tenant = TenantConfig.objects.get(tenant_name=tenant_name)
+                    request.context['tenant'] = tenant
+                except TenantConfig.DoesNotExist:
+                    pass
 
         # If we still don't have a tenant and we're visiting the root domain,
         # try to set a default tenant
         if not request.context['tenant'] and request.get_host() in ('localhost', '127.0.0.1'):
             try:
-                # Try to use the first tenant as default for the root domain
-                default_tenant = TenantConfig.objects.first()
-                if default_tenant:
-                    request.context['tenant'] = default_tenant
-                    request.session['tenant_id'] = default_tenant.tenant_id
+                # Always query TenantConfig from public schema
+                with schema_context('public'):
+                    # Try to use the first tenant as default for the root domain
+                    default_tenant = TenantConfig.objects.first()
+                    if default_tenant:
+                        request.context['tenant'] = default_tenant
+                        request.session['tenant_id'] = default_tenant.tenant_id
             except Exception:
                 pass
 
         # Check session for stored context values
         if 'assessment_id' in request.session:
-            try:
-                assessment_id = request.session['assessment_id']
-                request.context['assessment'] = Assessment.objects.get(id=assessment_id)
-            except Assessment.DoesNotExist:
-                # Clear invalid context
-                if 'assessment_id' in request.session:
-                    del request.session['assessment_id']
+            tenant = request.context['tenant']
+            if tenant:
+                try:
+                    assessment_id = request.session['assessment_id']
+                    with schema_context(tenant.schema_name):
+                        request.context['assessment'] = Assessment.objects.get(id=assessment_id)
+                except Assessment.DoesNotExist:
+                    # Clear invalid context
+                    if 'assessment_id' in request.session:
+                        del request.session['assessment_id']
 
         if 'iro_id' in request.session:
             try:
@@ -78,29 +94,32 @@ class ContextMiddleware:
                 if 'iro_id' in request.session:
                     del request.session['iro_id']
 
-        # ----------------------------------------------------------------
-        # Removed "and is_staff" so that any user can switch tenants freely
-        # ----------------------------------------------------------------
+        # Handle context updates from GET parameters
         if 'tenant_id' in request.GET: 
             try:
                 tenant_id = int(request.GET.get('tenant_id'))
-                tenant = TenantConfig.objects.get(tenant_id=tenant_id)
+                # Always query TenantConfig from public schema
+                with schema_context('public'):
+                    tenant = TenantConfig.objects.get(tenant_id=tenant_id)
                 request.context['tenant'] = tenant
                 request.session['tenant_id'] = tenant_id
             except (ValueError, TenantConfig.DoesNotExist):
                 pass
 
         if 'assessment_id' in request.GET:
-            try:
-                assessment_id = int(request.GET.get('assessment_id'))
-                assessment = Assessment.objects.get(id=assessment_id)
-                request.context['assessment'] = assessment
-                request.session['assessment_id'] = assessment_id
-                # Clear IRO when assessment changes
-                if 'iro_id' in request.session:
-                    del request.session['iro_id']
-            except (ValueError, Assessment.DoesNotExist):
-                pass
+            tenant = request.context['tenant']
+            if tenant:
+                try:
+                    assessment_id = int(request.GET.get('assessment_id'))
+                    with schema_context(tenant.schema_name):
+                        assessment = Assessment.objects.get(id=assessment_id)
+                    request.context['assessment'] = assessment
+                    request.session['assessment_id'] = assessment_id
+                    # Clear IRO when assessment changes
+                    if 'iro_id' in request.session:
+                        del request.session['iro_id']
+                except (ValueError, Assessment.DoesNotExist):
+                    pass
 
         if 'iro_id' in request.GET:
             try:

@@ -71,11 +71,40 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Show loading indicator
+    document.getElementById('iro-table-container').innerHTML = 
+        '<div class="d-flex justify-content-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+    
     // Get IRO data from the server
     fetch('{% url "assessments:iro-data" %}')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            // Configure columns
+            // Check if data is valid
+            if (!Array.isArray(data)) {
+                throw new Error('Invalid data format. Expected an array.');
+            }
+            
+            // Validate and normalize data to prevent JavaScript errors
+            const validatedData = data.map(item => {
+                return {
+                    iro_id: item.iro_id || 0,
+                    title: item.title || 'Untitled',
+                    type: ['Risk', 'Opportunity', 'Impact'].includes(item.type) ? item.type : 'Risk',
+                    esrs_standard: item.esrs_standard || '',
+                    impact_score: parseFloat(item.impact_score || 0),
+                    financial_score: parseFloat(item.financial_score || 0),
+                    current_stage: ['Draft', 'In_Review', 'Approved', 'Disclosed'].includes(item.current_stage) 
+                        ? item.current_stage : 'Draft',
+                    last_assessment_date: item.last_assessment_date || ''
+                };
+            });
+
+            // Configure columns      
             const columnDefs = [
                 { data: 'iro_id', title: 'IRO ID', readOnly: true, width: 80 },
                 { data: 'title', title: 'Title' },
@@ -95,10 +124,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         pattern: '0.0'
                     },
                     readOnly: true,
-                    className: function(row, col, prop) {
-                        const value = data[row]?.impact_score || 0;
-                        if (value > 3.5) return 'bg-danger bg-opacity-25';
-                        if (value > 2.5) return 'bg-warning bg-opacity-25';
+                    className: function(row, col, prop, cellProperties, value) {
+                        // Use the cell value directly instead of accessing data array
+                        const score = parseFloat(value || 0);
+                        if (score > 3.5) return 'bg-danger bg-opacity-25';
+                        if (score > 2.5) return 'bg-warning bg-opacity-25';
                         return 'bg-success bg-opacity-25';
                     }
                 },
@@ -110,10 +140,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         pattern: '0.0'
                     },
                     readOnly: true,
-                    className: function(row, col, prop) {
-                        const value = data[row]?.financial_score || 0;
-                        if (value > 3.5) return 'bg-danger bg-opacity-25';
-                        if (value > 2.5) return 'bg-warning bg-opacity-25';
+                    className: function(row, col, prop, cellProperties, value) {
+                        // Use the cell value directly instead of accessing data array
+                        const score = parseFloat(value || 0);
+                        if (score > 3.5) return 'bg-danger bg-opacity-25';
+                        if (score > 2.5) return 'bg-warning bg-opacity-25';
                         return 'bg-success bg-opacity-25';
                     }
                 },
@@ -123,8 +154,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     type: 'dropdown',
                     source: ['Draft', 'In_Review', 'Approved', 'Disclosed'],
                     editor: 'select'
+                },
+                {
+                    data: 'last_assessment_date',
+                    title: 'Last Assessment',
+                    readOnly: true
                 }
             ];
+            
+            // If no data available, show a message
+            if (validatedData.length === 0) {
+                document.getElementById('iro-table-container').innerHTML = 
+                    '<div class="alert alert-info">No IRO data available for the selected context. You may need to create IROs first.</div>';
+                document.getElementById('iro-count').textContent = '0';
+                return;
+            }
             
             // Initialize Handsontable
             const contextData = {
@@ -141,31 +185,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 rowHeaders: true,
                 height: 'auto',
                 licenseKey: 'non-commercial-and-evaluation'
-            }, data, contextData);
+            }, validatedData, contextData);
             
             // Update row count
-            document.getElementById('iro-count').textContent = data.length;
+            document.getElementById('iro-count').textContent = validatedData.length;
             
             // Handle search
             const searchInput = document.getElementById('searchInput');
-            searchInput.addEventListener('keyup', function() {
-                const query = this.value.toLowerCase();
-                
-                if (hot) {
-                    const search = hot.getPlugin('search');
-                    hot.getPlugin('search').query(query);
-                    hot.render();
+            if (searchInput) {
+                searchInput.addEventListener('keyup', function() {
+                    const query = this.value.toLowerCase();
                     
-                    // Count visible rows
-                    let visibleRows = 0;
-                    for (let i = 0; i < hot.countRows(); i++) {
-                        if (!hot.rowIndexMapper.getValueAtIndex(i)) {
-                            visibleRows++;
+                    if (hot) {
+                        const search = hot.getPlugin('search');
+                        hot.getPlugin('search').query(query);
+                        hot.render();
+                        
+                        // Count visible rows
+                        let visibleRows = 0;
+                        for (let i = 0; i < hot.countRows(); i++) {
+                            if (!hot.rowIndexMapper.getValueAtIndex(i)) {
+                                visibleRows++;
+                            }
                         }
+                        document.getElementById('iro-count').textContent = visibleRows;
                     }
-                    document.getElementById('iro-count').textContent = visibleRows;
-                }
-            });
+                });
+            }
             
             // Handle filter dropdown options
             const filterOptions = document.querySelectorAll('.filter-option');
@@ -201,7 +247,12 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Error loading IRO data:', error);
             document.getElementById('iro-table-container').innerHTML = 
-                '<div class="alert alert-danger">Error loading IRO data. Please try refreshing the page.</div>';
+                '<div class="alert alert-danger">' +
+                '<strong>Error loading IRO data.</strong><br>' +
+                'Please try refreshing the page or selecting a different context.<br>' +
+                '<small>Technical details: ' + error.message + '</small>' +
+                '</div>';
+            document.getElementById('iro-count').textContent = '0';
         });
 });
 </script>
