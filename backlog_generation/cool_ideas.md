@@ -18,6 +18,14 @@
 - IRO management platform
 - External stakeholder process
 
+# Reporting solutions
+- Beneficiary Ownership Information (BOI) as part Corporate Transparency Act (CTA)
+- Public Reporting gap assessment
+    - CSRD
+    - TCFD
+    - Cyber security
+
+
 
 # Learning paths 20 -weeks
 ## String 1: Strategic Due Diligence & Market Intelligence
