@@ -1,9 +1,15 @@
 <!-- templates/home.html -->
 {% extends "base.html" %}
 {% load assessment_filters %}
+{% load static %}
 
 {% block title %}Dashboard | DMA Platform{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -63,368 +69,36 @@
 </div>
 
 <div class="row mb-4">
-    <!-- Materiality matrix visualization -->
+    <!-- Topic-Level Double Materiality Quadrants -->
     <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Materiality Matrix</h5>
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="matrixDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            Last 12 Months
-                        </button>
-                        <ul class="dropdown-menu" aria-labelledby="matrixDropdown">
-                            <li><a class="dropdown-item" href="#">Last 6 Months</a></li>
-                            <li><a class="dropdown-item" href="#">Last 3 Months</a></li>
-                            <li><a class="dropdown-item" href="#">Custom Range</a></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body">
-                <canvas id="materialityMatrix" style="height: 300px;" data-matrix-data="{{ materiality_matrix_data }}"></canvas>
-            </div>
-        </div>
+        {% include "components/materiality_quadrants.html" %}
     </div>
     
     <!-- Recent activity timeline -->
     <div class="col-md-4">
-        <div class="card">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">Recent Activity</h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush">
-                    {% for activity in recent_activities %}
-                    <div class="list-group-item border-0 py-3" data-status="{{ activity.action }}">
-                        <div class="d-flex align-items-center">
-                            <div class="bg-{{ activity.icon_color }} rounded-circle p-2 me-3">
-                                <i class="fas fa-{{ activity.icon }} text-white small"></i>
-                            </div>
-                            <div>
-                                <p class="mb-0 fw-medium">{{ activity.description }}</p>
-                                <p class="text-muted small mb-0">{{ activity.timestamp|timesince }} ago</p>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="list-group-item border-0 py-3">
-                        <p class="text-center text-muted my-3">No recent activity</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
+        {% include "components/recent_activity.html" %}
     </div>
 </div>
 
-<!-- High Priority IROs section using Handsontable -->
+<!-- Priority IROs section using Handsontable -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">High Priority IROs</h5>
-                    <a href="{% url 'assessments:iro-list' %}" class="btn btn-sm btn-outline-primary">View All IROs</a>
-                </div>
-            </div>
-            <div class="card-body p-3">
-                <div id="high-priority-iros-container" data-save-url="{% url 'assessments:iro-save' %}" style="height: 300px; overflow: hidden;"></div>
-            </div>
-        </div>
+        {% include "components/priority_iros.html" %}
     </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Get high priority IROs data from a JSON string
-    const highPriorityIROsData = {{ high_priority_iros_json|safe }};
-    
-    // Define column configurations
-    const columnDefs = [
-        { data: 'iro_id', title: 'IRO ID', readOnly: true, width: 80 },
-        { data: 'title', title: 'Title', readOnly: true, width: 200 },
-        { 
-            data: 'type', 
-            title: 'Type',
-            readOnly: true,
-            width: 100,
-            renderer: function(instance, td, row, col, prop, value, cellProperties) {
-                Handsontable.renderers.TextRenderer.apply(this, arguments);
-                
-                // Add badge styling based on type
-                if (value) {
-                    let badgeClass = 'primary';
-                    if (value === 'Risk') badgeClass = 'danger';
-                    else if (value === 'Opportunity') badgeClass = 'success';
-                    
-                    td.innerHTML = `<span class="badge bg-${badgeClass}">${value}</span>`;
-                }
-                
-                return td;
-            }
-        },
-        { 
-            data: 'impact_score', 
-            title: 'Impact Score', 
-            type: 'numeric',
-            numericFormat: {
-                pattern: '0.0'
-            },
-            readOnly: true,
-            width: 120,
-            renderer: function(instance, td, row, col, prop, value, cellProperties) {
-                Handsontable.renderers.NumericRenderer.apply(this, arguments);
-                
-                // Add progress bar styling
-                if (value) {
-                    let barClass = 'success';
-                    if (value > 3.5) barClass = 'danger';
-                    else if (value > 2.5) barClass = 'warning';
-                    
-                    const percentage = value * 20; // Scale to percentage (0-5 scale * 20 = 0-100%)
-                    
-                    td.innerHTML = `
-                        <div class="d-flex align-items-center">
-                            <span class="me-2">${parseFloat(value).toFixed(1)}</span>
-                            <div class="progress" style="width: 60px; height: 5px;">
-                                <div class="progress-bar bg-${barClass}" style="width: ${percentage}%"></div>
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                return td;
-            }
-        },
-        { 
-            data: 'financial_score', 
-            title: 'Financial Score', 
-            type: 'numeric',
-            numericFormat: {
-                pattern: '0.0'
-            },
-            readOnly: true,
-            width: 120,
-            renderer: function(instance, td, row, col, prop, value, cellProperties) {
-                Handsontable.renderers.NumericRenderer.apply(this, arguments);
-                
-                // Add progress bar styling
-                if (value) {
-                    let barClass = 'success';
-                    if (value > 3.5) barClass = 'danger';
-                    else if (value > 2.5) barClass = 'warning';
-                    
-                    const percentage = value * 20; // Scale to percentage (0-5 scale * 20 = 0-100%)
-                    
-                    td.innerHTML = `
-                        <div class="d-flex align-items-center">
-                            <span class="me-2">${parseFloat(value).toFixed(1)}</span>
-                            <div class="progress" style="width: 60px; height: 5px;">
-                                <div class="progress-bar bg-${barClass}" style="width: ${percentage}%"></div>
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                return td;
-            }
-        },
-        { 
-            data: 'current_stage', 
-            title: 'Status',
-            readOnly: true,
-            width: 100,
-            renderer: function(instance, td, row, col, prop, value, cellProperties) {
-                Handsontable.renderers.TextRenderer.apply(this, arguments);
-                
-                // Add status badge styling
-                if (value) {
-                    let badgeClass = value.toLowerCase();
-                    if (badgeClass === 'draft') badgeClass = 'status-draft';
-                    else if (badgeClass === 'in_review') badgeClass = 'status-review';
-                    else if (badgeClass === 'approved') badgeClass = 'status-approved';
-                    else if (badgeClass === 'disclosed') badgeClass = 'status-disclosed';
-                    
-                    const displayValue = value.replace('_', ' ');
-                    
-                    td.innerHTML = `<span class="status-badge ${badgeClass}">${displayValue}</span>`;
-                }
-                
-                return td;
-            }
-        },
-        {
-            title: 'Actions',
-            data: 'iro_id',
-            readOnly: true,
-            width: 100,
-            renderer: function(instance, td, row, col, prop, value, cellProperties) {
-                // Create edit button
-                const iroId = value;
-                td.className = 'htCenter htMiddle';
-                td.innerHTML = `
-                    <a href="/assessments/iro/${iroId}/edit/" class="btn btn-sm btn-primary">
-                        <i class="fas fa-edit"></i> Edit
-                    </a>
-                `;
-                
-                return td;
-            }
-        }
-    ];
-    
-    // Initialize Handsontable
-    const contextData = {
-        tenant: {{ request.context.tenant.tenant_id|default:"null" }},
-        assessment: {{ request.context.assessment.id|default:"null" }}
-    };
-    
-    // Check if we have the container element
-    const container = document.getElementById('high-priority-iros-container');
-    if (container) {
-        const hot = window.handsonTableManager.initTable('high-priority-iros-container', {
-            colHeaders: columnDefs.map(col => col.title),
-            columns: columnDefs,
-            licenseKey: 'non-commercial-and-evaluation',
-            height: 'auto',
-            manualRowResize: true,
-            manualColumnResize: true,
-            stretchH: 'all',
-            autoColumnSize: true,
-            rowHeights: 50, // Slightly larger rows to accommodate the action buttons
-            readOnly: true, // Make the entire table read-only
-            outsideClickDeselects: false,
-            selectable: true,
-            contextMenu: false // Disable context menu for the dashboard view
-        }, highPriorityIROsData, contextData);
-        
-        // Add click handler for the entire row
-        hot.addHook('afterOnCellMouseDown', function(event, coords, TD) {
-            // Don't process clicks on the Actions column
-            if (coords.col === 6) return;
-            
-            // Navigate to IRO details page
-            const iroId = this.getDataAtRowProp(coords.row, 'iro_id');
-            if (iroId) {
-                window.location.href = `/assessments/iro/${iroId}/edit/`;
-            }
-        });
-    }
-});
+<!-- Hidden data for JavaScript -->
+<script id="topic-quadrants-data" type="application/json">
+    {{ topic_quadrants_json|safe }}
 </script>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    // Initialize materiality matrix using data from database
-    const matrixCtx = document.getElementById('materialityMatrix');
-    const matrixData = JSON.parse(matrixCtx.getAttribute('data-matrix-data') || '[]');
-    
-    if (matrixData.length > 0) {
-        initializeMatrixChart(matrixCtx, matrixData);
-    } else {
-        matrixCtx.innerHTML = 'No data available for materiality matrix';
-    }
-});
+{% endblock %}
 
-function initializeMatrixChart(canvas, data) {
-    // Process data into datasets grouped by type
-    const riskData = data.filter(item => item.type === 'Risk').map(d => ({
-        x: d.impact_score,
-        y: d.financial_score,
-        id: d.id,
-        title: d.title
-    }));
-    
-    const opportunityData = data.filter(item => item.type === 'Opportunity').map(d => ({
-        x: d.impact_score,
-        y: d.financial_score,
-        id: d.id,
-        title: d.title
-    }));
-    
-    const impactData = data.filter(item => item.type === 'Impact').map(d => ({
-        x: d.impact_score,
-        y: d.financial_score,
-        id: d.id,
-        title: d.title
-    }));
-    
-    const matrixChart = new Chart(canvas.getContext('2d'), {
-        type: 'scatter',
-        data: {
-            datasets: [
-                {
-                    label: 'Risks',
-                    data: riskData,
-                    backgroundColor: 'rgba(239, 68, 68, 0.7)',
-                    borderColor: 'rgba(239, 68, 68, 1)',
-                    borderWidth: 1,
-                    pointRadius: 8,
-                    pointHoverRadius: 10
-                }, 
-                {
-                    label: 'Opportunities',
-                    data: opportunityData,
-                    backgroundColor: 'rgba(34, 197, 94, 0.7)',
-                    borderColor: 'rgba(34, 197, 94, 1)',
-                    borderWidth: 1,
-                    pointRadius: 8,
-                    pointHoverRadius: 10
-                },
-                {
-                    label: 'Impacts',
-                    data: impactData,
-                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                    borderColor: 'rgba(59, 130, 246, 1)',
-                    borderWidth: 1,
-                    pointRadius: 8,
-                    pointHoverRadius: 10
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Impact Materiality'
-                    },
-                    min: 0,
-                    max: 5,
-                    grid: {
-                        display: true,
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Financial Materiality'
-                    },
-                    min: 0,
-                    max: 5,
-                    grid: {
-                        display: true,
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const point = context.raw;
-                            return `${point.title} (ID: ${point.id})
-Impact: ${point.x.toFixed(1)}, Financial: ${point.y.toFixed(1)}`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-</script>
+{% block extra_js %}
+<!-- Include Handsontable -->
+<script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+
+<!-- Include our custom JavaScript modules -->
+<script src="{% static 'js/materiality_quadrants.js' %}"></script>
+<script src="{% static 'js/quick_edit_manager.js' %}"></script>
 {% endblock %}

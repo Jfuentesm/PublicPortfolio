@@ -17,6 +17,14 @@ def home_dashboard(request):
     
     # Import the utility function
     from apps.assessments.utils import get_iros_for_tenant, get_all_tenant_iros
+    from apps.assessments.topic_aggregator import (
+        get_topics_by_materiality_quadrant, 
+        get_priority_iros,
+        sync_topics_from_iro_versions
+    )
+    
+    # Ensure all topics are synced from IRO versions
+    sync_topics_from_iro_versions(tenant)
     
     # Get IROs based on tenant context
     if tenant:
@@ -89,62 +97,26 @@ def home_dashboard(request):
         activity_data.append(activity_info)
     
     # Get high priority IROs (highest scores)
-    high_priority_iros = []
+    high_priority_iros = get_priority_iros(tenant, limit=10)
     
-    # Sort IROs by last_assessment_score (if available)
-    sorted_iros = sorted(
-        [iro for iro in iro_queryset if iro.last_assessment_score], 
-        key=lambda x: x.last_assessment_score, 
-        reverse=True
-    )
+    # Add debug logging to check what data is being returned
+    logger = logging.getLogger(__name__)
+    logger.debug("Priority IROs before JSON serialization: %s", high_priority_iros)
     
-    for iro in sorted_iros[:10]:
-        # Get the latest impact and financial scores
-        if tenant:
-            with schema_context(tenant.schema_name):
-                impact_assessments = list(ImpactAssessment.objects.filter(iro=iro).order_by('-created_on'))
-                risk_opp_assessments = list(RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on'))
-        else:
-            # Use the IRO's tenant schema
-            tenant_obj = iro.tenant
-            with schema_context(tenant_obj.schema_name):
-                impact_assessments = list(ImpactAssessment.objects.filter(iro=iro).order_by('-created_on'))
-                risk_opp_assessments = list(RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on'))
-        
-        impact_score = impact_assessments[0].impact_materiality_score if impact_assessments else 0.0
-        financial_score = risk_opp_assessments[0].financial_materiality_score if risk_opp_assessments else 0.0
-        
-        high_priority_iros.append({
-            'iro_id': iro.iro_id,
-            'title': iro.title,
-            'type': iro.type,
-            'impact_score': float(impact_score) if impact_score else 0.0,
-            'financial_score': float(financial_score) if financial_score else 0.0,
-            'current_stage': iro.current_stage,
-        })
+    # Ensure we have valid data before JSON serialization
+    if high_priority_iros is None:
+        high_priority_iros = []
     
-    # Prepare data for materiality matrix
-    matrix_data = []
-    for iro in iro_queryset:
-        if tenant:
-            with schema_context(tenant.schema_name):
-                impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-                risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-        else:
-            # Use the IRO's tenant schema
-            tenant_obj = iro.tenant
-            with schema_context(tenant_obj.schema_name):
-                impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-                risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-        
-        if impact_assessment and risk_opp_assessment:
-            matrix_data.append({
-                'id': iro.iro_id,
-                'title': iro.title,
-                'type': iro.type,
-                'impact_score': float(impact_assessment.impact_materiality_score or 0),
-                'financial_score': float(risk_opp_assessment.financial_materiality_score or 0),
-            })
+    # Serialize the data to JSON, handling potential errors
+    try:
+        high_priority_iros_json = json.dumps(high_priority_iros)
+        logger.debug("Priority IROs after JSON serialization: %s", high_priority_iros_json[:100] + '...' if len(high_priority_iros_json) > 100 else high_priority_iros_json)
+    except Exception as e:
+        logger.error("Error serializing priority IROs to JSON: %s", str(e))
+        high_priority_iros_json = '[]'
+    
+    # Get topics by materiality quadrant
+    topic_quadrants = get_topics_by_materiality_quadrant(tenant)
     
     context = {
         'total_iros': total_iros,
@@ -153,8 +125,9 @@ def home_dashboard(request):
         'completed_assessments_count': completed_assessments_count,
         'recent_activities': activity_data,
         'high_priority_iros': high_priority_iros,
-        'high_priority_iros_json': json.dumps(high_priority_iros),  # Add JSON serialized data for Handsontable
-        'materiality_matrix_data': json.dumps(matrix_data),
+        'high_priority_iros_json': high_priority_iros_json,
+        'topic_quadrants': topic_quadrants,
+        'topic_quadrants_json': json.dumps(topic_quadrants),
     }
     
     # Always add available tenants to context for the tenant selector, not just for staff users

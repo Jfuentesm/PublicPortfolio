@@ -1,9 +1,7 @@
 # core/settings/base.py
-
 import os
-from pathlib import Path
-import logging
 from datetime import datetime
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -165,18 +163,28 @@ LOG_FILENAME = f'app_{log_datetime}.log'
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+
+    # Instead of the 'tenant|default:Unknown' placeholder or dict 'defaults',
+    # use the standard python logging approach: define either a '%' style or
+    # a '{' style *without* custom fallback syntax.
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
+            # You can use either style='%' or style='{'. Below uses '%'
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s',
+            'datefmt': None,
+            'style': '%', 
         },
         'simple': {
-            'format': '{levelname} {asctime} {message}',
-            'style': '{',
+            'format': '%(levelname)s %(asctime)s %(message)s',
+            'style': '%',
         },
         'tenant_aware': {
-            'format': '{levelname} {asctime} {module} [TENANT:{tenant}] {message}',
-            'style': '{',
+            # Corrected:
+            #  - rename "format" → "fmt"
+            #  - remove "|default" placeholder
+            '()': 'logging.Formatter',
+            'fmt': '%(levelname)s %(asctime)s %(module)s [TENANT:%(tenant)s] %(message)s',
+            'style': '%',
         },
     },
     'filters': {

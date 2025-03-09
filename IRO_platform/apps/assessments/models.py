@@ -260,3 +260,118 @@ class FinMaterialityMagnitudeDef(models.Model):
 
     class Meta:
         db_table = 'fin_materiality_magnitude_def'
+
+
+class Topic(models.Model):
+    """
+    Model representing a sustainability topic that groups related IROs.
+    Topics can be at different levels (level1, level2, level3) forming a hierarchy.
+    """
+    topic_id = models.AutoField(primary_key=True)
+    tenant = models.ForeignKey(TenantConfig, on_delete=models.CASCADE, db_column="tenant_id")
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    parent_topic = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, 
+                                    related_name='child_topics')
+    level = models.IntegerField(default=1, help_text="Topic hierarchy level (1=highest, 3=lowest)")
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'topic'
+        unique_together = ('tenant', 'name', 'level')
+
+    def __str__(self):
+        return self.name
+    
+    @property
+    def iros(self):
+        """
+        Return all IROs associated with this topic at any level
+        """
+        from django.db.models import Q
+        
+        # Find all IRO versions that reference this topic
+        if self.level == 1:
+            return IRO.objects.filter(
+                iroversion__sust_topic_level1=self.name
+            ).distinct()
+        elif self.level == 2:
+            return IRO.objects.filter(
+                iroversion__sust_topic_level2=self.name
+            ).distinct()
+        elif self.level == 3:
+            return IRO.objects.filter(
+                iroversion__sust_topic_level3=self.name
+            ).distinct()
+        return IRO.objects.none()
+    
+    def get_impact_materiality_score(self):
+        """
+        Calculate the average impact materiality score for all IROs in this topic
+        """
+        iros = self.iros
+        if not iros.exists():
+            return 0.0
+            
+        total_score = 0.0
+        count = 0
+        
+        for iro in iros:
+            impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
+            if impact_assessment and impact_assessment.impact_materiality_score:
+                total_score += float(impact_assessment.impact_materiality_score)
+                count += 1
+                
+        return total_score / count if count > 0 else 0.0
+    
+    def get_financial_materiality_score(self):
+        """
+        Calculate the average financial materiality score for all IROs in this topic
+        """
+        iros = self.iros
+        if not iros.exists():
+            return 0.0
+            
+        total_score = 0.0
+        count = 0
+        
+        for iro in iros:
+            risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
+            if risk_opp_assessment and risk_opp_assessment.financial_materiality_score:
+                total_score += float(risk_opp_assessment.financial_materiality_score)
+                count += 1
+                
+        return total_score / count if count > 0 else 0.0
+    
+    def get_materiality_quadrant(self):
+        """
+        Determine which materiality quadrant this topic belongs to based on
+        average impact and financial materiality scores.
+        
+        Returns one of:
+        - 'financially_material': Financially material but not impact material
+        - 'double_material': Both financially and impact material
+        - 'not_material': Neither financially nor impact material
+        - 'impact_material': Impact material but not financially material
+        """
+        # Get materiality scores
+        impact_score = self.get_impact_materiality_score()
+        financial_score = self.get_financial_materiality_score()
+        
+        # Define materiality thresholds (can be adjusted as needed)
+        threshold = 2.5  # Assuming scores are on a 0-5 scale
+        
+        # Determine quadrant
+        if financial_score > threshold and impact_score <= threshold:
+            return 'financially_material'
+        elif financial_score > threshold and impact_score > threshold:
+            return 'double_material'
+        elif financial_score <= threshold and impact_score <= threshold:
+            return 'not_material'
+        else:  # financial_score <= threshold and impact_score > threshold
+            return 'impact_material'
+    
+    def get_iro_count(self):
+        """Return the number of IROs associated with this topic"""
+        return self.iros.count()
