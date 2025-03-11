@@ -1,0 +1,37 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    net-tools \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create directories for data
+RUN mkdir -p /data/input /data/output /data/taxonomy
+
+# Install Python dependencies in a specific order to avoid binary conflicts
+COPY requirements.txt .
+
+# Install NumPy first to ensure pandas works with it correctly
+RUN pip install --no-cache-dir numpy==1.24.4
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY ./app /app
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Diagnostic output for troubleshooting
+RUN echo "Python version:" && python --version
+RUN echo "NumPy version:" && python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
+RUN echo "Pandas version:" && python -c "import pandas; print(f'Pandas: {pandas.__version__}')" || echo "Pandas not installed"
+RUN echo "Checking pandas installation details:" && pip show pandas | grep Version || echo "Pandas package details not available"
+RUN echo "Directory structure:" && find /app -type f -name "*.py" | sort
+
+# Run Celery worker with better error reporting
+CMD ["sh", "-c", "cd /app && PYTHONPATH=/app celery -A tasks.celery_app worker --loglevel=debug"]

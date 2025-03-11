@@ -1,0 +1,53 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    net-tools \
+    curl \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create directories for data
+RUN mkdir -p /data/input /data/output /data/taxonomy /frontend/static
+
+# Install Python dependencies in a specific order to avoid binary conflicts
+COPY requirements.txt .
+
+# Install NumPy first to ensure pandas works with it correctly
+RUN pip install --no-cache-dir numpy==1.24.4
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY ./app /app
+COPY ./frontend /frontend
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Expose port
+EXPOSE 8000
+
+# Diagnostic output for troubleshooting
+RUN echo "Python version:" && python --version
+RUN echo "NumPy version:" && python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
+RUN echo "Pandas version:" && python -c "import pandas; print(f'Pandas: {pandas.__version__}')" || echo "Pandas not installed"
+RUN echo "Checking pandas installation details:" && pip show pandas | grep Version || echo "Pandas package details not available"
+RUN echo "Frontend directory contents:" && ls -la /frontend || echo "Frontend directory not found"
+
+# Add a healthcheck to verify the service is running
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# Run the application with improved diagnostics and error logging
+CMD ["sh", "-c", "echo 'Starting web server on 0.0.0.0:8000' && \
+                  echo 'Directory structure:' && \
+                  find /app -type f -name '*.py' | sort && \
+                  echo 'Frontend directory:' && \
+                  ls -la /frontend && \
+                  netstat -tuln || echo 'No network connections yet' && \
+                  python -c 'import sys; print(f\"Python path: {sys.path}\")' && \
+                  uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug"]
