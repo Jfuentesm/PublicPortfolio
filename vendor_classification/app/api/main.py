@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -6,19 +6,18 @@ from typing import Dict, Any, Optional
 import uuid
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import socket
 
 from models.job import Job, JobStatus, ProcessingStage
 from models.user import User
-from api.auth import get_current_user
+from api.auth import get_current_user, authenticate_user, create_access_token  # Added missing imports
 from core.database import get_db
 from core.initialize_db import initialize_database
 from services.file_service import save_upload_file
 from tasks.classification_tasks import process_vendor_file
 
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import timedelta
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -92,38 +91,49 @@ async def upload_file(
     db = Depends(get_db)
 ):
     """Upload vendor Excel file for processing."""
+    # Log the upload attempt with authentication information
+    logger.info(f"File upload attempt by user: {current_user.username}, filename: {file.filename}")
+    
     # Validate file
     if not file.filename.endswith(('.xlsx', '.xls')):
+        logger.warning(f"Invalid file format: {file.filename}")
         raise HTTPException(status_code=400, detail="Only Excel files (.xlsx, .xls) are supported")
     
     # Generate job ID
     job_id = str(uuid.uuid4())
     
-    # Save file
-    input_file_path = save_upload_file(file, job_id)
-    
-    # Create job record
-    job = Job(
-        id=job_id,
-        company_name=company_name,
-        input_file_name=file.filename,
-        status=JobStatus.PENDING,
-        current_stage=ProcessingStage.INGESTION,
-        created_by=current_user.username
-    )
-    
-    # Save job to database
-    db.add(job)
-    db.commit()
-    
-    # Start processing in background
-    background_tasks.add_task(process_vendor_file, job_id, input_file_path)
-    
-    return {
-        "job_id": job_id,
-        "status": "pending",
-        "message": f"File {file.filename} uploaded successfully and processing has started"
-    }
+    try:
+        # Save file
+        input_file_path = save_upload_file(file, job_id)
+        logger.debug(f"File saved at: {input_file_path}")
+        
+        # Create job record
+        job = Job(
+            id=job_id,
+            company_name=company_name,
+            input_file_name=file.filename,
+            status=JobStatus.PENDING,
+            current_stage=ProcessingStage.INGESTION,
+            created_by=current_user.username
+        )
+        
+        # Save job to database
+        db.add(job)
+        db.commit()
+        logger.info(f"Job created: {job_id} for company: {company_name}")
+        
+        # Start processing in background
+        background_tasks.add_task(process_vendor_file, job_id, input_file_path)
+        logger.debug(f"Background task scheduled for job: {job_id}")
+        
+        return {
+            "job_id": job_id,
+            "status": "pending",
+            "message": f"File {file.filename} uploaded successfully and processing has started"
+        }
+    except Exception as e:
+        logger.error(f"Error processing upload: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing upload: {str(e)}")
 
 @app.get("/api/v1/jobs/{job_id}", response_model=Dict[str, Any])
 async def get_job_status(
@@ -257,19 +267,29 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     Get an access token for authentication.
     """
     logger.debug(f"Login attempt for user: {form_data.username}")
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        logger.warning(f"Failed login attempt for user: {form_data.username}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    try:
+        user = authenticate_user(db, form_data.username, form_data.password)
+        if not user:
+            logger.warning(f"Failed login attempt for user: {form_data.username}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.username}, expires_delta=access_token_expires
         )
-    
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
-    
-    logger.info(f"User logged in successfully: {user.username}")
-    return {"access_token": access_token, "token_type": "bearer", "username": user.username}
+        
+        logger.info(f"User logged in successfully: {user.username}")
+        return {"access_token": access_token, "token_type": "bearer", "username": user.username}
+    except HTTPException:
+        # Re-raise HTTP exceptions to preserve their status codes
+        raise
+    except Exception as e:
+        logger.error(f"Error during login process: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during the login process",
+        )
