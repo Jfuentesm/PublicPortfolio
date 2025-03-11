@@ -341,27 +341,15 @@ class QuickEditManager {
 document.addEventListener('DOMContentLoaded', function() {
     const container = document.getElementById('priority-iros-container');
     if (container) {
-        // Safely read the raw data attribute
-        const rawData = container.dataset.priorityIros || '[]';
-        console.log("[QuickEditManager] Raw data attribute:", rawData);
-        
-        let parsedData;
-        try {
-            parsedData = JSON.parse(rawData);
-        } catch (err) {
-            console.error("[QuickEditManager] Failed to parse priorityIros JSON:", err, rawData);
-            // Optionally show an error to the user
-            container.innerHTML = `<div class="alert alert-danger">
-                <strong>Error:</strong> Could not load IRO data. Please check browser console for details.
-            </div>`;
-            return;
-        }
+        // Use the global variable instead of the data attribute
+        const data = window.priorityIrosData || [];
+        console.log("[QuickEditManager] Data from global variable:", data);
 
         // Get the save URL from data attribute
         const saveUrl = container.dataset.saveUrl;
 
         // Initialize the quick edit manager
-        const quickEditManager = new QuickEditManager(container, parsedData, saveUrl);
+        const quickEditManager = new QuickEditManager(container, data, saveUrl);
         
         // Store the instance in the window object for potential external access
         window.quickEditManager = quickEditManager;

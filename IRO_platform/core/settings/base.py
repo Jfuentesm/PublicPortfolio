@@ -164,14 +164,10 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
 
-    # Instead of the 'tenant|default:Unknown' placeholder or dict 'defaults',
-    # use the standard python logging approach: define either a '%' style or
-    # a '{' style *without* custom fallback syntax.
     'formatters': {
         'verbose': {
-            # You can use either style='%' or style='{'. Below uses '%'
             'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s',
-            'datefmt': None,
+            'datefmt': '%Y-%m-%d %H:%M:%S',
             'style': '%', 
         },
         'simple': {
@@ -179,12 +175,10 @@ LOGGING = {
             'style': '%',
         },
         'tenant_aware': {
-            # Corrected:
-            #  - rename "format" → "fmt"
-            #  - remove "|default" placeholder
-            '()': 'logging.Formatter',
-            'fmt': '%(levelname)s %(asctime)s %(module)s [TENANT:%(tenant)s] %(message)s',
+            'format': '%(levelname)s %(asctime)s %(module)s [TENANT:%(tenant)s] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
             'style': '%',
+            '()': 'core.middleware.logging_middleware.TenantFormatter',
         },
     },
     'filters': {
@@ -200,15 +194,19 @@ LOGGING = {
         },
         'file': {
             'level': 'DEBUG',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(LOG_DIR, LOG_FILENAME),
             'formatter': 'verbose',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 10,
         },
         'tenant_file': {
             'level': 'DEBUG',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(LOG_DIR, LOG_FILENAME),
             'formatter': 'tenant_aware',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 10,
         },
         'mail_admins': {
             'level': 'ERROR',
@@ -250,6 +248,11 @@ LOGGING = {
         'core': {
             'handlers': ['console', 'tenant_file'],
             'level': 'DEBUG',
+            'propagate': False,
+        },
+        'apps.requests': {
+            'handlers': ['console', 'tenant_file'],
+            'level': 'INFO',
             'propagate': False,
         },
     }

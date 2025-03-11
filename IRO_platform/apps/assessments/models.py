@@ -2,6 +2,7 @@
 
 from django.db import models
 from tenants.models import TenantConfig
+from django_tenants.utils import schema_context
 
 
 class Assessment(models.Model):
@@ -100,13 +101,17 @@ class IROVersion(models.Model):
 
 
 class IRORelationship(models.Model):
+    """
+    Tracks process-like relationships between IROs, specifically when an IRO is the result of 
+    splitting another IRO. This is not intended for general relationships between IROs.
+    """
     relationship_id = models.AutoField(primary_key=True)
     tenant = models.ForeignKey(TenantConfig, on_delete=models.CASCADE, db_column="tenant_id")
     source_iro = models.ForeignKey(IRO, on_delete=models.CASCADE, db_column="source_iro_id",
                                    related_name='source_relationships')
     target_iro = models.ForeignKey(IRO, on_delete=models.CASCADE, db_column="target_iro_id",
                                    related_name='target_relationships')
-    relationship_type = models.CharField(max_length=50)
+    relationship_type = models.CharField(max_length=50, help_text="Relationship type, e.g., 'split_from'")
     created_on = models.DateTimeField(auto_now_add=True)
     created_by = models.IntegerField()
     notes = models.TextField(null=True, blank=True)
@@ -294,15 +299,18 @@ class Topic(models.Model):
         # Find all IRO versions that reference this topic
         if self.level == 1:
             return IRO.objects.filter(
-                iroversion__sust_topic_level1=self.name
+                iroversion__sust_topic_level1=self.name,
+                tenant=self.tenant  # Ensure tenant filtering
             ).distinct()
         elif self.level == 2:
             return IRO.objects.filter(
-                iroversion__sust_topic_level2=self.name
+                iroversion__sust_topic_level2=self.name,
+                tenant=self.tenant  # Ensure tenant filtering
             ).distinct()
         elif self.level == 3:
             return IRO.objects.filter(
-                iroversion__sust_topic_level3=self.name
+                iroversion__sust_topic_level3=self.name,
+                tenant=self.tenant  # Ensure tenant filtering
             ).distinct()
         return IRO.objects.none()
     
@@ -310,39 +318,43 @@ class Topic(models.Model):
         """
         Calculate the average impact materiality score for all IROs in this topic
         """
-        iros = self.iros
-        if not iros.exists():
-            return 0.0
-            
-        total_score = 0.0
-        count = 0
-        
-        for iro in iros:
-            impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-            if impact_assessment and impact_assessment.impact_materiality_score:
-                total_score += float(impact_assessment.impact_materiality_score)
-                count += 1
+        # Always use schema context when accessing related objects
+        with schema_context(self.tenant.schema_name):
+            iros = self.iros
+            if not iros.exists():
+                return 0.0
                 
-        return total_score / count if count > 0 else 0.0
+            total_score = 0.0
+            count = 0
+            
+            for iro in iros:
+                impact_assessment = ImpactAssessment.objects.filter(iro=iro, tenant=self.tenant).order_by('-created_on').first()
+                if impact_assessment and impact_assessment.impact_materiality_score:
+                    total_score += float(impact_assessment.impact_materiality_score)
+                    count += 1
+                    
+            return total_score / count if count > 0 else 0.0
     
     def get_financial_materiality_score(self):
         """
         Calculate the average financial materiality score for all IROs in this topic
         """
-        iros = self.iros
-        if not iros.exists():
-            return 0.0
-            
-        total_score = 0.0
-        count = 0
-        
-        for iro in iros:
-            risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-            if risk_opp_assessment and risk_opp_assessment.financial_materiality_score:
-                total_score += float(risk_opp_assessment.financial_materiality_score)
-                count += 1
+        # Always use schema context when accessing related objects
+        with schema_context(self.tenant.schema_name):
+            iros = self.iros
+            if not iros.exists():
+                return 0.0
                 
-        return total_score / count if count > 0 else 0.0
+            total_score = 0.0
+            count = 0
+            
+            for iro in iros:
+                risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro, tenant=self.tenant).order_by('-created_on').first()
+                if risk_opp_assessment and risk_opp_assessment.financial_materiality_score:
+                    total_score += float(risk_opp_assessment.financial_materiality_score)
+                    count += 1
+                    
+            return total_score / count if count > 0 else 0.0
     
     def get_materiality_quadrant(self):
         """
@@ -374,4 +386,6 @@ class Topic(models.Model):
     
     def get_iro_count(self):
         """Return the number of IROs associated with this topic"""
-        return self.iros.count()
+        # Always use schema context when accessing related objects
+        with schema_context(self.tenant.schema_name):
+            return self.iros.count()

@@ -7,6 +7,17 @@ from django.utils import timezone
 
 request_logger = logging.getLogger('apps.requests')
 
+class TenantFormatter(logging.Formatter):
+    """
+    A custom formatter that provides a default value for the tenant attribute
+    when it's missing from the log record.
+    """
+    def format(self, record):
+        # Ensure tenant attribute exists on the record
+        if not hasattr(record, 'tenant'):
+            record.tenant = 'unknown'
+        return super().format(record)
+
 class LoggingMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response

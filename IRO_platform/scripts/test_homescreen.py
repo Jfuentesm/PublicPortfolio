@@ -24,7 +24,7 @@ from apps.assessments.topic_aggregator import sync_topics_from_iro_versions
 
 def create_test_data(tenant, user):
     """Create test data for the homescreen."""
-    print(f"Creating test data for tenant: {tenant.name}")
+    print(f"Creating test data for tenant: {tenant.tenant_name}")
     
     # Define test topics
     topics = [
@@ -247,7 +247,7 @@ def create_test_data(tenant, user):
 
 def test_homescreen_data(tenant):
     """Test the homescreen data for a tenant."""
-    print(f"Testing homescreen data for tenant: {tenant.name}")
+    print(f"Testing homescreen data for tenant: {tenant.tenant_name}")
     
     with schema_context(tenant.schema_name):
         # Test topic materiality quadrants
@@ -283,7 +283,7 @@ def main():
     tenant, created = TenantConfig.objects.get_or_create(
         schema_name='test',
         defaults={
-            'name': 'Test Tenant',
+            'tenant_name': 'Test Tenant',
             'paid_until': '2025-12-31',
             'on_trial': False
         }

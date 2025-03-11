@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# run_local.sh
+# ./run_local.sh
 # Run this any time you need to rebuild or re-init the local environment.
 
 set -e

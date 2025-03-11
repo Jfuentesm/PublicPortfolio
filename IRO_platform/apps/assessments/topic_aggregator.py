@@ -9,7 +9,9 @@ from django.db.models import Avg, Count, Q, F
 from django_tenants.utils import schema_context
 from apps.assessments.models import Topic, IRO, ImpactAssessment, RiskOppAssessment, IROVersion
 from tenants.models import TenantConfig
+import logging
 
+logger = logging.getLogger('apps')
 
 def get_topics_for_tenant(tenant=None):
     """
@@ -25,10 +27,10 @@ def get_topics_for_tenant(tenant=None):
                     topics = list(Topic.objects.filter(tenant=tenant))
                     return topics
                 except Exception as inner_e:
-                    print(f"Error querying Topics in tenant schema {tenant.schema_name}: {str(inner_e)}")
+                    logger.error(f"Error querying Topics in tenant schema {tenant.schema_name}: {str(inner_e)}", exc_info=True)
                     return []
         except Exception as schema_e:
-            print(f"Error switching to schema {tenant.schema_name}: {str(schema_e)}")
+            logger.error(f"Error switching to schema {tenant.schema_name}: {str(schema_e)}", exc_info=True)
             return []
     else:
         # If no valid tenant, use the current schema but be careful about filtering
@@ -39,10 +41,11 @@ def get_topics_for_tenant(tenant=None):
             try:
                 return list(Topic.objects.all())
             except Exception as query_e:
-                print(f"Error querying Topics in current schema {current_schema}: {str(query_e)}")
+                logger.error(f"Error querying Topics in current schema {current_schema}: {str(query_e)}", exc_info=True)
                 return []
         else:
             # We're in the public schema, we can't get Topics directly
+            logger.warning("Attempted to get topics while in public schema with no tenant specified")
             return []
 
 
@@ -73,10 +76,21 @@ def get_topics_by_materiality_quadrant(tenant=None):
     - 'impact_material': Topics that are impact material but not financially material
     """
     # Get topics for the tenant
+    topics = []
+    
     if tenant:
-        topics = get_topics_for_tenant(tenant)
+        # Always use schema context when accessing tenant data
+        with schema_context(tenant.schema_name):
+            # Ensure topics are synced before processing
+            sync_topics_from_iro_versions(tenant)
+            
+            # Get topics with schema context
+            topics = list(Topic.objects.filter(tenant=tenant))
+            logger.debug(f"Found {len(topics)} topics for tenant {tenant.tenant_name}")
     else:
+        # For cross-tenant operations
         topics = get_all_tenant_topics()
+        logger.debug(f"Found {len(topics)} topics across all tenants")
     
     # Initialize result dictionary
     result = {
@@ -88,20 +102,30 @@ def get_topics_by_materiality_quadrant(tenant=None):
     
     # Group topics by quadrant
     for topic in topics:
-        quadrant = topic.get_materiality_quadrant()
-        result[quadrant].append({
-            'id': topic.topic_id,
-            'name': topic.name,
-            'level': topic.level,
-            'impact_score': topic.get_impact_materiality_score(),
-            'financial_score': topic.get_financial_materiality_score(),
-            'iro_count': topic.get_iro_count()
-        })
+        # Make sure to use schema context for topic operations
+        with schema_context(topic.tenant.schema_name):
+            try:
+                quadrant = topic.get_materiality_quadrant()
+                impact_score = topic.get_impact_materiality_score()
+                financial_score = topic.get_financial_materiality_score()
+                iro_count = topic.get_iro_count()
+                
+                # Log for debugging
+                logger.debug(f"Topic '{topic.name}': quadrant={quadrant}, impact={impact_score}, financial={financial_score}, iros={iro_count}")
+                
+                result[quadrant].append({
+                    'id': topic.topic_id,
+                    'name': topic.name,
+                    'level': topic.level,
+                    'impact_score': impact_score,
+                    'financial_score': financial_score,
+                    'iro_count': iro_count
+                })
+            except Exception as e:
+                logger.error(f"Error processing topic {topic.name} (ID: {topic.topic_id}): {str(e)}", exc_info=True)
     
     return result
 
-
-# apps/assessments/topic_aggregator.py - update the get_priority_iros function
 
 def get_priority_iros(tenant=None, limit=10):
     """
@@ -115,28 +139,31 @@ def get_priority_iros(tenant=None, limit=10):
     Returns a list of IRO objects with their latest assessment scores.
     """
     from apps.assessments.utils import get_iros_for_tenant, get_all_tenant_iros
-    import logging
-    
-    logger = logging.getLogger('apps')
     
     # Get IROs based on tenant context
     if tenant:
         try:
-            logger.debug("Fetching priority IROs for tenant: %s", tenant.tenant_name)
-            iro_queryset = get_iros_for_tenant(tenant)
+            # Add tenant to log context
+            tenant_name = tenant.tenant_name if hasattr(tenant, 'tenant_name') else str(tenant)
+            logger.debug(f"Fetching priority IROs for tenant: {tenant_name}")
+            
+            # Make sure we use schema context for tenant operations
+            with schema_context(tenant.schema_name):
+                iro_queryset = list(IRO.objects.filter(tenant=tenant))
         except Exception as e:
-            logger.error("Error fetching IROs for tenant %s: %s", 
-                         tenant.tenant_name if tenant else "None", str(e), exc_info=True)
+            tenant_name = tenant.tenant_name if hasattr(tenant, 'tenant_name') else "None"
+            logger.error(f"Error fetching IROs for tenant {tenant_name}: {str(e)}", exc_info=True)
             return []
     else:
         try:
+            # Default tenant for all-tenant operations
             logger.debug("Fetching priority IROs for all tenants")
             iro_queryset = get_all_tenant_iros()
         except Exception as e:
-            logger.error("Error fetching IROs for all tenants: %s", str(e), exc_info=True)
+            logger.error(f"Error fetching IROs for all tenants: {str(e)}", exc_info=True)
             return []
     
-    logger.debug("Found %d IROs in queryset", len(iro_queryset) if iro_queryset else 0)
+    logger.debug(f"Found {len(iro_queryset) if iro_queryset else 0} IROs in queryset")
     
     # Filter IROs with assessment scores
     scored_iros = []
@@ -156,46 +183,37 @@ def get_priority_iros(tenant=None, limit=10):
     for iro in sorted_iros[:limit]:
         try:
             # Get the latest impact and financial scores
-            if tenant:
-                with schema_context(tenant.schema_name):
-                    impact_assessments = list(ImpactAssessment.objects.filter(iro=iro).order_by('-created_on'))
-                    risk_opp_assessments = list(RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on'))
-            else:
-                # Use the IRO's tenant schema
-                tenant_obj = iro.tenant
-                with schema_context(tenant_obj.schema_name):
-                    impact_assessments = list(ImpactAssessment.objects.filter(iro=iro).order_by('-created_on'))
-                    risk_opp_assessments = list(RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on'))
+            tenant_to_use = tenant or iro.tenant
             
-            impact_score = impact_assessments[0].impact_materiality_score if impact_assessments else 0.0
-            financial_score = risk_opp_assessments[0].financial_materiality_score if risk_opp_assessments else 0.0
+            # Always use schema context for tenant operations
+            with schema_context(tenant_to_use.schema_name):
+                impact_assessments = list(ImpactAssessment.objects.filter(iro=iro, tenant=tenant_to_use).order_by('-created_on'))
+                risk_opp_assessments = list(RiskOppAssessment.objects.filter(iro=iro, tenant=tenant_to_use).order_by('-created_on'))
             
-            # Get the topic information
-            if tenant:
-                with schema_context(tenant.schema_name):
-                    version = IROVersion.objects.filter(iro=iro).order_by('-version_number').first()
-            else:
-                tenant_obj = iro.tenant
-                with schema_context(tenant_obj.schema_name):
-                    version = IROVersion.objects.filter(iro=iro).order_by('-version_number').first()
-            
-            topic_level1 = version.sust_topic_level1 if version else None
-            
-            # Ensure all values are JSON-serializable
-            iro_data = {
-                'iro_id': iro.iro_id,
-                'title': str(iro.title) if hasattr(iro, 'title') else f"IRO #{iro.iro_id}",
-                'type': str(iro.type),
-                'topic': str(topic_level1) if topic_level1 else None,
-                'impact_score': float(impact_score) if impact_score else 0.0,
-                'financial_score': float(financial_score) if financial_score else 0.0,
-                'current_stage': str(iro.current_stage),
-            }
-            result.append(iro_data)
+                impact_score = float(impact_assessments[0].impact_materiality_score or 0) if impact_assessments else 0.0
+                financial_score = float(risk_opp_assessments[0].financial_materiality_score or 0) if risk_opp_assessments else 0.0
+                
+                # Get the topic information
+                version = IROVersion.objects.filter(iro=iro, tenant=tenant_to_use).order_by('-version_number').first()
+                
+                topic_level1 = version.sust_topic_level1 if version else None
+                
+                # Ensure all values are JSON-serializable
+                iro_data = {
+                    'iro_id': iro.iro_id,
+                    'title': str(iro.title) if hasattr(iro, 'title') else f"IRO #{iro.iro_id}",
+                    'type': str(iro.type),
+                    'topic': str(topic_level1) if topic_level1 else None,
+                    'impact_score': impact_score,
+                    'financial_score': financial_score,
+                    'current_stage': str(iro.current_stage),
+                }
+                result.append(iro_data)
         except Exception as e:
-            logger.error("Error processing IRO %s: %s", iro.iro_id, str(e), exc_info=True)
+            iro_id = getattr(iro, 'iro_id', 'unknown')
+            logger.error(f"Error processing IRO {iro_id}: {str(e)}", exc_info=True)
     
-    logger.debug("Returning %d priority IROs", len(result))
+    logger.debug(f"Returning {len(result)} priority IROs")
     return result
 
 
@@ -206,31 +224,43 @@ def sync_topics_from_iro_versions(tenant=None):
     """
     from django.db import transaction
     
-    if tenant:
-        tenants = [tenant]
-    else:
-        tenants = TenantConfig.objects.all()
+    if tenant is None:
+        # If no tenant specified, log and return
+        logger.warning("No tenant specified for sync_topics_from_iro_versions")
+        return False
     
-    for tenant_obj in tenants:
-        with schema_context(tenant_obj.schema_name):
-            with transaction.atomic():
+    logger.info(f"Syncing topics for tenant: {tenant.tenant_name}")
+    
+    # Always use schema context when working with tenant data
+    with schema_context(tenant.schema_name):
+        with transaction.atomic():
+            try:
                 # Get all unique topic values from IROVersion
                 level1_topics = IROVersion.objects.filter(
-                    sust_topic_level1__isnull=False
+                    tenant=tenant,
+                    sust_topic_level1__isnull=False,
+                    sust_topic_level1__gte=''  # Filter out empty strings
                 ).values_list('sust_topic_level1', flat=True).distinct()
                 
                 level2_topics = IROVersion.objects.filter(
-                    sust_topic_level2__isnull=False
+                    tenant=tenant,
+                    sust_topic_level2__isnull=False,
+                    sust_topic_level2__gte=''  # Filter out empty strings
                 ).values_list('sust_topic_level2', 'sust_topic_level1').distinct()
                 
                 level3_topics = IROVersion.objects.filter(
-                    sust_topic_level3__isnull=False
+                    tenant=tenant,
+                    sust_topic_level3__isnull=False,
+                    sust_topic_level3__gte=''  # Filter out empty strings
                 ).values_list('sust_topic_level3', 'sust_topic_level2').distinct()
+                
+                # Log the counts for debugging
+                logger.debug(f"Found {len(level1_topics)} level 1 topics, {len(level2_topics)} level 2 topics, {len(level3_topics)} level 3 topics")
                 
                 # Create level 1 topics if they don't exist
                 for topic_name in level1_topics:
                     Topic.objects.get_or_create(
-                        tenant=tenant_obj,
+                        tenant=tenant,
                         name=topic_name,
                         level=1,
                         defaults={'description': f"Level 1 topic: {topic_name}"}
@@ -246,14 +276,14 @@ def sync_topics_from_iro_versions(tenant=None):
                     if parent_name:
                         try:
                             parent_topic = Topic.objects.get(
-                                tenant=tenant_obj,
+                                tenant=tenant,
                                 name=parent_name,
                                 level=1
                             )
                         except Topic.DoesNotExist:
                             # Create parent topic if it doesn't exist
                             parent_topic = Topic.objects.create(
-                                tenant=tenant_obj,
+                                tenant=tenant,
                                 name=parent_name,
                                 level=1,
                                 description=f"Level 1 topic: {parent_name}"
@@ -261,7 +291,7 @@ def sync_topics_from_iro_versions(tenant=None):
                     
                     # Create topic
                     Topic.objects.get_or_create(
-                        tenant=tenant_obj,
+                        tenant=tenant,
                         name=topic_name,
                         level=2,
                         defaults={
@@ -280,7 +310,7 @@ def sync_topics_from_iro_versions(tenant=None):
                     if parent_name:
                         try:
                             parent_topic = Topic.objects.get(
-                                tenant=tenant_obj,
+                                tenant=tenant,
                                 name=parent_name,
                                 level=2
                             )
@@ -290,7 +320,7 @@ def sync_topics_from_iro_versions(tenant=None):
                     
                     # Create topic
                     Topic.objects.get_or_create(
-                        tenant=tenant_obj,
+                        tenant=tenant,
                         name=topic_name,
                         level=3,
                         defaults={
@@ -298,5 +328,13 @@ def sync_topics_from_iro_versions(tenant=None):
                             'parent_topic': parent_topic
                         }
                     )
-    
-    return True
+                
+                # Count the final number of topics
+                topic_count = Topic.objects.filter(tenant=tenant).count()
+                logger.info(f"Successfully synced topics for tenant {tenant.tenant_name}. Total topics: {topic_count}")
+                
+                return True
+                
+            except Exception as e:
+                logger.error(f"Error syncing topics for tenant {tenant.tenant_name}: {str(e)}", exc_info=True)
+                return False

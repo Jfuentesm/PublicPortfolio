@@ -24,11 +24,13 @@ def home_dashboard(request):
     )
     
     # Ensure all topics are synced from IRO versions
-    sync_topics_from_iro_versions(tenant)
+    if tenant:
+        sync_topics_from_iro_versions(tenant)
     
     # Get IROs based on tenant context
     if tenant:
-        iro_queryset = get_iros_for_tenant(tenant)
+        with schema_context(tenant.schema_name):
+            iro_queryset = get_iros_for_tenant(tenant)
     else:
         # If no tenant selected, get IROs from all tenant schemas
         iro_queryset = get_all_tenant_iros()
@@ -101,7 +103,8 @@ def home_dashboard(request):
     
     # Add debug logging to check what data is being returned
     logger = logging.getLogger(__name__)
-    logger.debug("Priority IROs before JSON serialization: %s", high_priority_iros)
+    tenant_name = tenant.tenant_name if hasattr(tenant, 'tenant_name') and tenant else 'unknown'
+    logger.debug(f"Priority IROs before JSON serialization: {high_priority_iros}")
     
     # Ensure we have valid data before JSON serialization
     if high_priority_iros is None:
@@ -110,9 +113,9 @@ def home_dashboard(request):
     # Serialize the data to JSON, handling potential errors
     try:
         high_priority_iros_json = json.dumps(high_priority_iros)
-        logger.debug("Priority IROs after JSON serialization: %s", high_priority_iros_json[:100] + '...' if len(high_priority_iros_json) > 100 else high_priority_iros_json)
+        logger.debug(f"Priority IROs after JSON serialization: {high_priority_iros_json[:100] + '...' if len(high_priority_iros_json) > 100 else high_priority_iros_json}")
     except Exception as e:
-        logger.error("Error serializing priority IROs to JSON: %s", str(e))
+        logger.error(f"Error serializing priority IROs to JSON: {str(e)}")
         high_priority_iros_json = '[]'
     
     # Get topics by materiality quadrant
@@ -148,6 +151,7 @@ def home_dashboard(request):
     context['available_iros'] = available_iros
     
     return render(request, 'home.html', context)
+    
 
 @require_GET
 def set_context(request):
