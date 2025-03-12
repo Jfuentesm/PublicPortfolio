@@ -11,7 +11,11 @@ import socket
 
 from models.job import Job, JobStatus, ProcessingStage
 from models.user import User
-from api.auth import get_current_user, authenticate_user, create_access_token  # Added missing imports
+
+# Ensure this import is correct and present:
+from core.config import settings
+
+from api.auth import get_current_user, authenticate_user, create_access_token
 from core.database import get_db
 from core.initialize_db import initialize_database
 from services.file_service import save_upload_file
@@ -41,6 +45,7 @@ app.add_middleware(
 # Mount static files for frontend
 app.mount("/static", StaticFiles(directory="/frontend/static"), name="static")
 
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     """Serve the frontend application."""
@@ -50,12 +55,17 @@ async def root():
         return FileResponse(index_path)
     else:
         logger.error(f"Index file not found at {index_path}")
-        return HTMLResponse(content=f"<html><body><h1>Error: Frontend file not found</h1><p>Could not find {index_path}</p><p>Directory contents: {os.listdir('/frontend')}</p></body></html>")
+        return HTMLResponse(
+            content=f"<html><body><h1>Error: Frontend file not found</h1>"
+                    f"<p>Could not find {index_path}</p>"
+                    f"<p>Directory contents: {os.listdir('/frontend')}</p>"
+                    "</body></html>"
+        )
+
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint to verify service is running."""
-    # Log server information
     hostname = socket.gethostname()
     local_ip = socket.gethostbyname(hostname)
     logger.info(f"Health check called. Server running on {hostname}, IP: {local_ip}")
@@ -81,7 +91,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
-# Re-adding missing API endpoints
+
 @app.post("/api/v1/upload", response_model=Dict[str, Any])
 async def upload_file(
     background_tasks: BackgroundTasks,
@@ -91,23 +101,18 @@ async def upload_file(
     db = Depends(get_db)
 ):
     """Upload vendor Excel file for processing."""
-    # Log the upload attempt with authentication information
     logger.info(f"File upload attempt by user: {current_user.username}, filename: {file.filename}")
     
-    # Validate file
     if not file.filename.endswith(('.xlsx', '.xls')):
         logger.warning(f"Invalid file format: {file.filename}")
         raise HTTPException(status_code=400, detail="Only Excel files (.xlsx, .xls) are supported")
     
-    # Generate job ID
     job_id = str(uuid.uuid4())
     
     try:
-        # Save file
         input_file_path = save_upload_file(file, job_id)
         logger.debug(f"File saved at: {input_file_path}")
         
-        # Create job record
         job = Job(
             id=job_id,
             company_name=company_name,
@@ -116,13 +121,10 @@ async def upload_file(
             current_stage=ProcessingStage.INGESTION,
             created_by=current_user.username
         )
-        
-        # Save job to database
         db.add(job)
         db.commit()
         logger.info(f"Job created: {job_id} for company: {company_name}")
         
-        # Start processing in background
         background_tasks.add_task(process_vendor_file, job_id, input_file_path)
         logger.debug(f"Background task scheduled for job: {job_id}")
         
@@ -135,6 +137,7 @@ async def upload_file(
         logger.error(f"Error processing upload: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing upload: {str(e)}")
 
+
 @app.get("/api/v1/jobs/{job_id}", response_model=Dict[str, Any])
 async def get_job_status(
     job_id: str,
@@ -143,7 +146,6 @@ async def get_job_status(
 ):
     """Check job status."""
     job = db.query(Job).filter(Job.id == job_id).first()
-    
     if not job:
         raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
     
@@ -154,8 +156,9 @@ async def get_job_status(
         "current_stage": job.current_stage,
         "created_at": job.created_at,
         "updated_at": job.updated_at,
-        "estimated_completion": job.estimated_completion if hasattr(job, 'estimated_completion') else None
+        "estimated_completion": job.stats.get('estimated_completion', None)
     }
+
 
 @app.get("/api/v1/jobs/{job_id}/download")
 async def download_results(
@@ -165,7 +168,6 @@ async def download_results(
 ):
     """Download job results."""
     job = db.query(Job).filter(Job.id == job_id).first()
-    
     if not job:
         raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
     
@@ -176,7 +178,6 @@ async def download_results(
         raise HTTPException(status_code=404, detail="Output file not found")
     
     output_path = os.path.join("/data", "output", job_id, job.output_file_name)
-    
     if not os.path.exists(output_path):
         raise HTTPException(status_code=404, detail="Output file not found")
     
@@ -185,6 +186,7 @@ async def download_results(
         filename=job.output_file_name,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 
 @app.post("/api/v1/jobs/{job_id}/notify", response_model=Dict[str, Any])
 async def request_notification(
@@ -195,11 +197,9 @@ async def request_notification(
 ):
     """Request email notification when job completes."""
     job = db.query(Job).filter(Job.id == job_id).first()
-    
     if not job:
         raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
     
-    # Update job with notification email
     job.notification_email = email.get("email")
     db.commit()
     
@@ -207,6 +207,7 @@ async def request_notification(
         "success": True,
         "message": f"Notification will be sent to {email.get('email')} when job completes"
     }
+
 
 @app.get("/api/v1/jobs/{job_id}/stats", response_model=Dict[str, Any])
 async def get_job_stats(
@@ -216,7 +217,6 @@ async def get_job_stats(
 ):
     """Get job processing statistics."""
     job = db.query(Job).filter(Job.id == job_id).first()
-    
     if not job:
         raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
     
@@ -229,44 +229,17 @@ async def get_job_stats(
         "processing_time": job.stats.get("processing_time", 0)
     }
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup."""
-    logger.info("Starting application initialization")
-    
-    # Initialize database
-    try:
-        logger.info("Initializing database...")
-        initialize_database()
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error(f"Error initializing database: {e}")
-    
-    # Log server information
-    hostname = socket.gethostname()
-    local_ip = socket.gethostbyname(hostname)
-    logger.info(f"Server running on {hostname}, IP: {local_ip}")
-    logger.info(f"Web server binding to 0.0.0.0:8000")
-    
-    # Check frontend files
-    if os.path.exists("/frontend"):
-        logger.info(f"Frontend directory contents: {os.listdir('/frontend')}")
-    else:
-        logger.error("Frontend directory not found!")
 
-# Re-adding the main entry point
-if __name__ == "__main__":
-    import uvicorn
-    logger.info("Starting uvicorn server at 0.0.0.0:8000")
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
-
-# Add login endpoint
 @app.post("/token", response_model=Dict[str, Any])
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db = Depends(get_db)
+):
     """
     Get an access token for authentication.
     """
     logger.debug(f"Login attempt for user: {form_data.username}")
+    
     try:
         user = authenticate_user(db, form_data.username, form_data.password)
         if not user:
@@ -277,15 +250,23 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
+        # Double-check that 'settings' is in scope
+        logger.debug("About to create token, verifying settings is defined:")
+        logger.debug(f"SECRET_KEY length: {len(settings.SECRET_KEY)}")
+        
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data={"sub": user.username}, expires_delta=access_token_expires
+            data={"sub": user.username}, 
+            expires_delta=access_token_expires
         )
         
         logger.info(f"User logged in successfully: {user.username}")
-        return {"access_token": access_token, "token_type": "bearer", "username": user.username}
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "username": user.username
+        }
     except HTTPException:
-        # Re-raise HTTP exceptions to preserve their status codes
         raise
     except Exception as e:
         logger.error(f"Error during login process: {str(e)}")
@@ -293,3 +274,32 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during the login process",
         )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize application on startup."""
+    logger.info("Starting application initialization")
+    
+    try:
+        logger.info("Initializing database...")
+        initialize_database()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing database: {e}")
+    
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    logger.info(f"Server running on {hostname}, IP: {local_ip}")
+    logger.info("Web server binding to 0.0.0.0:8000")
+    
+    if os.path.exists("/frontend"):
+        logger.info(f"Frontend directory contents: {os.listdir('/frontend')}")
+    else:
+        logger.error("Frontend directory not found!")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    logger.info("Starting uvicorn server at 0.0.0.0:8000")
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

@@ -1,6 +1,6 @@
 import logging
 from sqlalchemy import create_engine
-from core.database import Base
+from core.database import Base, SessionLocal
 from core.config import settings
 import sys
 import uuid
@@ -18,21 +18,26 @@ logger.info("Importing models for database initialization")
 from models.user import User
 from models.job import Job
 
-def create_default_user():
-    """Create a default admin user if no users exist."""
-    logger.info("Checking for existing users...")
-    
-    # Get database session
+def create_or_update_admin_user():
+    """
+    Ensure the 'admin' user exists.
+    If no user with username=admin, create one with default password 'password'.
+    Otherwise, optionally update its password to ensure a consistent known credential.
+    """
     db = SessionLocal()
-    
     try:
-        # Check if any users exist
-        user_count = db.query(User).count()
-        logger.info(f"Found {user_count} existing users")
-        
-        if user_count == 0:
+        # Check for existing 'admin' user explicitly
+        admin_user = db.query(User).filter(User.username == "admin").first()
+        if admin_user:
+            logger.info("Admin user already exists.")
+            # OPTIONAL: Force-update the password each time:
+            # If you do NOT want to re-hash or overwrite the password, remove below lines.
+            admin_user.hashed_password = get_password_hash("password")
+            db.commit()
+            logger.info("Admin password was updated/reset to default: 'password'.")
+        else:
             # Create default admin user
-            default_user = User(
+            admin_user = User(
                 id=str(uuid.uuid4()),
                 username="admin",
                 email="admin@example.com",
@@ -41,21 +46,17 @@ def create_default_user():
                 is_active=True,
                 is_superuser=True
             )
-            
-            db.add(default_user)
+            db.add(admin_user)
             db.commit()
             logger.info("Created default admin user: admin / password")
-        else:
-            logger.info("Users already exist, skipping default user creation")
-    
     except Exception as e:
-        logger.error(f"Error creating default user: {e}")
+        logger.error(f"Error ensuring admin user: {e}")
         db.rollback()
     finally:
         db.close()
 
 def initialize_database():
-    """Initialize database by creating all tables."""
+    """Initialize database by creating all tables, then ensuring 'admin' user exists."""
     try:
         logger.info(f"Initializing database at {settings.DATABASE_URL}")
         engine = create_engine(settings.DATABASE_URL)
@@ -65,8 +66,8 @@ def initialize_database():
         Base.metadata.create_all(engine)
         logger.info("Database tables created successfully")
         
-        # Create default user
-        create_default_user()
+        # Create or update the admin user
+        create_or_update_admin_user()
         
         return True
     except Exception as e:
