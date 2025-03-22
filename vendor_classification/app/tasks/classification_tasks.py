@@ -1,6 +1,5 @@
 import os
 import time
-import logging
 import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -8,12 +7,19 @@ from celery import shared_task
 from sqlalchemy.orm import Session
 
 from core.database import SessionLocal
+from core.logging_config import (
+    get_logger, LogTimer, set_correlation_id, set_job_id, 
+    log_function_call, set_log_context, log_duration
+)
 from models.job import Job, JobStatus, ProcessingStage
 from models.taxonomy import Taxonomy
 from services.file_service import read_vendor_file, normalize_vendor_names, generate_output_file
 from services.llm_service import LLMService
 from services.search_service import SearchService
 from utils.taxonomy_loader import load_taxonomy
+
+# Configure logger
+logger = get_logger("vendor_classification.tasks")
 
 @shared_task
 def process_vendor_file(job_id: str, file_path: str):
@@ -24,6 +30,12 @@ def process_vendor_file(job_id: str, file_path: str):
         job_id: Job ID
         file_path: Path to vendor file
     """
+    # Set correlation ID for logging
+    set_correlation_id(job_id)
+    set_job_id(job_id)
+    logger.info(f"Starting vendor file processing task", 
+               extra={"job_id": job_id, "file_path": file_path})
+    
     # Create a new event loop for this task
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -32,11 +44,25 @@ def process_vendor_file(job_id: str, file_path: str):
     db = SessionLocal()
     
     try:
+        # Set context for logging
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if job:
+            set_log_context({
+                "company_name": job.company_name,
+                "creator": job.created_by,
+                "file_name": job.input_file_name
+            })
+            logger.info(f"Processing file for company", 
+                       extra={"company": job.company_name})
+        
         # Run the async processing function
-        loop.run_until_complete(_process_vendor_file_async(job_id, file_path, db))
+        with LogTimer(logger, "Complete file processing", level=logger.info, include_in_stats=True):
+            loop.run_until_complete(_process_vendor_file_async(job_id, file_path, db))
+            
+        logger.info(f"Vendor file processing completed successfully")
     except Exception as e:
         # Log error
-        logging.error(f"Error processing job {job_id}: {e}")
+        logger.error(f"Error processing vendor file", exc_info=True)
         
         try:
             # Get job from database
@@ -46,13 +72,18 @@ def process_vendor_file(job_id: str, file_path: str):
                 # Update job status
                 job.fail(str(e))
                 db.commit()
+                logger.info(f"Job status updated to failed", 
+                           extra={"error": str(e)})
         except Exception as db_error:
-            logging.error(f"Error updating job status: {db_error}")
+            logger.error(f"Error updating job status", exc_info=True,
+                        extra={"original_error": str(e), "db_error": str(db_error)})
     finally:
         # Close database session
         db.close()
         loop.close()
+        logger.debug(f"Database session and event loop closed")
 
+@log_function_call(logger, level=logger.info)
 async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
     """
     Async implementation of vendor file processing.
@@ -70,7 +101,7 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
     job = db.query(Job).filter(Job.id == job_id).first()
     
     if not job:
-        logging.error(f"Job with ID {job_id} not found")
+        logger.error(f"Job not found in database", extra={"job_id": job_id})
         return
     
     # Update job status
@@ -78,6 +109,8 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
     job.current_stage = ProcessingStage.INGESTION.value
     job.progress = 0.1
     db.commit()
+    logger.info(f"Job status updated", 
+               extra={"status": job.status, "stage": job.current_stage, "progress": job.progress})
     
     # Initialize processing stats
     start_time = datetime.now()
@@ -96,17 +129,28 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
     }
     
     # Read vendor file
-    vendors = read_vendor_file(file_path)
+    logger.info(f"Reading vendor file")
+    with log_duration(logger, "Reading vendor file"):
+        vendors = read_vendor_file(file_path)
+    logger.info(f"Vendor file read successfully", 
+               extra={"vendor_count": len(vendors)})
     
     # Update job progress
     job.current_stage = ProcessingStage.NORMALIZATION.value
     job.progress = 0.2
     db.commit()
+    logger.info(f"Job status updated", 
+               extra={"stage": job.current_stage, "progress": job.progress})
     
     # Normalize vendor names
-    normalized_vendors = normalize_vendor_names(vendors)
+    logger.info(f"Normalizing vendor names")
+    with log_duration(logger, "Normalizing vendor names"):
+        normalized_vendors = normalize_vendor_names(vendors)
+    logger.info(f"Vendor names normalized", 
+               extra={"normalized_count": len(normalized_vendors)})
     
     # Remove duplicates while preserving order
+    logger.info(f"Removing duplicate vendors")
     unique_vendors = []
     seen = set()
     for vendor in normalized_vendors:
@@ -114,39 +158,67 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
             unique_vendors.append(vendor)
             seen.add(vendor)
     
+    logger.info(f"Duplicates removed", 
+               extra={"unique_count": len(unique_vendors)})
+    
     # Update stats
     stats["total_vendors"] = len(normalized_vendors)
     stats["unique_vendors"] = len(unique_vendors)
     
     # Load taxonomy
-    taxonomy = load_taxonomy()
+    logger.info(f"Loading taxonomy")
+    with log_duration(logger, "Loading taxonomy"):
+        taxonomy = load_taxonomy()
+    logger.info(f"Taxonomy loaded", 
+               extra={"taxonomy_version": taxonomy.version})
     
     # Initialize results
     results = {vendor: {} for vendor in unique_vendors}
     
     # Process vendors
-    await process_vendors(unique_vendors, taxonomy, results, stats, job, db, llm_service, search_service)
+    logger.info(f"Starting vendor classification")
+    with log_duration(logger, "Complete vendor classification", level=logger.info):
+        await process_vendors(unique_vendors, taxonomy, results, stats, job, db, llm_service, search_service)
+    logger.info(f"Vendor classification completed")
     
     # Update job progress
     job.current_stage = ProcessingStage.RESULT_GENERATION.value
     job.progress = 0.9
     db.commit()
+    logger.info(f"Job status updated", 
+               extra={"stage": job.current_stage, "progress": job.progress})
     
     # Generate output file
-    output_file_name = generate_output_file(normalized_vendors, results, job_id)
+    logger.info(f"Generating output file")
+    with log_duration(logger, "Generating output file"):
+        output_file_name = generate_output_file(normalized_vendors, results, job_id)
+    logger.info(f"Output file generated", 
+               extra={"output_file": output_file_name})
     
     # Update stats
     end_time = datetime.now()
+    processing_duration = (end_time - start_time).total_seconds()
     stats["end_time"] = end_time
-    stats["processing_duration_seconds"] = (end_time - start_time).total_seconds()
+    stats["processing_duration_seconds"] = processing_duration
+    
+    # Update cost estimates based on token usage
+    token_cost_per_1k = 0.002  # Example cost, adjust as needed
+    estimated_cost = (stats["api_usage"]["azure_openai_tokens_total"] / 1000) * token_cost_per_1k
+    stats["api_usage"]["cost_estimate_usd"] = estimated_cost
     
     # Complete job
     job.complete(output_file_name, stats)
     db.commit()
-    
-    # Log completion
-    logging.info(f"Job {job_id} completed successfully")
+    logger.info(f"Job completed successfully", 
+               extra={
+                   "processing_duration": processing_duration,
+                   "output_file": output_file_name,
+                   "api_calls": stats["api_usage"]["azure_openai_calls"],
+                   "tokens_used": stats["api_usage"]["azure_openai_tokens_total"],
+                   "estimated_cost": estimated_cost
+               })
 
+@log_function_call(logger)
 async def process_vendors(
     vendors: List[str],
     taxonomy: Taxonomy,
@@ -174,11 +246,15 @@ async def process_vendors(
     job.current_stage = ProcessingStage.CLASSIFICATION_L1.value
     job.progress = 0.3
     db.commit()
+    logger.info(f"Starting Level 1 classification", 
+               extra={"vendor_count": len(vendors)})
     
     level1_batches = create_batches(vendors, batch_size=10)
     level1_results = {}
     
-    for batch in level1_batches:
+    for i, batch in enumerate(level1_batches):
+        logger.info(f"Processing Level 1 batch {i+1}/{len(level1_batches)}", 
+                   extra={"batch_size": len(batch)})
         batch_results = await process_batch(batch, 1, None, taxonomy, llm_service, stats)
         level1_results.update(batch_results)
     
@@ -189,6 +265,7 @@ async def process_vendors(
     # Update job progress
     job.progress = 0.4
     db.commit()
+    logger.info(f"Level 1 classification completed")
     
     # Process subsequent levels (2-4) based on Level 1 groupings
     for level in range(2, 5):
@@ -204,38 +281,59 @@ async def process_vendors(
             job.progress = 0.7
         db.commit()
         
+        logger.info(f"Starting Level {level} classification")
+        
         # Group vendors by previous level classification
         grouped_vendors = group_by_parent_category(results, level-1)
+        logger.info(f"Grouped vendors by parent category", 
+                   extra={"level": level, "group_count": len(grouped_vendors)})
         
         # Process each group separately
         for parent_category, group_vendors in grouped_vendors.items():
+            logger.info(f"Processing Level {level} group", 
+                       extra={"parent_category": parent_category, "vendor_count": len(group_vendors)})
+            
             level_batches = create_batches(group_vendors, batch_size=10)
             level_results = {}
             
-            for batch in level_batches:
+            for i, batch in enumerate(level_batches):
+                logger.info(f"Processing Level {level} batch {i+1}/{len(level_batches)} for parent {parent_category}", 
+                           extra={"batch_size": len(batch)})
                 batch_results = await process_batch(batch, level, parent_category, taxonomy, llm_service, stats)
                 level_results.update(batch_results)
             
             # Update results with this level's classifications
             for vendor, classification in level_results.items():
                 results[vendor][f"level{level}"] = classification
+        
+        logger.info(f"Level {level} classification completed")
     
     # Handle unknown vendors that couldn't be classified
     job.current_stage = ProcessingStage.SEARCH.value
     job.progress = 0.8
     db.commit()
+    logger.info(f"Starting search for unknown vendors")
     
     unknown_vendors = identify_unknown_vendors(results)
+    logger.info(f"Identified unknown vendors", 
+               extra={"unknown_count": len(unknown_vendors)})
+    
     if unknown_vendors:
         unknown_results = {}
-        for vendor in unknown_vendors:
+        for i, vendor in enumerate(unknown_vendors):
+            logger.info(f"Searching for vendor information {i+1}/{len(unknown_vendors)}", 
+                       extra={"vendor": vendor})
             search_result = await search_vendor(vendor, taxonomy, llm_service, search_service, stats)
             unknown_results[vendor] = search_result
         
         # Update results with findings from Tavily searches
         for vendor, search_result in unknown_results.items():
             results[vendor]["search_results"] = search_result
+        
+        logger.info(f"Unknown vendor search completed", 
+                   extra={"searched_count": len(unknown_vendors)})
 
+@log_function_call(logger)
 async def process_batch(
     batch: List[str],
     level: int,
@@ -260,7 +358,11 @@ async def process_batch(
     """
     results = {}
     
-    response = await llm_service.classify_batch(batch, level, taxonomy, parent_category)
+    logger.debug(f"Sending batch to LLM for classification", 
+               extra={"level": level, "batch_size": len(batch), "parent_category": parent_category})
+    
+    with LogTimer(logger, f"LLM classification - Level {level}", include_in_stats=True):
+        response = await llm_service.classify_batch(batch, level, taxonomy, parent_category)
     
     # Update API usage stats
     stats["api_usage"]["azure_openai_calls"] += 1
@@ -268,10 +370,24 @@ async def process_batch(
     stats["api_usage"]["azure_openai_tokens_output"] += response["usage"]["completion_tokens"]
     stats["api_usage"]["azure_openai_tokens_total"] += response["usage"]["total_tokens"]
     
+    # Log token usage
+    logger.debug(f"LLM API usage", 
+               extra={
+                   "level": level,
+                   "prompt_tokens": response["usage"]["prompt_tokens"],
+                   "completion_tokens": response["usage"]["completion_tokens"],
+                   "total_tokens": response["usage"]["total_tokens"]
+               })
+    
     # Process results
     classifications = response["result"]["classifications"]
+    logger.debug(f"Received classifications from LLM", 
+               extra={"classification_count": len(classifications)})
+    
     for classification in classifications:
         vendor_name = classification["vendor_name"]
+        classification_possible = not classification.get("classification_not_possible", False)
+        
         results[vendor_name] = {
             "category_id": classification["category_id"],
             "category_name": classification["category_name"],
@@ -279,9 +395,19 @@ async def process_batch(
             "classification_not_possible": classification.get("classification_not_possible", False),
             "classification_not_possible_reason": classification.get("classification_not_possible_reason", None)
         }
+        
+        logger.debug(f"Vendor classified", 
+                   extra={
+                       "vendor": vendor_name,
+                       "level": level,
+                       "category_id": classification["category_id"] if classification_possible else "N/A",
+                       "confidence": classification["confidence"] if classification_possible else 0,
+                       "classification_possible": classification_possible
+                   })
     
     return results
 
+@log_function_call(logger)
 async def search_vendor(
     vendor: str,
     taxonomy: Taxonomy,
@@ -302,15 +428,24 @@ async def search_vendor(
     Returns:
         Search and classification results
     """
+    logger.info(f"Searching for vendor information", extra={"vendor": vendor})
+    
     # Search for vendor information
-    search_result = await search_service.search_vendor(vendor)
+    with LogTimer(logger, "Tavily search", include_in_stats=True):
+        search_result = await search_service.search_vendor(vendor)
     
     # Update API usage stats
     stats["api_usage"]["tavily_search_calls"] += 1
     
+    source_count = len(search_result.get("sources", []))
+    logger.info(f"Search completed", extra={"vendor": vendor, "source_count": source_count})
+    
     # Process search results with LLM
     if search_result.get("sources"):
-        classification = await llm_service.process_search_results(vendor, search_result, taxonomy)
+        logger.info(f"Classifying vendor based on search results", extra={"vendor": vendor})
+        
+        with LogTimer(logger, "LLM classification from search", include_in_stats=True):
+            classification = await llm_service.process_search_results(vendor, search_result, taxonomy)
         
         # Update API usage stats
         stats["api_usage"]["azure_openai_calls"] += 1
@@ -318,12 +453,37 @@ async def search_vendor(
         stats["api_usage"]["azure_openai_tokens_output"] += classification["usage"]["completion_tokens"]
         stats["api_usage"]["azure_openai_tokens_total"] += classification["usage"]["total_tokens"]
         
+        # Log token usage
+        logger.debug(f"LLM API usage for search processing", 
+                   extra={
+                       "vendor": vendor,
+                       "prompt_tokens": classification["usage"]["prompt_tokens"],
+                       "completion_tokens": classification["usage"]["completion_tokens"],
+                       "total_tokens": classification["usage"]["total_tokens"]
+                   })
+        
         # Add classification to search result
         search_result["classification"] = classification["result"]
         
         # Check if classification was successful
-        if not classification["result"].get("classification_not_possible", True):
+        classification_possible = not classification["result"].get("classification_not_possible", True)
+        
+        if classification_possible:
             stats["tavily_search_successful_classifications"] = stats.get("tavily_search_successful_classifications", 0) + 1
+            logger.info(f"Successful classification from search", 
+                       extra={
+                           "vendor": vendor,
+                           "category_id": classification["result"].get("category_id", "unknown"),
+                           "confidence": classification["result"].get("confidence", 0)
+                       })
+        else:
+            logger.info(f"Classification from search not possible", 
+                       extra={
+                           "vendor": vendor,
+                           "reason": classification["result"].get("classification_not_possible_reason", "unknown")
+                       })
+    else:
+        logger.warning(f"No search results found for vendor", extra={"vendor": vendor})
     
     return search_result
 
