@@ -1,0 +1,104 @@
+[
+    {
+        "scenario": {
+            "overview": "A rapidly growing coastal city must decide whether to approve a major tech company's proposal to build a large-scale desalination plant. The facility promises to solve water scarcity issues and create jobs, but raises concerns about marine ecosystem impact, energy consumption, and long-term environmental consequences.",
+            "tags": ["environmental", "technology", "urban development", "sustainability", "economic growth"],
+            "prompts": {
+                "scenario_introduction_prompt": "As the city's advisory committee, you need to evaluate the comprehensive impact of the proposed desalination plant. Consider all stakeholders, short and long-term consequences, and systemic implications.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Analyze the temporal implications of building the desalination plant across multiple timeframes.",
+                    "prompt_structured_JSON_output_instructions": "Provide analysis in format: {short_term_impacts: [], medium_term_impacts: [], long_term_impacts: [], path_dependencies: [], irreversibility_factors: []}",
+                    "prompt_guidelines": "Consider impacts ranging from immediate construction effects to multi-generational consequences, including lock-in effects and irreversible changes."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Map out all stakeholders and their interests, including often overlooked or marginalized groups.",
+                    "prompt_structured_JSON_output_instructions": "Format: {direct_human_stakeholders: [], indirect_human_stakeholders: [], non_human_stakeholders: [], marginalized_groups: [], future_stakeholders: []}",
+                    "prompt_guidelines": "Include both obvious and non-obvious stakeholders, their specific concerns, and potential conflicts of interest."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Identify key feedback loops and system dynamics in the project's ecosystem.",
+                    "prompt_structured_JSON_output_instructions": "Format: {positive_feedback_loops: [], negative_feedback_loops: [], emergent_properties: [], system_vulnerabilities: [], cascade_effects: []}",
+                    "prompt_guidelines": "Focus on interconnections between environmental, social, and economic systems."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Develop alternative solutions and assess their robustness across different future scenarios.",
+                    "prompt_structured_JSON_output_instructions": "Format: {alternative_solutions: [], scenario_analysis: [], robustness_metrics: [], adaptation_strategies: [], risk_mitigation: []}",
+                    "prompt_guidelines": "Consider multiple futures and how different solutions perform under various conditions."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Evaluate ethical implications and value alignment across different cultural perspectives.",
+                    "prompt_structured_JSON_output_instructions": "Format: {ethical_frameworks: [], cultural_considerations: [], value_conflicts: [], equity_issues: [], proposed_resolutions: []}",
+                    "prompt_guidelines": "Address intergenerational equity, cultural values, and moral philosophy frameworks."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "A leading AI research company has developed a powerful language model that could revolutionize healthcare diagnosis but raises concerns about privacy, bias, and the future of human medical expertise. The company seeks approval for widespread deployment in public healthcare systems.",
+            "tags": ["healthcare", "artificial intelligence", "ethics", "privacy", "social impact"],
+            "prompts": {
+                "scenario_introduction_prompt": "As a regulatory body, evaluate the implications of approving this AI system for widespread healthcare deployment.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Assess the potential impacts on healthcare delivery and medical profession evolution.",
+                    "prompt_structured_JSON_output_instructions": "Format: {immediate_healthcare_impacts: [], professional_impacts: [], system_changes: [], transition_challenges: [], long_term_transformations: []}",
+                    "prompt_guidelines": "Consider both intended and unintended consequences for healthcare systems and practitioners."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Analyze privacy implications and data governance requirements.",
+                    "prompt_structured_JSON_output_instructions": "Format: {privacy_risks: [], data_protection_measures: [], governance_frameworks: [], compliance_requirements: [], ethical_safeguards: []}",
+                    "prompt_guidelines": "Address both technical and social aspects of privacy protection."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Evaluate potential biases and accessibility issues across different demographics.",
+                    "prompt_structured_JSON_output_instructions": "Format: {bias_types: [], affected_groups: [], accessibility_barriers: [], mitigation_strategies: [], monitoring_methods: []}",
+                    "prompt_guidelines": "Consider historical healthcare disparities and how they might be perpetuated or addressed."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Develop a framework for measuring and ensuring system reliability and safety.",
+                    "prompt_structured_JSON_output_instructions": "Format: {safety_metrics: [], reliability_standards: [], testing_protocols: [], oversight_mechanisms: [], incident_response: []}",
+                    "prompt_guidelines": "Include both technical and procedural safety measures."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Design a stakeholder engagement and governance model.",
+                    "prompt_structured_JSON_output_instructions": "Format: {stakeholder_roles: [], decision_processes: [], accountability_measures: [], feedback_mechanisms: [], adaptation_protocols: []}",
+                    "prompt_guidelines": "Ensure inclusive representation and clear accountability structures."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "A developing nation must decide whether to accept a major international investment to convert large areas of agricultural land into carbon capture facilities, promising economic benefits but potentially affecting food security and traditional farming communities.",
+            "tags": ["climate change", "agriculture", "economic development", "social justice", "food security"],
+            "prompts": {
+                "scenario_introduction_prompt": "As policy advisors, evaluate the complex trade-offs between climate action, food security, and social justice.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Analyze food security implications and agricultural system impacts.",
+                    "prompt_structured_JSON_output_instructions": "Format: {food_security_metrics: [], agricultural_impacts: [], economic_effects: [], social_consequences: [], adaptation_needs: []}",
+                    "prompt_guidelines": "Consider both local and national food security implications."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Evaluate the climate change mitigation potential against social costs.",
+                    "prompt_structured_JSON_output_instructions": "Format: {carbon_reduction_potential: [], social_costs: [], economic_benefits: [], environmental_impacts: [], trade_off_analysis: []}",
+                    "prompt_guidelines": "Include both quantitative and qualitative aspects of the trade-offs."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Assess impacts on traditional farming communities and cultural heritage.",
+                    "prompt_structured_JSON_output_instructions": "Format: {community_impacts: [], cultural_effects: [], livelihood_changes: [], compensation_measures: [], transition_support: []}",
+                    "prompt_guidelines": "Consider both tangible and intangible cultural impacts."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Develop alternative approaches that balance climate action with food security.",
+                    "prompt_structured_JSON_output_instructions": "Format: {alternative_solutions: [], feasibility_assessment: [], implementation_strategies: [], cost_benefit_analysis: [], risk_management: []}",
+                    "prompt_guidelines": "Focus on solutions that address multiple objectives simultaneously."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Design a just transition framework for affected communities.",
+                    "prompt_structured_JSON_output_instructions": "Format: {transition_phases: [], support_mechanisms: [], skill_development: [], economic_opportunities: [], community_engagement: []}",
+                    "prompt_guidelines": "Ensure equitable distribution of benefits and burdens."
+                }
+            }
+        }
+    }
+]

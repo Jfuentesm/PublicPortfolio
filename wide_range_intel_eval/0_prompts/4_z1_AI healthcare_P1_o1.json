@@ -1,0 +1,177 @@
+{
+    "stakeholders": [
+      {
+        "group": "MetroCare Executive Leadership",
+        "primary_concerns": [
+          "Financial viability of the AI system",
+          "Return on investment",
+          "Strategic alignment",
+          "Liability and compliance"
+        ],
+        "impact_level": "High",
+        "representation_status": "Fully Represented"
+      },
+      {
+        "group": "Physicians and Clinical Staff",
+        "primary_concerns": [
+          "Accuracy of AI diagnoses",
+          "Impact on clinical workflows",
+          "Job security or role change",
+          "Training and adaptation costs"
+        ],
+        "impact_level": "High",
+        "representation_status": "Fully Represented"
+      },
+      {
+        "group": "Patients (Urban & Rural)",
+        "primary_concerns": [
+          "Privacy and confidentiality of data",
+          "Equitable quality of care",
+          "Bias in AI model performance",
+          "Autonomy and informed consent"
+        ],
+        "impact_level": "High",
+        "representation_status": "Partially Represented"
+      },
+      {
+        "group": "Rural Community Advocates",
+        "primary_concerns": [
+          "Inclusivity of AI data sets",
+          "Access to advanced diagnostic tools",
+          "Potential algorithmic bias",
+          "Healthcare disparity reduction"
+        ],
+        "impact_level": "High",
+        "representation_status": "Partially Represented"
+      },
+      {
+        "group": "Data Privacy Advocates",
+        "primary_concerns": [
+          "Data protection regulations",
+          "Risk of unauthorized access or breaches",
+          "Ethical handling of patient information",
+          "Vendor compliance with privacy standards"
+        ],
+        "impact_level": "Medium",
+        "representation_status": "Uncertain"
+      },
+      {
+        "group": "Government and Regulatory Bodies",
+        "primary_concerns": [
+          "Regulatory compliance",
+          "Public trust in AI healthcare",
+          "Patient safety standards",
+          "Oversight of data sharing"
+        ],
+        "impact_level": "Medium",
+        "representation_status": "Fully Represented"
+      },
+      {
+        "group": "Health Insurers and Payers",
+        "primary_concerns": [
+          "Cost impact and reimbursement models",
+          "Accuracy of AI-driven diagnoses for claims",
+          "Potential shift in risk profiles",
+          "Data usage in underwriting"
+        ],
+        "impact_level": "Medium",
+        "representation_status": "Fully Represented"
+      },
+      {
+        "group": "AI Vendor",
+        "primary_concerns": [
+          "Continuous data collection for model updates",
+          "Profitability and contractual terms",
+          "Access to diverse patient data",
+          "Maintaining product reputation"
+        ],
+        "impact_level": "High",
+        "representation_status": "Fully Represented"
+      },
+      {
+        "group": "IT Department",
+        "primary_concerns": [
+          "Technical infrastructure readiness",
+          "Integration with existing systems",
+          "Cybersecurity implications",
+          "Scalability and maintenance"
+        ],
+        "impact_level": "Medium",
+        "representation_status": "Partially Represented"
+      }
+    ],
+    "stakeholder_relationships": [
+      {
+        "group1": "MetroCare Executive Leadership",
+        "group2": "Physicians and Clinical Staff",
+        "relationship_type": "Collaborative governance",
+        "potential_conflicts": [
+          "Budget allocation for training",
+          "Workflow redesign disagreements"
+        ]
+      },
+      {
+        "group1": "MetroCare Executive Leadership",
+        "group2": "AI Vendor",
+        "relationship_type": "Contractual partnership",
+        "potential_conflicts": [
+          "Long-term cost commitments",
+          "Ownership of patient data"
+        ]
+      },
+      {
+        "group1": "Patients (Urban & Rural)",
+        "group2": "Data Privacy Advocates",
+        "relationship_type": "Shared interest in privacy",
+        "potential_conflicts": [
+          "Balancing personalization vs. privacy",
+          "Consent management complexities"
+        ]
+      },
+      {
+        "group1": "Rural Community Advocates",
+        "group2": "AI Vendor",
+        "relationship_type": "Stakeholder representation",
+        "potential_conflicts": [
+          "Insufficient rural data representation",
+          "Risk of biased model outcomes"
+        ]
+      },
+      {
+        "group1": "Government and Regulatory Bodies",
+        "group2": "MetroCare Executive Leadership",
+        "relationship_type": "Regulatory oversight",
+        "potential_conflicts": [
+          "Compliance burden vs. innovation",
+          "Data-sharing policies"
+        ]
+      },
+      {
+        "group1": "Health Insurers and Payers",
+        "group2": "MetroCare Executive Leadership",
+        "relationship_type": "Negotiation and funding",
+        "potential_conflicts": [
+          "Coverage of AI-driven diagnostics",
+          "Risk-sharing models"
+        ]
+      },
+      {
+        "group1": "IT Department",
+        "group2": "Physicians and Clinical Staff",
+        "relationship_type": "Technical support and training",
+        "potential_conflicts": [
+          "Resource constraints",
+          "System downtime or delays"
+        ]
+      },
+      {
+        "group1": "AI Vendor",
+        "group2": "Data Privacy Advocates",
+        "relationship_type": "Compliance and risk mitigation",
+        "potential_conflicts": [
+          "Use of sensitive patient information",
+          "Transparency in AI model updates"
+        ]
+      }
+    ]
+  }

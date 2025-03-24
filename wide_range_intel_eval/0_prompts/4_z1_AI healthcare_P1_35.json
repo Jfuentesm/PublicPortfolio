@@ -1,0 +1,113 @@
+{
+    "stakeholders": [
+        {
+            "group": "Patients (Urban)",
+            "primary_concerns": [
+                "Diagnostic accuracy and reliability",
+                "Data privacy and security",
+                "Cost implications for care",
+                "Integration with current care experience"
+            ],
+            "impact_level": "High",
+            "representation_status": "Direct through patient advocacy groups"
+        },
+        {
+            "group": "Patients (Rural)",
+            "primary_concerns": [
+                "AI model bias due to urban-centric training data",
+                "Access to technology benefits",
+                "Cost implications for care",
+                "Cultural appropriateness of AI solutions"
+            ],
+            "impact_level": "High",
+            "representation_status": "Limited representation"
+        },
+        {
+            "group": "Clinical Staff (Physicians)",
+            "primary_concerns": [
+                "Impact on clinical autonomy",
+                "Workflow disruption",
+                "Liability concerns",
+                "Training requirements"
+            ],
+            "impact_level": "High",
+            "representation_status": "Strong through medical leadership"
+        },
+        {
+            "group": "Nursing Staff",
+            "primary_concerns": [
+                "Workflow changes",
+                "Patient care quality",
+                "Training needs",
+                "Job security"
+            ],
+            "impact_level": "High",
+            "representation_status": "Moderate through nursing leadership"
+        },
+        {
+            "group": "Hospital Administration",
+            "primary_concerns": [
+                "ROI on $50M investment",
+                "Regulatory compliance",
+                "Operational efficiency",
+                "Risk management"
+            ],
+            "impact_level": "High",
+            "representation_status": "Strong through executive team"
+        },
+        {
+            "group": "IT Department",
+            "primary_concerns": [
+                "System integration",
+                "Data security",
+                "Technical support requirements",
+                "Infrastructure readiness"
+            ],
+            "impact_level": "High",
+            "representation_status": "Strong through CIO"
+        },
+        {
+            "group": "AI Vendor",
+            "primary_concerns": [
+                "Data access",
+                "System performance",
+                "Contract terms",
+                "Ongoing partnership"
+            ],
+            "impact_level": "Medium",
+            "representation_status": "Direct through vendor representatives"
+        }
+    ],
+    "stakeholder_relationships": [
+        {
+            "group1": "Clinical Staff",
+            "group2": "Hospital Administration",
+            "relationship_type": "Potentially adversarial",
+            "potential_conflicts": [
+                "Implementation timeline expectations",
+                "Resource allocation",
+                "Training time requirements"
+            ]
+        },
+        {
+            "group1": "Patients",
+            "group2": "AI Vendor",
+            "relationship_type": "Indirect with tension",
+            "potential_conflicts": [
+                "Data privacy concerns",
+                "Consent requirements",
+                "Trust issues"
+            ]
+        },
+        {
+            "group1": "Rural Patients",
+            "group2": "Urban Patients",
+            "relationship_type": "Competing interests",
+            "potential_conflicts": [
+                "Resource allocation",
+                "Model bias concerns",
+                "Access equity"
+            ]
+        }
+    ]
+}

@@ -1,0 +1,104 @@
+{
+    "scenario": {
+        "overview": "In March 2025, researchers at QuantumTech, a private quantum computing company, achieve a breakthrough that enables the practical breaking of current encryption standards within hours. This development arrives years ahead of previous estimates, potentially compromising global digital infrastructure, financial systems, and national security. The discovery has been privately disclosed to an emergency session of the International Quantum Security Coalition (IQSC), a newly formed body of 40 nations, before public announcement. The IQSC must develop recommendations within 72 hours.",
+        "tags": ["technology", "security", "geopolitics", "ethics"],
+        "prompts": {
+            "scenario_introduction_prompt": "You are the lead advisor to the IQSC, tasked with developing comprehensive recommendations for managing this quantum computing breakthrough.",
+            "scenario_question1_prompt": {
+                "prompt_goal": "Analyze the immediate global security implications and propose initial response measures",
+                "prompt_structured_JSON_output_instructions": {
+                    "threat_assessment": {
+                        "critical_systems": [{
+                            "system_type": "string",
+                            "vulnerability_level": "string",
+                            "immediate_risks": ["string"]
+                        }],
+                        "response_measures": [{
+                            "measure_type": "string",
+                            "implementation_timeline": "string",
+                            "required_coordination": ["string"]
+                        }]
+                    }
+                },
+                "prompt_guidelines": "Consider immediate vulnerabilities across different sectors and practical response measures",
+                "prompt_relevant_sub-dimensions": ["Short-Term Impacts", "Global Effects", "Evidence-Based Decision-Making"]
+            },
+            "scenario_question2_prompt": {
+                "prompt_goal": "Evaluate the geopolitical dynamics and potential power shifts from asymmetric access to this technology",
+                "prompt_structured_JSON_output_instructions": {
+                    "geopolitical_analysis": {
+                        "power_dynamics": [{
+                            "actor_type": "string",
+                            "potential_advantages": ["string"],
+                            "strategic_implications": ["string"]
+                        }],
+                        "alliance_impacts": [{
+                            "relationship_type": "string",
+                            "stability_factors": ["string"],
+                            "mitigation_strategies": ["string"]
+                        }]
+                    }
+                },
+                "prompt_guidelines": "Analyze how this breakthrough might affect international relations and global stability",
+                "prompt_relevant_sub-dimensions": ["Systemic Interconnectivity", "Feedback Loops", "Unintended Consequences"]
+            },
+            "scenario_question3_prompt": {
+                "prompt_goal": "Design a framework for equitable global access while maintaining security",
+                "prompt_structured_JSON_output_instructions": {
+                    "access_framework": {
+                        "governance_structure": {
+                            "oversight_bodies": ["string"],
+                            "decision_mechanisms": ["string"],
+                            "accountability_measures": ["string"]
+                        },
+                        "technology_sharing": [{
+                            "access_level": "string",
+                            "eligibility_criteria": ["string"],
+                            "safeguards": ["string"]
+                        }]
+                    }
+                },
+                "prompt_guidelines": "Balance security concerns with ethical imperatives for equitable access",
+                "prompt_relevant_sub-dimensions": ["Moral Philosophy", "Cultural Sensitivity", "Marginalized Voices"]
+            },
+            "scenario_question4_prompt": {
+                "prompt_goal": "Develop a transition strategy for global digital infrastructure",
+                "prompt_structured_JSON_output_instructions": {
+                    "transition_plan": {
+                        "priority_systems": [{
+                            "system_category": "string",
+                            "upgrade_requirements": ["string"],
+                            "timeline_milestones": ["string"]
+                        }],
+                        "coordination_mechanisms": [{
+                            "stakeholder_group": "string",
+                            "responsibilities": ["string"],
+                            "resource_needs": ["string"]
+                        }]
+                    }
+                },
+                "prompt_guidelines": "Create a practical roadmap for upgrading global systems to quantum-resistant alternatives",
+                "prompt_relevant_sub-dimensions": ["Path Dependency", "Robustness", "Interdisciplinary Thinking"]
+            },
+            "scenario_question5_prompt": {
+                "prompt_goal": "Anticipate and prepare for potential misuse scenarios",
+                "prompt_structured_JSON_output_instructions": {
+                    "risk_mitigation": {
+                        "threat_scenarios": [{
+                            "scenario_type": "string",
+                            "likelihood": "string",
+                            "potential_impact": ["string"]
+                        }],
+                        "prevention_strategies": [{
+                            "strategy_type": "string",
+                            "implementation_approach": ["string"],
+                            "success_metrics": ["string"]
+                        }]
+                    }
+                },
+                "prompt_guidelines": "Consider both state and non-state actors, including criminal organizations",
+                "prompt_relevant_sub-dimensions": ["Scenario Planning", "Flexibility", "Cognitive Bias Awareness"]
+            }
+        }
+    }
+}

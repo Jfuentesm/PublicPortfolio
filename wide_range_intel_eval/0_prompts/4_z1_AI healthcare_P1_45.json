@@ -1,0 +1,143 @@
+{
+  "stakeholders": [
+    {
+      "group": "Patients",
+      "primary_concerns": [
+        "Privacy of shared data",
+        "Equity in diagnostic accuracy (especially rural populations)",
+        "Quality of care with new workflows"
+      ],
+      "impact_level": "High",
+      "representation_status": "Weak (represented indirectly via patient advocacy groups)"
+    },
+    {
+      "group": "Healthcare Providers (Doctors, Nurses, Technicians)",
+      "primary_concerns": [
+        "Adapting to new diagnostic workflows",
+        "Accuracy and reliability of AI recommendations",
+        "Potential job displacement or role modification"
+      ],
+      "impact_level": "High",
+      "representation_status": "Moderate (represented through internal committees)"
+    },
+    {
+      "group": "Rural Communities",
+      "primary_concerns": [
+        "Potential bias in AI models trained primarily on urban data",
+        "Access to quality care under new systems",
+        "Continued investment in local healthcare infrastructure"
+      ],
+      "impact_level": "High",
+      "representation_status": "Weak (often underrepresented in network-wide planning)"
+    },
+    {
+      "group": "Hospital Administration and Executives",
+      "primary_concerns": [
+        "Financial implications of the $50M investment",
+        "Operational efficiency and patient satisfaction",
+        "Impact on hospital reputation and compliance with regulations"
+      ],
+      "impact_level": "High",
+      "representation_status": "Strong (direct decision-makers)"
+    },
+    {
+      "group": "Third-party Vendor",
+      "primary_concerns": [
+        "Continuous data access for updates",
+        "Adoption and success of the AI system",
+        "Long-term partnership viability with MetroCare"
+      ],
+      "impact_level": "Medium",
+      "representation_status": "Strong (contractually tied to MetroCare)"
+    },
+    {
+      "group": "Regulatory Bodies",
+      "primary_concerns": [
+        "Compliance with data privacy laws (e.g., HIPAA)",
+        "Ethical use of AI in healthcare",
+        "Equitable care outcomes across demographics"
+      ],
+      "impact_level": "Medium",
+      "representation_status": "Moderate (external oversight)"
+    },
+    {
+      "group": "Patient Advocacy Organizations",
+      "primary_concerns": [
+        "Ensuring patient data privacy and security",
+        "Equity in healthcare access and outcomes",
+        "Transparency in how AI decisions are made"
+      ],
+      "impact_level": "Medium",
+      "representation_status": "Moderate (lobbying influence)"
+    },
+    {
+      "group": "IT and Data Management Teams",
+      "primary_concerns": [
+        "Infrastructure capacity for data sharing and processing",
+        "Cybersecurity and risks of data breaches",
+        "Operational complexities during integration"
+      ],
+      "impact_level": "Medium",
+      "representation_status": "Strong (internal stakeholders)"
+    }
+  ]
+}
+
+{
+  "stakeholder_relationships": [
+    {
+      "group1": "Patients",
+      "group2": "Healthcare Providers",
+      "relationship_type": "Service delivery relationship",
+      "potential_conflicts": [
+        "Trust in AI diagnostic accuracy",
+        "Impact of disrupted workflows on patient care"
+      ]
+    },
+    {
+      "group1": "Healthcare Providers",
+      "group2": "Hospital Administration and Executives",
+      "relationship_type": "Internal collaboration and hierarchy",
+      "potential_conflicts": [
+        "Providers resisting workflow changes",
+        "Executives prioritizing financial goals over frontline concerns"
+      ]
+    },
+    {
+      "group1": "Third-party Vendor",
+      "group2": "IT and Data Management Teams",
+      "relationship_type": "Contractual data-sharing partnership",
+      "potential_conflicts": [
+        "Data security and vendor access concerns",
+        "IT burden during implementation and updates"
+      ]
+    },
+    {
+      "group1": "Rural Communities",
+      "group2": "Hospital Administration and Executives",
+      "relationship_type": "Community-patient and system leadership relationship",
+      "potential_conflicts": [
+        "Underrepresentation of rural needs in AI system design",
+        "Resource allocation favoring urban facilities"
+      ]
+    },
+    {
+      "group1": "Regulatory Bodies",
+      "group2": "Third-party Vendor",
+      "relationship_type": "Regulator-vendor compliance oversight",
+      "potential_conflicts": [
+        "Vendor operating outside regulatory standards",
+        "Ensuring AI model updates comply with evolving laws"
+      ]
+    },
+    {
+      "group1": "Patient Advocacy Organizations",
+      "group2": "Hospital Administration and Executives",
+      "relationship_type": "External lobbying and oversight",
+      "potential_conflicts": [
+        "Advocacy groups pushing for patient-first policies vs. admin prioritizing financial goals"
+      ]
+    }
+  ]
+}
+

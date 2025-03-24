@@ -1,0 +1,104 @@
+[
+    {
+        "scenario": {
+            "overview": "A multinational technology corporation plans to launch an AI-powered educational platform globally. The platform promises personalized learning experiences, real-time analytics for educators, and adaptive curricula. However, concerns arise regarding data privacy, algorithmic bias, digital equity, and long-term impacts on traditional educational institutions and employment patterns within education sectors.",
+            "tags": ["technology", "education", "AI ethics", "privacy", "digital equity", "globalization"],
+            "prompts": {
+                "scenario_introduction_prompt": "You are advising the leadership of this tech corporation on launching an AI-powered educational platform. Your recommendations should balance technological innovation, ethical considerations, stakeholder impacts, and long-term sustainability.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Identify immediate and long-term impacts of deploying this AI-powered educational platform.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with two fields: 'immediate_impacts' and 'long_term_impacts', each containing arrays of concise impact descriptions.",
+                    "prompt_guidelines": "Consider impacts across multiple stakeholders including students, educators, educational institutions, privacy advocates, and society at large."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Analyze potential unintended consequences and propose mitigation strategies.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array with objects containing two fields: 'unintended_consequence' and 'mitigation_strategy', clearly describing each.",
+                    "prompt_guidelines": "Include second-order and third-order effects related to algorithmic bias, data privacy breaches, educational inequity, and employment disruptions."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Recommend strategies to ensure inclusion of marginalized voices in platform design and implementation.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array of recommended strategies, each described in one to two sentences.",
+                    "prompt_guidelines": "Ensure strategies are actionable and measurable, addressing accessibility, cultural sensitivity, and representation."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Evaluate how launching this platform could create path dependencies, constraining or enabling future educational innovations.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with two fields: 'constraining_dependencies' and 'enabling_dependencies', each containing precise examples.",
+                    "prompt_guidelines": "Provide clear explanations of path dependencies created by large-scale deployment of AI in education."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Design a robust scenario planning framework to prepare for uncertainties associated with global deployment.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object detailing at least three distinct future scenarios, each with fields 'scenario_name', 'description', and 'recommended_responses'.",
+                    "prompt_guidelines": "Scenarios should cover diverse outcomes such as regulatory backlash, technological failures, or unexpected social acceptance patterns."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "A developing nation discovers significant lithium reserves within a protected ecosystem that houses endangered species and indigenous communities. Exploiting these reserves could significantly boost the country's economy, provide jobs, and reduce global lithium shortages essential for renewable energy technologies. Yet, it poses irreversible ecological damage, displacement risks for indigenous populations, and potential long-term loss of biodiversity.",
+            "tags": ["environment", "mining", "biodiversity", "indigenous rights", "economic development", "renewable energy"],
+            "prompts": {
+                "scenario_introduction_prompt": "Advise the nation's government on whether and how to proceed with extracting lithium reserves, balancing environmental conservation, human rights, and economic interests sustainably.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Assess the short- and long-term trade-offs involved in lithium extraction.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with fields 'short_term_tradeoffs' and 'long_term_tradeoffs', listing and briefly explaining each trade-off.",
+                    "prompt_guidelines": "Consider economic development, ecological impacts, community displacement, and global renewable energy implications."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Identify key systemic interconnections and potential cascading effects from ecosystem disruption.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array with objects containing fields 'system_connection' and 'potential_cascading_effects'.",
+                    "prompt_guidelines": "Clearly map ecological, social, and economic interdependencies and their cascading consequences."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Propose ethical frameworks suitable for guiding the government's decision-making process.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array of ethical frameworks with fields 'framework_name' and 'justification_for_use'.",
+                    "prompt_guidelines": "Explain clearly why each framework suits this complex ecological and social context."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Suggest concrete measures to ensure genuine inclusion and empowerment of indigenous communities in decision-making.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array of suggested measures, each with concise descriptions.",
+                    "prompt_guidelines": "Measures must be specific, realistic, measurable, and culturally sensitive."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Develop strategies for enhancing resilience and adaptability in implementing your recommendations.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array of strategies with brief descriptions.",
+                    "prompt_guidelines": "Ensure strategies address uncertainty in ecological outcomes, economic fluctuations, and social responses."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "A global pharmaceutical company develops a groundbreaking gene-editing therapy capable of eliminating hereditary diseases preemptively. The therapy has enormous potential health benefits but raises profound ethical questions about genetic equity, unintended genetic consequences, accessibility for marginalized populations, and concerns about creating genetic disparities between wealthy and poorer communities.",
+            "tags": ["healthcare", "gene editing", "ethics", "equity", "biotechnology", "global health"],
+            "prompts": {
+                "scenario_introduction_prompt": "You are tasked with setting guidelines for ethical deployment and governance of this gene-editing therapy on a global scale, considering both health opportunities and ethical challenges.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Outline immediate ethical and social implications of globally deploying gene-editing technology.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array of implications with concise explanations.",
+                    "prompt_guidelines": "Include implications for healthcare equity, genetic diversity, public perception, and regulatory challenges."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Examine potential long-term emergent properties and unintended consequences of widespread use.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array of objects with fields 'emergent_property' and 'unintended_consequences'.",
+                    "prompt_guidelines": "Consider genetic, ecological, societal, and health system impacts."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Propose interdisciplinary knowledge domains essential for a robust governance framework.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array of knowledge domains with brief justifications for their inclusion.",
+                    "prompt_guidelines": "Ensure integration of fields such as genetics, ethics, sociology, law, and economics."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Recommend mechanisms to ensure intergenerational equity in the use of gene-editing technologies.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array of recommended mechanisms with brief explanations.",
+                    "prompt_guidelines": "Mechanisms must include long-term governance, monitoring, and equitable access considerations."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Identify cognitive biases that could affect decision-makers in deploying gene-editing therapies and suggest mitigation strategies.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON array with fields 'cognitive_bias' and 'mitigation_strategy'.",
+                    "prompt_guidelines": "Clearly explain how each bias could impact decisions and provide actionable strategies for managing them."
+                }
+            }
+        }
+    }
+]

@@ -1,0 +1,104 @@
+[
+    {
+        "scenario": {
+            "overview": "A multinational technology company (Company X) is planning to establish a major presence in several emerging markets. The expansion involves setting up local data centers and hiring regional talent, but also introduces challenges around data privacy, labor practices, environmental sustainability, and long-term societal impacts.",
+            "tags": ["business", "global-expansion", "data-privacy", "labor", "sustainability"],
+            "prompts": {
+                "scenario_introduction_prompt": "You are an external consultant tasked with guiding Company X in a strategic expansion that balances immediate operational concerns with broader, long-term impacts on local communities and global systems. Provide an executive overview of potential opportunities and risks.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Identify the key stakeholders (human and non-human) affected by Company X’s global expansion and outline their primary concerns.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with two arrays: 'human_stakeholders' and 'non_human_stakeholders'. Provide brief descriptions of their concerns.",
+                    "prompt_guidelines": "Be specific and ensure you consider marginalized communities, local ecosystems, and indirect stakeholders."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Discuss how short-term gains and long-term implications might conflict in this expansion strategy.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'short_term_gains', 'long_term_implications', and 'potential_conflicts'.",
+                    "prompt_guidelines": "Include considerations related to economic, social, and environmental sustainability."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Evaluate how data privacy regulations and concerns might influence or constrain Company X’s choices in different regions.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'regulatory_challenges', 'privacy_risks', and 'possible_strategies'.",
+                    "prompt_guidelines": "Reference potential differences across jurisdictions and potential stakeholder reactions."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Propose a holistic risk mitigation plan that takes into account environmental impact, labor rights, and long-term brand reputation.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'environmental_measures', 'labor_rights_measures', and 'reputation_management_strategies'.",
+                    "prompt_guidelines": "Use systems-thinking principles to address interconnected risks."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Develop an adaptive strategy for Company X to continuously reassess and adjust its expansion plan over time.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'monitoring_metrics', 'feedback_loops', and 'contingency_plans'.",
+                    "prompt_guidelines": "Include specific actions for ongoing scenario planning and stakeholder engagement."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "A coastal region is facing escalating ecological stress due to industrial pollution, overfishing, and rising sea levels. Local authorities, international organizations, and fishing communities are trying to collaborate on a sustainable ocean governance initiative, balancing short-term economic needs with long-term environmental health.",
+            "tags": ["environment", "marine-conservation", "sustainability", "climate-resilience"],
+            "prompts": {
+                "scenario_introduction_prompt": "You are an environmental policy advisor brought in to mediate between industry stakeholders, local fishers, and conservation groups to develop a sustainable policy framework for the region’s marine resources.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Identify and categorize the main pressures on the coastal ecosystem and the human communities that rely on it.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'ecological_pressures', 'social_economic_pressures', and 'key_affected_groups'.",
+                    "prompt_guidelines": "Outline the direct and indirect factors contributing to the region’s environmental degradation."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Formulate an integrated policy approach that addresses both immediate livelihood concerns and future ecological integrity.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'short_term_policy_actions', 'medium_long_term_strategies', and 'stakeholder_inclusion_methods'.",
+                    "prompt_guidelines": "Incorporate ecosystem-based management principles and multi-stakeholder collaboration."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Analyze how feedback loops in the local marine ecosystem (e.g., fish population decline feeding into economic hardship) impact policy decisions, and propose ways to break negative cycles.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'identified_feedback_loops', 'negative_loop_impacts', and 'solutions_to_break_loops'.",
+                    "prompt_guidelines": "Demonstrate systemic thinking and propose clear interventions."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Assess potential unintended consequences of new regulations on marginalized groups, including subsistence fishers and local small-scale businesses.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'potential_harms', 'who_is_affected', and 'mitigation_strategies'.",
+                    "prompt_guidelines": "Emphasize equity and fairness while addressing environmental objectives."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Recommend a framework for ongoing monitoring, enforcement, and adaptation of these policies over the next decade.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'monitoring_indicators', 'enforcement_mechanisms', and 'adaptation_pathways'.",
+                    "prompt_guidelines": "Ensure the framework can evolve with changing social and ecological conditions."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "A sudden outbreak of a highly contagious disease prompts a global scramble for limited vaccine supplies. Governments, corporate entities, and international health NGOs must collaborate on prioritizing vaccine distribution, while also tackling public mistrust and socio-economic disparities.",
+            "tags": ["healthcare", "pandemic-response", "vaccine-distribution", "global-coordination"],
+            "prompts": {
+                "scenario_introduction_prompt": "You are leading a global task force responsible for creating a transparent, equitable plan for vaccine distribution. Provide a high-level summary of the situation and its complexities.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Identify the critical stakeholders involved in vaccine allocation and detail their competing interests.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'stakeholders', 'interests', and 'conflicts_of_interest'.",
+                    "prompt_guidelines": "Include marginalized populations, as well as non-governmental and supranational organizations."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Outline the short-term vs. long-term ethical considerations in distributing scarce resources during a pandemic.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'short_term_ethical_issues', 'long_term_ethical_issues', and 'trade_off_analysis'.",
+                    "prompt_guidelines": "Cover immediate life-saving measures as well as future public health implications."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Propose a data-driven mechanism for determining vaccine priority groups, factoring in both local and global needs.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'priority_criteria', 'data_sources', and 'algorithm_outline'.",
+                    "prompt_guidelines": "Reference epidemiological data, risk factors, and equity principles."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Describe potential unintended consequences of your proposed mechanism and how they could be mitigated.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'possible_unintended_consequences', 'root_causes', and 'mitigation_strategies'.",
+                    "prompt_guidelines": "Address issues like black markets, public mistrust, or logistical bottlenecks."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Develop a communication strategy that fosters public trust across diverse cultural settings while explaining the rationale behind distribution decisions.",
+                    "prompt_structured_JSON_output_instructions": "Return a JSON object with keys 'key_messages', 'communication_channels', and 'feedback_collection_methods'.",
+                    "prompt_guidelines": "Highlight empathy, transparency, and cultural sensitivity."
+                }
+            }
+        }
+    }
+]

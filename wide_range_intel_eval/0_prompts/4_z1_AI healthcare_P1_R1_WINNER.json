@@ -1,0 +1,91 @@
+{
+    "stakeholders": [
+      {
+        "group": "Patients (Urban & Rural)",
+        "primary_concerns": ["Data privacy breaches", "Algorithmic bias in rural populations", "Over-reliance on AI reducing physician interaction"],
+        "impact_level": "High",
+        "representation_status": "Limited formal representation (rely on patient advocacy groups)"
+      },
+      {
+        "group": "Clinical Staff (Physicians/Technicians)",
+        "primary_concerns": ["Workflow disruption (250+ diagnostic protocols affected)", "Liability for AI errors", "Skillset obsolescence fears"],
+        "impact_level": "Critical",
+        "representation_status": "Unionized physicians have collective bargaining"
+      },
+      {
+        "group": "MetroCare Administration",
+        "primary_concerns": ["ROI on $50M investment", "Regulatory penalties (HIPAA/HITECH implications)", "Reputational risk from AI failures"],
+        "impact_level": "Decision-making authority",
+        "representation_status": "Fully represented in negotiations"
+      },
+      {
+        "group": "Insurance Providers",
+        "primary_concerns": ["Reimbursement model changes", "Increased claims from false positives", "Long-term cost containment"],
+        "impact_level": "Moderate-High",
+        "representation_status": "Strong through contracted agreements"
+      },
+      {
+        "group": "AI Vendor (MediAI Tech)",
+        "primary_concerns": ["Data pipeline continuity for model updates", "IP protection", "Performance guarantees in rural settings"],
+        "impact_level": "High",
+        "representation_status": "Corporate legal team engaged"
+      },
+      {
+        "group": "Regulatory Bodies (FDA/OCR)",
+        "primary_concerns": ["Algorithm validation across diverse populations (21% rural)", "Informed consent for data reuse", "Adverse event reporting compliance"],
+        "impact_level": "Veto authority",
+        "representation_status": "Formal oversight role"
+      },
+      {
+        "group": "Community Health Orgs",
+        "primary_concerns": ["Reinforcement of urban care bias", "Resource diversion from preventive care", "Digital literacy disparities"],
+        "impact_level": "Moderate",
+        "representation_status": "Coalition forming among rural advocates"
+      },
+      {
+        "group": "Competitor Health Systems",
+        "primary_concerns": ["Market advantage from early adoption", "Staff poaching opportunities", "Benchmarking pressure"],
+        "impact_level": "Low",
+        "representation_status": "No direct representation"
+      }
+    ],
+    "stakeholder_relationships": [
+      {
+        "group1": "Patients",
+        "group2": "Clinical Staff",
+        "relationship_type": "Care delivery interdependence",
+        "potential_conflicts": ["Trust in AI vs. human judgment", "Time savings vs. perceived care depersonalization"]
+      },
+      {
+        "group1": "MetroCare Administration",
+        "group2": "AI Vendor",
+        "relationship_type": "Strategic partnership",
+        "potential_conflicts": ["Data control (vendor demands perpetual access)", "Performance penalties for <95% accuracy"]
+      },
+      {
+        "group1": "Clinical Staff",
+        "group2": "MetroCare Administration",
+        "relationship_type": "Employer-employee",
+        "potential_conflicts": ["Staff reduction fears vs. productivity promises", "Training burden allocation"]
+      },
+      {
+        "group1": "Rural Communities",
+        "group2": "MetroCare Network",
+        "relationship_type": "Service provision",
+        "potential_conflicts": ["Equity in diagnostic capabilities", "Travel requirements for AI-calibrated care"]
+      },
+      {
+        "group1": "Regulatory Bodies",
+        "group2": "MetroCare Administration",
+        "relationship_type": "Compliance oversight",
+        "potential_conflicts": ["Audit requirements slowing implementation", "Penalties for urban/rural outcome disparities"]
+      },
+      {
+        "group1": "Competitor Health Systems",
+        "group2": "MetroCare Network",
+        "relationship_type": "Market rivalry",
+        "potential_conflicts": ["Talent attraction differentials", "Patient acquisition through tech differentiation"]
+      }
+    ]
+  }
+  

@@ -1,0 +1,101 @@
+[
+    {
+        "scenario": {
+            "overview": "A multinational corporation is considering investing in a new AI technology that promises to significantly increase operational efficiency and profitability. However, this technology could lead to substantial job losses, increased surveillance of employees and customers, and potential misuse of personal data. Additionally, the production of the necessary hardware involves resource extraction and generates electronic waste, raising environmental concerns.",
+            "tags": ["business", "technology", "ethics", "environment", "social impact"],
+            "prompts": {
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Identify all relevant stakeholders affected by the decision to invest in the new AI technology.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with a key 'stakeholders' containing a list of objects, each with 'name' and 'interest' keys.",
+                    "prompt_guidelines": "Consider both direct and indirect stakeholders, including employees, customers, local communities, future generations, and non-human entities like the environment."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Analyze the short-term and long-term impacts of investing in the new AI technology.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys 'short_term_impacts' and 'long_term_impacts', each containing a list of impact descriptions.",
+                    "prompt_guidelines": "Consider economic, social, environmental, and technological impacts. Think about how these impacts might evolve over time."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Evaluate the ethical implications of investing in the new AI technology.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys for different ethical frameworks (e.g., 'utilitarianism', 'deontology', 'virtue_ethics'), each containing an analysis of the decision from that perspective.",
+                    "prompt_guidelines": "Consider issues like privacy, job displacement, fairness, and the potential for misuse."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Analyze the systemic interconnections and potential unintended consequences of investing in the new AI technology.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys 'interconnections' and 'unintended_consequences', each containing a list of relevant points.",
+                    "prompt_guidelines": "Think about how the technology might affect other industries, societal norms, or global systems. Consider feedback loops and emergent properties."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Propose a decision or strategy regarding the investment in the new AI technology that balances the various considerations.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys 'decision' (e.g., 'invest', 'do_not_invest', 'conditional_investment') and 'rationale', which includes a detailed explanation.",
+                    "prompt_guidelines": "Ensure the decision considers stakeholder interests, ethical implications, long-term impacts, and systemic effects. Propose any conditions or mitigations if applicable."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "A coastal city is facing the threat of rising sea levels due to climate change. The city council is considering various adaptation strategies: building sea walls, relocating infrastructure, or investing in green infrastructure like mangroves. Each option has different costs, effectiveness, and impacts on the local ecosystem and communities.",
+            "tags": ["environment", "climate change", "urban planning", "social equity", "economics"],
+            "prompts": {
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Identify all relevant stakeholders affected by the choice of adaptation strategy.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with a key 'stakeholders' containing a list of objects, each with 'name' and 'interest' keys.",
+                    "prompt_guidelines": "Include residents, businesses, government agencies, environmental groups, and future generations."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Analyze the short-term and long-term impacts of each adaptation strategy.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys for each strategy (e.g., 'sea_walls', 'relocation', 'green_infrastructure'), each containing 'short_term_impacts' and 'long_term_impacts' lists.",
+                    "prompt_guidelines": "Consider effectiveness in preventing flooding, economic costs, social disruption, and environmental sustainability."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Evaluate the ethical implications of each adaptation strategy.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys for each strategy, each containing analyses from ethical perspectives like 'utilitarianism', 'justice', and 'sustainability'.",
+                    "prompt_guidelines": "Consider fairness in resource allocation, protection of vulnerable communities, and intergenerational equity."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Analyze the systemic interconnections and potential unintended consequences of each adaptation strategy.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys for each strategy, each containing 'interconnections' and 'unintended_consequences' lists.",
+                    "prompt_guidelines": "Think about how each strategy affects local ecosystems, regional economies, and global climate patterns."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Recommend an adaptation strategy that best balances the various considerations.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys 'recommended_strategy' and 'rationale', which includes a detailed explanation.",
+                    "prompt_guidelines": "Justify the recommendation based on stakeholder needs, ethical considerations, long-term sustainability, and systemic impacts."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "A country is dealing with a rapidly spreading infectious disease. The government must decide on public health measures such as lockdowns, vaccination campaigns, or travel restrictions. Each measure has implications for public health, economic stability, individual freedoms, and social cohesion.",
+            "tags": ["healthcare", "public health", "economics", "ethics", "social policy"],
+            "prompts": {
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Identify all relevant stakeholders affected by the public health measures.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with a key 'stakeholders' containing a list of objects, each with 'name' and 'interest' keys.",
+                    "prompt_guidelines": "Include healthcare workers, patients, businesses, marginalized communities, and international partners."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Analyze the short-term and long-term impacts of each public health measure.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys for each measure (e.g., 'lockdowns', 'vaccination', 'travel_restrictions'), each containing 'short_term_impacts' and 'long_term_impacts' lists.",
+                    "prompt_guidelines": "Consider health outcomes, economic effects, social behavior, and potential for future outbreaks."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Evaluate the ethical implications of each public health measure.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys for each measure, each containing analyses from ethical perspectives like 'autonomy', 'beneficence', and 'justice'.",
+                    "prompt_guidelines": "Consider individual rights, public good, equitable access to resources, and potential discrimination."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Analyze the systemic interconnections and potential unintended consequences of each public health measure.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys for each measure, each containing 'interconnections' and 'unintended_consequences' lists.",
+                    "prompt_guidelines": "Think about effects on healthcare systems, supply chains, mental health, and global health security."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Recommend a set of public health measures that balance the various considerations.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON object with keys 'recommended_measures' (a list of selected measures) and 'rationale', which includes a detailed explanation.",
+                    "prompt_guidelines": "Justify the recommendation based on stakeholder needs, ethical principles, long-term health outcomes, and systemic resilience."
+                }
+            }
+        }
+    }
+]
