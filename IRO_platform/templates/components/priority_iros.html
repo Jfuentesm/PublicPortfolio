@@ -1,0 +1,33 @@
+<!-- templates/components/priority_iros.html -->
+<div class="card">
+    <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Priority IROs</h5>
+            <div>
+                <button id="save-priority-iros" class="btn btn-sm btn-primary me-2" style="display: none;">
+                    <i class="fas fa-save me-1"></i> Save Changes
+                </button>
+                <a href="{% url 'assessments:iro-list' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-list me-1"></i> View All IROs
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <!-- Removed the problematic data-priority-iros attribute -->
+        <div id="priority-iros-container"
+             data-save-url="{% url 'assessments:batch-update-iros' %}"
+             style="height: 300px; overflow: hidden;">
+        </div>
+        
+        <!-- Added separate script tag to avoid HTML attribute issues -->
+        <script type="application/javascript">
+            window.priorityIrosData = {{ high_priority_iros_json|safe }};
+        </script>
+    </div>
+    <div class="card-footer bg-white py-2 px-3">
+        <small class="text-muted">
+            <i class="fas fa-info-circle me-1"></i> Quick-edit table for high-priority IROs. Click on cells to edit values.
+        </small>
+    </div>
+</div>

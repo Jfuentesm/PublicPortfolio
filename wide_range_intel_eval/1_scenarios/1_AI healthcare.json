@@ -1,0 +1,124 @@
+{
+    "scenario": {
+        "overview": "In 2025, MetroCare Health Network, a system of 12 hospitals serving both urban and rural communities, is considering implementing an advanced AI diagnostic system. The system promises 95% accuracy in early disease detection across 50+ conditions, but requires extensive patient data sharing, costs $50M to implement, and will significantly impact current diagnostic workflows. The system's AI models were primarily trained on data from urban populations, and the vendor requires continuous data sharing for model updates.",
+        "tags": ["healthcare", "technology", "ethics", "equity"],
+        "prompts": {
+            "scenario_introduction_prompt": "You are the Chief Strategy Officer of MetroCare Health Network, tasked with making a comprehensive recommendation regarding the AI diagnostic system implementation.",
+            "scenario_question1_prompt": {
+                "prompt_goal": "Conduct a comprehensive stakeholder analysis identifying all affected parties and their primary concerns",
+                "prompt_structured_JSON_output_instructions": {
+                    "stakeholders": [
+                        {
+                            "group": "string",
+                            "primary_concerns": ["string"],
+                            "impact_level": "string",
+                            "representation_status": "string"
+                        }
+                    ],
+                    "stakeholder_relationships": [
+                        {
+                            "group1": "string",
+                            "group2": "string",
+                            "relationship_type": "string",
+                            "potential_conflicts": ["string"]
+                        }
+                    ]
+                },
+                "prompt_guidelines": "Consider both direct and indirect stakeholders, power dynamics, and potential conflicts of interest",
+                "prompt_relevant_sub-dimensions": ["Direct Human Stakeholders", "Marginalized Voices"]
+            },
+            "scenario_question2_prompt": {
+                "prompt_goal": "Analyze the system-wide implications and feedback loops of implementing the AI diagnostic system",
+                "prompt_structured_JSON_output_instructions": {
+                    "feedback_loops": [
+                        {
+                            "loop_name": "string",
+                            "type": "string",
+                            "description": "string",
+                            "affected_components": ["string"],
+                            "potential_outcomes": ["string"]
+                        }
+                    ],
+                    "system_interactions": [
+                        {
+                            "component": "string",
+                            "direct_effects": ["string"],
+                            "indirect_effects": ["string"],
+                            "risk_level": "string"
+                        }
+                    ]
+                },
+                "prompt_guidelines": "Map out both reinforcing and balancing feedback loops, considering clinical, operational, and social dimensions",
+                "prompt_relevant_sub-dimensions": ["Feedback Loops", "Systemic Interconnectivity"]
+            },
+            "scenario_question3_prompt": {
+                "prompt_goal": "Evaluate the temporal implications of the AI system implementation across different timeframes",
+                "prompt_structured_JSON_output_instructions": {
+                    "temporal_analysis": {
+                        "immediate_effects": {
+                            "timeframe": "0-1 year",
+                            "impacts": ["string"],
+                            "adaptations_required": ["string"]
+                        },
+                        "medium_term": {
+                            "timeframe": "1-5 years",
+                            "impacts": ["string"],
+                            "emerging_challenges": ["string"]
+                        },
+                        "long_term": {
+                            "timeframe": "5+ years",
+                            "impacts": ["string"],
+                            "strategic_considerations": ["string"]
+                        }
+                    }
+                },
+                "prompt_guidelines": "Consider both direct implementation effects and broader systemic changes over time",
+                "prompt_relevant_sub-dimensions": ["Short-Term Impacts", "Long-Term Impacts", "Path Dependency"]
+            },
+            "scenario_question4_prompt": {
+                "prompt_goal": "Analyze the ethical implications and value alignment of the AI diagnostic system",
+                "prompt_structured_JSON_output_instructions": {
+                    "ethical_analysis": {
+                        "principle": "string",
+                        "concerns": ["string"],
+                        "affected_groups": ["string"],
+                        "mitigation_strategies": ["string"]
+                    },
+                    "value_conflicts": [
+                        {
+                            "conflict_description": "string",
+                            "competing_values": ["string"],
+                            "resolution_approach": "string"
+                        }
+                    ]
+                },
+                "prompt_guidelines": "Consider medical ethics principles, equity concerns, and cultural implications",
+                "prompt_relevant_sub-dimensions": ["Moral Philosophy", "Cultural Sensitivity"]
+            },
+            "scenario_question5_prompt": {
+                "prompt_goal": "Develop a resilience and adaptation strategy for the AI system implementation",
+                "prompt_structured_JSON_output_instructions": {
+                    "resilience_plan": {
+                        "scenarios": [
+                            {
+                                "scenario_type": "string",
+                                "probability": "string",
+                                "impact": "string",
+                                "mitigation_strategies": ["string"]
+                            }
+                        ],
+                        "adaptation_mechanisms": [
+                            {
+                                "mechanism": "string",
+                                "trigger_conditions": ["string"],
+                                "response_actions": ["string"]
+                            }
+                        ]
+                    }
+                },
+                "prompt_guidelines": "Include both preventive measures and adaptive responses to potential challenges",
+                "prompt_relevant_sub-dimensions": ["Scenario Planning", "Robustness", "Flexibility"]
+            }
+        }
+    }
+}

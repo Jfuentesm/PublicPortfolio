@@ -1,0 +1,165 @@
+/**
+ * Dashboard CSS Styles
+ * 
+ * Styles for the IRO Platform dashboard components including
+ * materiality quadrants, priority IROs table, and recent activity.
+ */
+
+/* Metric Cards */
+.metric-card {
+    padding: 1.25rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.metric-value {
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.metric-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+/* Materiality Quadrants */
+.materiality-quadrants-container {
+    height: 500px;
+    overflow: hidden;
+}
+
+.quadrant {
+    padding: 1rem;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    height: 250px;
+    overflow-y: auto;
+}
+
+.quadrant-header {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.quadrant.double-material {
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+.quadrant.financially-material {
+    background-color: rgba(255, 193, 7, 0.05);
+}
+
+.quadrant.impact-material {
+    background-color: rgba(25, 135, 84, 0.05);
+}
+
+.quadrant.not-material {
+    background-color: rgba(108, 117, 125, 0.05);
+}
+
+.topic-list {
+    margin: 0;
+    padding: 0;
+}
+
+.topic-item {
+    margin-bottom: 0.5rem;
+}
+
+.topic-item a {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.25rem;
+    text-decoration: none;
+    color: #212529;
+    transition: background-color 0.2s;
+}
+
+.topic-item a:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.topic-name {
+    font-weight: 500;
+}
+
+.topic-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.empty-message {
+    padding: 1rem;
+    text-align: center;
+    font-style: italic;
+}
+
+.quadrant-note {
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Recent Activity */
+.list-group-item {
+    transition: background-color 0.2s;
+}
+
+.list-group-item:hover {
+    background-color: rgba(0, 0, 0, 0.01);
+}
+
+/* Priority IROs Table */
+#priority-iros-container {
+    width: 100%;
+    overflow: hidden;
+}
+
+.handsontable .htCenter {
+    text-align: center;
+}
+
+.handsontable .htMiddle {
+    vertical-align: middle;
+}
+
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-draft {
+    background-color: #e9ecef;
+    color: #495057;
+}
+
+.status-review {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-approved {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.status-disclosed {
+    background-color: #cfe2ff;
+    color: #084298;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .materiality-quadrants-container {
+        height: auto;
+    }
+    
+    .quadrant {
+        height: auto;
+        max-height: 200px;
+    }
+}

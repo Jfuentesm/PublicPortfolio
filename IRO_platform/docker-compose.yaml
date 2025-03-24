@@ -3,40 +3,41 @@ services:
     build: .
     command: >
       sh -c "
-        until pg_isready -h db -p 5432 -U dma_user; do 
-          echo 'Waiting for database...'; 
-          sleep 2; 
+        echo '[WEB CONTAINER] Starting up...';
+        until pg_isready -h db -p 5432 -U dma_user; do
+          echo '[WEB CONTAINER] Waiting for database to become ready...';
+          sleep 2;
         done;
-        # Optional but recommended to include the tenants app in makemigrations:
+
+        echo '[WEB CONTAINER] Running makemigrations (tenants + everything else)...';
         python manage.py makemigrations tenants;
         python manage.py makemigrations;
 
-        # 1) Migrate shared schema
+        echo '[WEB CONTAINER] Migrating shared schema...';
         python manage.py migrate_schemas --shared;
 
-        # 2) Create or update the default tenant
+        echo '[WEB CONTAINER] Creating or updating default tenant...';
         python manage.py init_tenant --name=default --domain=localhost;
 
-        # 3) Migrate the tenant schemas
+        echo '[WEB CONTAINER] Migrating tenant schemas...';
         python manage.py migrate_schemas --tenant;
-        
-        # 4) Initialize sample data for testing
+
+        echo '[WEB CONTAINER] Initializing sample data...';
         python manage.py init_sample_data;
-        
-        # Check if tenant schemas have the iro table after migration
-        echo 'Listing tables in tenant_tenant1 schema...'
+
+        echo '[WEB CONTAINER] Double-checking tables present in each tenant schema...';
         PGPASSWORD=password psql -h db -U dma_user -d dma_db -c \"\\dt tenant_tenant1.*\"
-        echo 'Listing tables in tenant_tenant2 schema...'
         PGPASSWORD=password psql -h db -U dma_user -d dma_db -c \"\\dt tenant_tenant2.*\"
 
-        # 5) Collect static files so admin CSS/JS are available
+        echo '[WEB CONTAINER] Collecting static files...';
         python manage.py collectstatic --noinput;
 
-        # Finally start Gunicorn
-        gunicorn core.wsgi:application --bind 0.0.0.0:8000
+        echo '[WEB CONTAINER] Launching Gunicorn...';
+        exec gunicorn core.wsgi:application --bind 0.0.0.0:8000
       "
     volumes:
       - .:/app
+      - app_logs:/app/logs
     ports:
       - "8000:8000"
     environment:
@@ -49,6 +50,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Add a healthcheck so Docker can verify Gunicorn is truly up
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     logging:
       driver: "json-file"
       options:
@@ -68,6 +76,7 @@ services:
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     ports:
       - "5432:5432"
+    # Already has a healthcheck
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dma_user -d dma_db"]
       interval: 5s
@@ -96,7 +105,7 @@ services:
 
   worker:
     build: .
-    user: appuser  # Use the non-root user
+    user: appuser
     command: celery -A core worker --loglevel=info
     volumes:
       - .:/app
@@ -110,6 +119,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # If you want the worker to wait for web to be healthy as well, you could do:
+      # web:
+      #   condition: service_healthy
     logging:
       driver: "json-file"
       options:
@@ -118,3 +130,4 @@ services:
 
 volumes:
   postgres_data:
+  app_logs:

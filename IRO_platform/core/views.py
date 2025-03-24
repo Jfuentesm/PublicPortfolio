@@ -6,6 +6,10 @@ from tenants.models import TenantConfig
 from apps.assessments.models import Assessment, IRO, ImpactAssessment, RiskOppAssessment, AuditTrail, Review
 from django_tenants.utils import schema_context
 import json
+import logging
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
 
 def home_dashboard(request):
     # Get tenant from context middleware
@@ -13,10 +17,20 @@ def home_dashboard(request):
     
     # Import the utility function
     from apps.assessments.utils import get_iros_for_tenant, get_all_tenant_iros
+    from apps.assessments.topic_aggregator import (
+        get_topics_by_materiality_quadrant, 
+        get_priority_iros,
+        sync_topics_from_iro_versions
+    )
+    
+    # Ensure all topics are synced from IRO versions
+    if tenant:
+        sync_topics_from_iro_versions(tenant)
     
     # Get IROs based on tenant context
     if tenant:
-        iro_queryset = get_iros_for_tenant(tenant)
+        with schema_context(tenant.schema_name):
+            iro_queryset = get_iros_for_tenant(tenant)
     else:
         # If no tenant selected, get IROs from all tenant schemas
         iro_queryset = get_all_tenant_iros()
@@ -85,62 +99,27 @@ def home_dashboard(request):
         activity_data.append(activity_info)
     
     # Get high priority IROs (highest scores)
-    high_priority_iros = []
+    high_priority_iros = get_priority_iros(tenant, limit=10)
     
-    # Sort IROs by last_assessment_score (if available)
-    sorted_iros = sorted(
-        [iro for iro in iro_queryset if iro.last_assessment_score], 
-        key=lambda x: x.last_assessment_score, 
-        reverse=True
-    )
+    # Add debug logging to check what data is being returned
+    logger = logging.getLogger(__name__)
+    tenant_name = tenant.tenant_name if hasattr(tenant, 'tenant_name') and tenant else 'unknown'
+    logger.debug(f"Priority IROs before JSON serialization: {high_priority_iros}")
     
-    for iro in sorted_iros[:10]:
-        # Get the latest impact and financial scores
-        if tenant:
-            with schema_context(tenant.schema_name):
-                impact_assessments = list(ImpactAssessment.objects.filter(iro=iro).order_by('-created_on'))
-                risk_opp_assessments = list(RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on'))
-        else:
-            # Use the IRO's tenant schema
-            tenant_obj = iro.tenant
-            with schema_context(tenant_obj.schema_name):
-                impact_assessments = list(ImpactAssessment.objects.filter(iro=iro).order_by('-created_on'))
-                risk_opp_assessments = list(RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on'))
-        
-        impact_score = impact_assessments[0].impact_materiality_score if impact_assessments else 0.0
-        financial_score = risk_opp_assessments[0].financial_materiality_score if risk_opp_assessments else 0.0
-        
-        high_priority_iros.append({
-            'iro_id': iro.iro_id,
-            'title': iro.title,
-            'type': iro.type,
-            'impact_score': float(impact_score) if impact_score else 0.0,
-            'financial_score': float(financial_score) if financial_score else 0.0,
-            'current_stage': iro.current_stage,
-        })
+    # Ensure we have valid data before JSON serialization
+    if high_priority_iros is None:
+        high_priority_iros = []
     
-    # Prepare data for materiality matrix
-    matrix_data = []
-    for iro in iro_queryset:
-        if tenant:
-            with schema_context(tenant.schema_name):
-                impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-                risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-        else:
-            # Use the IRO's tenant schema
-            tenant_obj = iro.tenant
-            with schema_context(tenant_obj.schema_name):
-                impact_assessment = ImpactAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-                risk_opp_assessment = RiskOppAssessment.objects.filter(iro=iro).order_by('-created_on').first()
-        
-        if impact_assessment and risk_opp_assessment:
-            matrix_data.append({
-                'id': iro.iro_id,
-                'title': iro.title,
-                'type': iro.type,
-                'impact_score': float(impact_assessment.impact_materiality_score or 0),
-                'financial_score': float(risk_opp_assessment.financial_materiality_score or 0),
-            })
+    # Serialize the data to JSON, handling potential errors
+    try:
+        high_priority_iros_json = json.dumps(high_priority_iros)
+        logger.debug(f"Priority IROs after JSON serialization: {high_priority_iros_json[:100] + '...' if len(high_priority_iros_json) > 100 else high_priority_iros_json}")
+    except Exception as e:
+        logger.error(f"Error serializing priority IROs to JSON: {str(e)}")
+        high_priority_iros_json = '[]'
+    
+    # Get topics by materiality quadrant
+    topic_quadrants = get_topics_by_materiality_quadrant(tenant)
     
     context = {
         'total_iros': total_iros,
@@ -149,14 +128,30 @@ def home_dashboard(request):
         'completed_assessments_count': completed_assessments_count,
         'recent_activities': activity_data,
         'high_priority_iros': high_priority_iros,
-        'high_priority_iros_json': json.dumps(high_priority_iros),  # Add JSON serialized data for Handsontable
-        'materiality_matrix_data': json.dumps(matrix_data),
+        'high_priority_iros_json': high_priority_iros_json,
+        'topic_quadrants': topic_quadrants,
+        'topic_quadrants_json': json.dumps(topic_quadrants),
     }
     
     # Always add available tenants to context for the tenant selector, not just for staff users
     context['available_tenants'] = TenantConfig.objects.all()
     
+    # ADD THIS SECTION: Fetch available assessments for the selected tenant
+    available_assessments = []
+    if tenant:
+        with schema_context(tenant.schema_name):
+            available_assessments = list(Assessment.objects.filter(tenant=tenant))
+    context['available_assessments'] = available_assessments
+    
+    # If we have a tenant but no IROs selected yet, prepare available IROs list
+    available_iros = []
+    if tenant:
+        with schema_context(tenant.schema_name):
+            available_iros = list(IRO.objects.filter(tenant=tenant))
+    context['available_iros'] = available_iros
+    
     return render(request, 'home.html', context)
+    
 
 @require_GET
 def set_context(request):
@@ -164,6 +159,8 @@ def set_context(request):
     View to handle setting context values and redirecting.
     Can be called via AJAX or as a normal GET request.
     """
+    from django_tenants.utils import schema_context
+    
     redirect_url = request.GET.get('next', '/')
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     
@@ -174,8 +171,10 @@ def set_context(request):
     if 'tenant_id' in request.GET and is_staff:
         try:
             tenant_id = int(request.GET.get('tenant_id'))
-            tenant = TenantConfig.objects.get(tenant_id=tenant_id)
-            request.session['tenant_id'] = tenant_id
+            # Always query TenantConfig from public schema
+            with schema_context('public'):
+                tenant = TenantConfig.objects.get(tenant_id=tenant_id)
+                request.session['tenant_id'] = tenant_id
         except (ValueError, TenantConfig.DoesNotExist):
             pass
     
@@ -184,11 +183,14 @@ def set_context(request):
     if 'assessment_id' in request.GET:
         try:
             assessment_id = int(request.GET.get('assessment_id'))
-            assessment = Assessment.objects.get(id=assessment_id)
-            request.session['assessment_id'] = assessment_id
-            # Clear IRO when assessment changes
-            if 'iro_id' in request.session:
-                del request.session['iro_id']
+            tenant = request.context.get('tenant')
+            if tenant:
+                with schema_context(tenant.schema_name):
+                    assessment = Assessment.objects.get(id=assessment_id)
+                    request.session['assessment_id'] = assessment_id
+                    # Clear IRO when assessment changes
+                    if 'iro_id' in request.session:
+                        del request.session['iro_id']
         except (ValueError, Assessment.DoesNotExist):
             pass
     
@@ -196,9 +198,12 @@ def set_context(request):
     if 'iro_id' in request.GET:
         try:
             iro_id = int(request.GET.get('iro_id'))
-            iro = IRO.objects.get(iro_id=iro_id)
-            request.session['iro_id'] = iro_id
-        except (ValueError, IRO.DoesNotExist):
+            if request.context.get('tenant'):
+                from apps.assessments.utils import get_iro_by_id
+                iro = get_iro_by_id(iro_id, request.context.get('tenant'))
+                if iro:
+                    request.session['iro_id'] = iro_id
+        except ValueError:
             pass
     
     if is_ajax:
@@ -212,34 +217,49 @@ def set_context(request):
         # Populate context based on session values
         if 'tenant_id' in request.session:
             try:
-                tenant = TenantConfig.objects.get(tenant_id=request.session['tenant_id'])
-                context['tenant'] = {
-                    'tenant_id': tenant.tenant_id,
-                    'tenant_name': tenant.tenant_name
-                }
+                # Always query TenantConfig from public schema
+                with schema_context('public'):
+                    tenant = TenantConfig.objects.get(tenant_id=request.session['tenant_id'])
+                    context['tenant'] = {
+                        'tenant_id': tenant.tenant_id,
+                        'tenant_name': tenant.tenant_name
+                    }
             except TenantConfig.DoesNotExist:
                 pass
         
-        if 'assessment_id' in request.session:
+        if 'assessment_id' in request.session and 'tenant_id' in request.session:
             try:
-                assessment = Assessment.objects.get(id=request.session['assessment_id'])
-                context['assessment'] = {
-                    'id': assessment.id,
-                    'name': assessment.name,
-                    'description': assessment.description
-                }
-            except Assessment.DoesNotExist:
+                # Get tenant for schema context
+                with schema_context('public'):
+                    tenant = TenantConfig.objects.get(tenant_id=request.session['tenant_id'])
+                
+                # Get assessment using tenant's schema
+                with schema_context(tenant.schema_name):
+                    assessment = Assessment.objects.get(id=request.session['assessment_id'])
+                    context['assessment'] = {
+                        'id': assessment.id,
+                        'name': assessment.name,
+                        'description': assessment.description
+                    }
+            except (TenantConfig.DoesNotExist, Assessment.DoesNotExist):
                 pass
         
-        if 'iro_id' in request.session:
+        if 'iro_id' in request.session and 'tenant_id' in request.session:
             try:
-                iro = IRO.objects.get(iro_id=request.session['iro_id'])
-                context['iro'] = {
-                    'iro_id': iro.iro_id,
-                    'title': iro.title if hasattr(iro, 'title') else f"IRO #{iro.iro_id}",
-                    'type': iro.type
-                }
-            except IRO.DoesNotExist:
+                # Get tenant for schema context
+                with schema_context('public'):
+                    tenant = TenantConfig.objects.get(tenant_id=request.session['tenant_id'])
+                
+                # Get IRO using tenant's schema
+                from apps.assessments.utils import get_iro_by_id
+                iro = get_iro_by_id(request.session['iro_id'], tenant)
+                if iro:
+                    context['iro'] = {
+                        'iro_id': iro.iro_id,
+                        'title': iro.title if hasattr(iro, 'title') else f"IRO #{iro.iro_id}",
+                        'type': iro.type
+                    }
+            except TenantConfig.DoesNotExist:
                 pass
         
         return JsonResponse({
@@ -250,3 +270,55 @@ def set_context(request):
     else:
         # For non-AJAX requests, redirect to the specified next URL
         return redirect(redirect_url)
+    
+
+# Get the frontend logger
+frontend_logger = logging.getLogger('frontend')
+
+@require_POST
+@csrf_exempt  # In production, you should use proper CSRF protection
+def frontend_log(request):
+    """
+    Endpoint to receive logs from the frontend
+    """
+    try:
+        data = json.loads(request.body)
+        logs = data.get('logs', [])
+        
+        for log_entry in logs:
+            level = log_entry.get('level', 'INFO').upper()
+            message = log_entry.get('message', '')
+            context = log_entry.get('context', {})
+            
+            # Add request metadata
+            meta = {
+                'ip': request.META.get('REMOTE_ADDR'),
+                'user_agent': log_entry.get('userAgent'),
+                'url': log_entry.get('url'),
+                'user': str(request.user) if request.user.is_authenticated else 'anonymous',
+                'session_id': log_entry.get('sessionId'),
+            }
+            
+            # Combine context with metadata
+            extra = {'meta': meta, 'context': context}
+            
+            # Log with appropriate level
+            if level == 'DEBUG':
+                frontend_logger.debug(message, extra=extra)
+            elif level == 'INFO':
+                frontend_logger.info(message, extra=extra)
+            elif level == 'WARNING':
+                frontend_logger.warning(message, extra=extra)
+            elif level == 'ERROR':
+                frontend_logger.error(message, extra=extra)
+            elif level == 'CRITICAL':
+                frontend_logger.critical(message, extra=extra)
+            else:
+                frontend_logger.info(message, extra=extra)
+        
+        return JsonResponse({'success': True, 'count': len(logs)})
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

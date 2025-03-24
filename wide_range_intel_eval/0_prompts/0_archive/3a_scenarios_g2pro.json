@@ -1,0 +1,105 @@
+
+[
+    {
+        "scenario": {
+            "overview": "A multinational corporation is considering relocating its manufacturing operations to a developing country to reduce labor costs. This move would involve closing down several factories in its home country, leading to significant job losses. The developing country offers lower wages, less stringent environmental regulations, and tax incentives. However, there are concerns about labor rights, potential environmental damage, and the long-term economic impact on both the home and host countries.  The corporation is also facing increasing pressure from shareholders to maximize profits and from activist groups to adopt sustainable and ethical practices.",
+            "tags": ["business", "economics", "ethics", "globalization", "sustainability", "labor rights"],
+            "prompts": {
+                "scenario_introduction_prompt": "You are a multinational corporation. You are considering relocating its manufacturing operations to a developing country to reduce labor costs. This move would involve closing down several factories in its home country, leading to significant job losses. The developing country offers lower wages, less stringent environmental regulations, and tax incentives. However, there are concerns about labor rights, potential environmental damage, and the long-term economic impact on both the home and host countries. The corporation is also facing increasing pressure from shareholders to maximize profits and from activist groups to adopt sustainable and ethical practices.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Identify all relevant stakeholders and their primary concerns.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'stakeholders'. The value should be a list of JSON objects. Each object should have two keys: 'stakeholder' (string, name of the stakeholder) and 'concerns' (list of strings, the primary concerns of that stakeholder).",
+                    "prompt_guidelines": "Consider direct and indirect, human and non-human stakeholders. Be as comprehensive as possible."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Propose three distinct courses of action and outline their potential short-term and long-term consequences.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'courses_of_action'. The value should be a list of JSON objects. Each object should have three keys: 'action' (string, a brief description of the course of action), 'short_term_consequences' (list of strings), and 'long_term_consequences' (list of strings).",
+                    "prompt_guidelines": "Consider a wide range of consequences, including economic, social, environmental, and ethical aspects. Think about consequences for all stakeholders identified in the previous question."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Identify potential unintended consequences (second-order and third-order effects) for each course of action.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'unintended_consequences'. The value should be a list of JSON objects. Each object should have two keys: 'action' (string, a brief description of the course of action, matching the actions from question 2) and 'consequences' (list of strings, describing the unintended consequences).",
+                    "prompt_guidelines": "Think beyond the immediate and obvious effects. Consider how actions might affect different systems and stakeholders in unexpected ways."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Recommend a course of action and justify your decision using principles of wide-boundary intelligence.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with two keys: 'recommended_action' (string, a brief description of the recommended course of action) and 'justification' (string, a detailed explanation of the reasoning behind the recommendation, explicitly referencing principles of wide-boundary intelligence, such as Temporal Awareness, Spatial Awareness, Stakeholder Inclusion, Ethical and Value Alignment, Complexity and System Thinking, Knowledge Integration, Resilience and Adaptability, Psychological and Emotional Intelligence).",
+                    "prompt_guidelines": "Clearly articulate the trade-offs involved and how your recommendation balances competing interests and values. Demonstrate a holistic understanding of the situation."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Outline a plan for monitoring and adapting to the chosen course of action.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'monitoring_and_adaptation_plan'. The value should be a JSON object with the following keys: 'metrics' (list of strings, specific, measurable, achievable, relevant, and time-bound metrics to track the impact of the decision), 'monitoring_methods' (list of strings, methods for collecting data on the chosen metrics), 'adaptation_triggers' (list of strings, specific conditions that would trigger a reassessment of the course of action), and 'adaptation_options' (list of strings, potential adjustments or alternative courses of action if adaptation is needed).",
+                    "prompt_guidelines": "Be specific and practical. Consider how you would measure the impact of your decision and how you would respond to changing circumstances."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "A coastal city is facing increasing risks from rising sea levels and more frequent extreme weather events due to climate change. The city council must decide on a comprehensive adaptation strategy. Options include building seawalls and other hard infrastructure, implementing nature-based solutions like mangrove restoration, relocating vulnerable communities, and investing in early warning systems. Each option has different costs, benefits, and potential drawbacks, and there are significant uncertainties about the future rate of sea-level rise and the effectiveness of different adaptation measures. The city's population includes diverse communities with varying levels of vulnerability and resources.",
+            "tags": ["environment", "climate change", "urban planning", "disaster management", "social equity", "resilience"],
+            "prompts": {
+                "scenario_introduction_prompt": "You are a city council. You are facing increasing risks from rising sea levels and more frequent extreme weather events due to climate change. The city council must decide on a comprehensive adaptation strategy. Options include building seawalls and other hard infrastructure, implementing nature-based solutions like mangrove restoration, relocating vulnerable communities, and investing in early warning systems. Each option has different costs, benefits, and potential drawbacks, and there are significant uncertainties about the future rate of sea-level rise and the effectiveness of different adaptation measures. The city's population includes diverse communities with varying levels of vulnerability and resources.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Identify all relevant stakeholders and their primary concerns.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'stakeholders'. The value should be a list of JSON objects. Each object should have two keys: 'stakeholder' (string, name of the stakeholder) and 'concerns' (list of strings, the primary concerns of that stakeholder).",
+                    "prompt_guidelines": "Consider direct and indirect, human and non-human stakeholders. Be as comprehensive as possible."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Propose three distinct adaptation strategies and outline their potential short-term and long-term consequences.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'adaptation_strategies'. The value should be a list of JSON objects. Each object should have three keys: 'strategy' (string, a brief description of the adaptation strategy), 'short_term_consequences' (list of strings), and 'long_term_consequences' (list of strings).",
+                    "prompt_guidelines": "Consider a wide range of consequences, including environmental, economic, social, and cultural aspects. Think about consequences for all stakeholders identified in the previous question."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Identify potential unintended consequences (second-order and third-order effects) for each adaptation strategy.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'unintended_consequences'. The value should be a list of JSON objects. Each object should have two keys: 'strategy' (string, a brief description of the adaptation strategy, matching the strategies from question 2) and 'consequences' (list of strings, describing the unintended consequences).",
+                    "prompt_guidelines": "Think beyond the immediate and obvious effects. Consider how actions might affect different systems and stakeholders in unexpected ways. Consider ecological, social, and economic impacts."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Recommend an adaptation strategy and justify your decision using principles of wide-boundary intelligence.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with two keys: 'recommended_strategy' (string, a brief description of the recommended adaptation strategy) and 'justification' (string, a detailed explanation of the reasoning behind the recommendation, explicitly referencing principles of wide-boundary intelligence, such as Temporal Awareness, Spatial Awareness, Stakeholder Inclusion, Ethical and Value Alignment, Complexity and System Thinking, Knowledge Integration, Resilience and Adaptability, Psychological and Emotional Intelligence).",
+                    "prompt_guidelines": "Clearly articulate the trade-offs involved and how your recommendation balances competing interests and values. Demonstrate a holistic understanding of the situation and a commitment to long-term resilience."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Outline a plan for monitoring and adapting to the chosen adaptation strategy.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'monitoring_and_adaptation_plan'. The value should be a JSON object with the following keys: 'metrics' (list of strings, specific, measurable, achievable, relevant, and time-bound metrics to track the impact of the decision), 'monitoring_methods' (list of strings, methods for collecting data on the chosen metrics), 'adaptation_triggers' (list of strings, specific conditions that would trigger a reassessment of the adaptation strategy), and 'adaptation_options' (list of strings, potential adjustments or alternative strategies if adaptation is needed).",
+                    "prompt_guidelines": "Be specific and practical. Consider how you would measure the success of your adaptation strategy and how you would respond to new information or changing circumstances. Include social, economic, and environmental indicators."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "A national government is developing a policy framework for the development and deployment of artificial intelligence (AI). The framework must address various aspects, including research funding, ethical guidelines, workforce development, data privacy, cybersecurity, and international cooperation. There are competing priorities and concerns among different stakeholders, including AI researchers, industry leaders, civil society organizations, and the general public. The government aims to foster innovation and economic growth while mitigating potential risks associated with AI, such as job displacement, algorithmic bias, and misuse of the technology.",
+            "tags": ["technology", "artificial intelligence", "policy", "ethics", "innovation", "regulation", "national security"],
+            "prompts": {
+                "scenario_introduction_prompt": "You are a national government. You are developing a policy framework for the development and deployment of artificial intelligence (AI). The framework must address various aspects, including research funding, ethical guidelines, workforce development, data privacy, cybersecurity, and international cooperation. There are competing priorities and concerns among different stakeholders, including AI researchers, industry leaders, civil society organizations, and the general public. The government aims to foster innovation and economic growth while mitigating potential risks associated with AI, such as job displacement, algorithmic bias, and misuse of the technology.",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Identify all relevant stakeholders and their primary concerns.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'stakeholders'. The value should be a list of JSON objects. Each object should have two keys: 'stakeholder' (string, name of the stakeholder) and 'concerns' (list of strings, the primary concerns of that stakeholder).",
+                    "prompt_guidelines": "Consider direct and indirect, human and non-human stakeholders (e.g., future generations, the environment). Be as comprehensive as possible."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Propose three distinct policy frameworks and outline their potential short-term and long-term consequences.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'policy_frameworks'. The value should be a list of JSON objects. Each object should have three keys: 'framework' (string, a brief description of the policy framework), 'short_term_consequences' (list of strings), and 'long_term_consequences' (list of strings).",
+                    "prompt_guidelines": "Consider a wide range of consequences, including economic, social, ethical, and geopolitical aspects. Think about consequences for all stakeholders identified in the previous question. Consider the impact on innovation, competitiveness, social equity, and national security."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Identify potential unintended consequences (second-order and third-order effects) for each policy framework.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'unintended_consequences'. The value should be a list of JSON objects. Each object should have two keys: 'framework' (string, a brief description of the policy framework, matching the frameworks from question 2) and 'consequences' (list of strings, describing the unintended consequences).",
+                    "prompt_guidelines": "Think beyond the immediate and obvious effects. Consider how actions might affect different sectors of society, international relations, and the future development of AI in unexpected ways."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Recommend a policy framework and justify your decision using principles of wide-boundary intelligence.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with two keys: 'recommended_framework' (string, a brief description of the recommended policy framework) and 'justification' (string, a detailed explanation of the reasoning behind the recommendation, explicitly referencing principles of wide-boundary intelligence, such as Temporal Awareness, Spatial Awareness, Stakeholder Inclusion, Ethical and Value Alignment, Complexity and System Thinking, Knowledge Integration, Resilience and Adaptability, Psychological and Emotional Intelligence).",
+                    "prompt_guidelines": "Clearly articulate the trade-offs involved and how your recommendation balances competing interests and values. Demonstrate a holistic understanding of the complex challenges and opportunities presented by AI. Explain how your framework promotes long-term societal well-being and minimizes potential harms."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Outline a plan for monitoring and adapting to the chosen policy framework.",
+                    "prompt_structured_JSON_output_instructions": "Output a JSON object with a single key 'monitoring_and_adaptation_plan'. The value should be a JSON object with the following keys: 'metrics' (list of strings, specific, measurable, achievable, relevant, and time-bound metrics to track the impact of the decision), 'monitoring_methods' (list of strings, methods for collecting data on the chosen metrics), 'adaptation_triggers' (list of strings, specific conditions that would trigger a reassessment of the policy framework), and 'adaptation_options' (list of strings, potential adjustments or alternative frameworks if adaptation is needed).",
+                    "prompt_guidelines": "Be specific and practical. Consider how you would measure the success of your policy framework and how you would respond to new technological developments, ethical concerns, or societal impacts. Include metrics related to innovation, economic growth, social equity, ethical compliance, and national security."
+                }
+            }
+        }
+    }
+]

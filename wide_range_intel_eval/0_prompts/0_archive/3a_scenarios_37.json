@@ -1,0 +1,104 @@
+[
+    {
+        "scenario": {
+            "overview": "In 2030, a revolutionary carbon capture technology has been developed that can remove CO2 from the atmosphere at an unprecedented rate. However, its deployment requires significant land use changes and has potential impacts on local ecosystems. As the CEO of a major tech company, you're considering investing billions in this technology to combat climate change.",
+            "tags": ["climate change", "technology", "environment", "business", "ethics"],
+            "prompts": {
+                "scenario_introduction_prompt": "You are the CEO of a major tech company in 2030. A new carbon capture technology has been developed that can remove CO2 from the atmosphere at an unprecedented rate, but its deployment requires significant land use changes and may impact local ecosystems. You're considering investing billions in this technology to combat climate change. How do you approach this decision?",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Analyze the potential long-term consequences of deploying this technology on a global scale.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'temporal_impacts': {'short_term': [], 'medium_term': [], 'long_term': []}, 'stakeholder_impacts': {'human': [], 'non_human': []}, 'systemic_effects': {'environmental': [], 'economic': [], 'social': []}}",
+                    "prompt_guidelines": "Consider both positive and negative impacts across different time scales and systems. Include at least three points for each category."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Develop a strategy for stakeholder engagement and addressing potential resistance to the technology.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'stakeholder_groups': [], 'engagement_methods': [], 'potential_concerns': [], 'mitigation_strategies': []}",
+                    "prompt_guidelines": "Identify at least five stakeholder groups, including marginalized voices. Propose innovative engagement methods and strategies to address concerns."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Evaluate the ethical implications of investing in this technology versus alternative approaches to climate change mitigation.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'ethical_frameworks': [], 'pros': [], 'cons': [], 'alternative_approaches': [], 'ethical_recommendation': ''}",
+                    "prompt_guidelines": "Apply at least two ethical frameworks in your analysis. Consider intergenerational equity and potential unintended consequences."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Design a robust monitoring and adaptive management plan for the technology's deployment.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'key_indicators': [], 'monitoring_methods': [], 'feedback_mechanisms': [], 'adaptation_triggers': [], 'contingency_plans': []}",
+                    "prompt_guidelines": "Include ecological, social, and economic indicators. Propose innovative monitoring techniques and clear criteria for when to adapt or halt the project."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Analyze potential unintended consequences and propose strategies to mitigate them.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'potential_consequences': [{'description': '', 'likelihood': '', 'impact': '', 'mitigation_strategy': ''}], 'systemic_risks': [], 'resilience_measures': []}",
+                    "prompt_guidelines": "Consider at least five potential unintended consequences across different domains. Assess their likelihood and potential impact, and propose specific mitigation strategies for each."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "In 2028, a groundbreaking AI system has been developed that can predict individual health outcomes with 95% accuracy, including potential mental health issues and susceptibility to addiction. As the Minister of Health, you must decide whether to implement this system nationwide, potentially revolutionizing preventive healthcare but raising significant privacy and ethical concerns.",
+            "tags": ["healthcare", "AI", "ethics", "privacy", "policy"],
+            "prompts": {
+                "scenario_introduction_prompt": "As the Minister of Health in 2028, you're faced with a decision to implement a new AI system nationwide that can predict individual health outcomes with 95% accuracy, including mental health issues and addiction susceptibility. This could revolutionize preventive healthcare but raises significant privacy and ethical concerns. How do you approach this decision?",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Analyze the potential societal impacts of implementing this AI health prediction system.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'positive_impacts': [], 'negative_impacts': [], 'affected_groups': [], 'long_term_consequences': []}",
+                    "prompt_guidelines": "Consider impacts on public health, individual behavior, insurance systems, and social dynamics. Include at least four points for each category."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Develop a comprehensive privacy protection framework for the AI health prediction system.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'data_collection_policies': [], 'data_storage_measures': [], 'access_control_mechanisms': [], 'individual_rights': [], 'accountability_measures': []}",
+                    "prompt_guidelines": "Ensure compliance with existing privacy laws while proposing innovative measures to address the unique challenges of this technology."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Evaluate the ethical implications of using AI for health predictions and propose guidelines for its use.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'ethical_concerns': [], 'beneficence_considerations': [], 'non_maleficence_considerations': [], 'justice_considerations': [], 'autonomy_considerations': [], 'proposed_guidelines': []}",
+                    "prompt_guidelines": "Apply ethical principles such as beneficence, non-maleficence, justice, and autonomy. Consider potential discrimination and the right not to know."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Design a pilot implementation program and evaluation framework for the AI health prediction system.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'pilot_scope': {}, 'implementation_phases': [], 'success_metrics': [], 'risk_mitigation_strategies': [], 'stakeholder_feedback_mechanisms': [], 'scalability_assessment_criteria': []}",
+                    "prompt_guidelines": "Include a diverse range of communities in the pilot. Propose comprehensive success metrics that go beyond health outcomes to include ethical and societal impacts."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Analyze potential unintended consequences of the AI health prediction system and propose adaptive policies.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'potential_consequences': [{'description': '', 'likelihood': '', 'impact': '', 'adaptive_policy': ''}], 'monitoring_mechanisms': [], 'policy_adjustment_triggers': [], 'long_term_resilience_strategies': []}",
+                    "prompt_guidelines": "Consider consequences across health, social, economic, and psychological domains. Propose flexible policies that can adapt to emerging issues and changing societal values."
+                }
+            }
+        }
+    },
+    {
+        "scenario": {
+            "overview": "In 2026, a consortium of companies has developed a network of autonomous drone delivery systems capable of replacing 80% of traditional ground-based delivery services. This technology promises to significantly reduce carbon emissions and delivery costs, but raises concerns about job displacement, privacy, and airspace congestion. As a policymaker, you must decide on the regulatory framework for this new technology.",
+            "tags": ["technology", "transportation", "economics", "labor", "environment"],
+            "prompts": {
+                "scenario_introduction_prompt": "It's 2026, and a consortium of companies has developed a network of autonomous drone delivery systems capable of replacing 80% of traditional ground-based delivery services. This technology promises to significantly reduce carbon emissions and delivery costs but raises concerns about job displacement, privacy, and airspace congestion. As a policymaker, you must decide on the regulatory framework for this new technology. How do you approach this decision?",
+                "scenario_question1_prompt": {
+                    "prompt_goal": "Analyze the potential economic and environmental impacts of widespread adoption of autonomous drone delivery systems.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'economic_impacts': {'positive': [], 'negative': []}, 'environmental_impacts': {'positive': [], 'negative': []}, 'affected_industries': [], 'long_term_projections': []}",
+                    "prompt_guidelines": "Consider impacts on employment, urban planning, energy consumption, and ecosystem effects. Provide quantitative estimates where possible."
+                },
+                "scenario_question2_prompt": {
+                    "prompt_goal": "Develop a comprehensive regulatory framework for the integration of autonomous drone delivery systems into existing transportation infrastructure.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'airspace_management': [], 'safety_regulations': [], 'noise_pollution_measures': [], 'privacy_protections': [], 'integration_with_existing_systems': [], 'licensing_and_certification': []}",
+                    "prompt_guidelines": "Address potential conflicts with current aviation regulations. Consider innovative approaches to airspace management and public safety."
+                },
+                "scenario_question3_prompt": {
+                    "prompt_goal": "Propose strategies to mitigate job displacement and support workforce transition in affected industries.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'affected_job_categories': [], 'short_term_mitigation_strategies': [], 'long_term_transition_programs': [], 'new_job_opportunities': [], 'education_and_training_initiatives': [], 'social_safety_net_adjustments': []}",
+                    "prompt_guidelines": "Consider both direct and indirect job impacts. Propose innovative retraining programs and potential new industries that could emerge."
+                },
+                "scenario_question4_prompt": {
+                    "prompt_goal": "Design a stakeholder engagement and public communication strategy for the introduction of autonomous drone delivery systems.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'key_stakeholders': [], 'communication_channels': [], 'public_education_initiatives': [], 'feedback_mechanisms': [], 'conflict_resolution_processes': [], 'timeline_for_engagement': []}",
+                    "prompt_guidelines": "Include a diverse range of stakeholders, including those potentially opposed to the technology. Propose innovative methods for public participation in the decision-making process."
+                },
+                "scenario_question5_prompt": {
+                    "prompt_goal": "Evaluate the potential long-term societal impacts of autonomous drone delivery systems and propose adaptive policy mechanisms.",
+                    "prompt_structured_JSON_output_instructions": "Provide a JSON response with the following structure: {'potential_societal_changes': [], 'ethical_considerations': [], 'adaptive_policy_mechanisms': [], 'long_term_monitoring_indicators': [], 'international_cooperation_frameworks': [], 'future_scenario_planning': []}",
+                    "prompt_guidelines": "Consider impacts on urban design, social interactions, and potential shifts in consumer behavior. Propose flexible policies that can adapt to unforeseen consequences and technological advancements."
+                }
+            }
+        }
+    }
+]

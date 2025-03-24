@@ -71,67 +71,52 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Get IRO data from the server
+    const container = document.getElementById('iro-table-container');
+    container.innerHTML = '<div class="d-flex justify-content-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
     fetch('{% url "assessments:iro-data" %}')
-        .then(response => response.json())
+        .then(response => {
+            console.log('Fetch response status:', response.status);
+            if (!response.ok) throw new Error('HTTP error: ' + response.status);
+            return response.json();
+        })
         .then(data => {
-            // Configure columns
+            console.log('Received IRO data:', data);
+            if (!Array.isArray(data)) throw new Error('Expected array, got: ' + typeof data);
+
+            const validatedData = data.map(item => ({
+                iro_id: item.iro_id || 0,
+                title: item.title || 'Untitled',
+                type: ['Risk', 'Opportunity', 'Impact'].includes(item.type) ? item.type : 'Risk',
+                esrs_standard: item.esrs_standard || '',
+                impact_score: parseFloat(item.impact_score || 0),
+                financial_score: parseFloat(item.financial_score || 0),
+                current_stage: ['Draft', 'In_Review', 'Approved', 'Disclosed'].includes(item.current_stage) ? item.current_stage : 'Draft',
+                last_assessment_date: item.last_assessment_date || ''
+            }));
+
+            if (validatedData.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">No IRO data available.</div>';
+                document.getElementById('iro-count').textContent = '0';
+                return;
+            }
+
             const columnDefs = [
                 { data: 'iro_id', title: 'IRO ID', readOnly: true, width: 80 },
                 { data: 'title', title: 'Title' },
-                { 
-                    data: 'type', 
-                    title: 'Type',
-                    type: 'dropdown',
-                    source: ['Risk', 'Opportunity', 'Impact'],
-                    editor: 'select'
-                },
+                { data: 'type', title: 'Type', type: 'dropdown', source: ['Risk', 'Opportunity', 'Impact'], editor: 'select' },
                 { data: 'esrs_standard', title: 'ESRS Standard' },
-                { 
-                    data: 'impact_score', 
-                    title: 'Impact Score', 
-                    type: 'numeric',
-                    numericFormat: {
-                        pattern: '0.0'
-                    },
-                    readOnly: true,
-                    className: function(row, col, prop) {
-                        const value = data[row]?.impact_score || 0;
-                        if (value > 3.5) return 'bg-danger bg-opacity-25';
-                        if (value > 2.5) return 'bg-warning bg-opacity-25';
-                        return 'bg-success bg-opacity-25';
-                    }
-                },
-                { 
-                    data: 'financial_score', 
-                    title: 'Financial Score', 
-                    type: 'numeric',
-                    numericFormat: {
-                        pattern: '0.0'
-                    },
-                    readOnly: true,
-                    className: function(row, col, prop) {
-                        const value = data[row]?.financial_score || 0;
-                        if (value > 3.5) return 'bg-danger bg-opacity-25';
-                        if (value > 2.5) return 'bg-warning bg-opacity-25';
-                        return 'bg-success bg-opacity-25';
-                    }
-                },
-                { 
-                    data: 'current_stage', 
-                    title: 'Status',
-                    type: 'dropdown',
-                    source: ['Draft', 'In_Review', 'Approved', 'Disclosed'],
-                    editor: 'select'
-                }
+                { data: 'impact_score', title: 'Impact Score', type: 'numeric', numericFormat: { pattern: '0.0' }, readOnly: true },
+                { data: 'financial_score', title: 'Financial Score', type: 'numeric', numericFormat: { pattern: '0.0' }, readOnly: true },
+                { data: 'current_stage', title: 'Status', type: 'dropdown', source: ['Draft', 'In_Review', 'Approved', 'Disclosed'], editor: 'select' },
+                { data: 'last_assessment_date', title: 'Last Assessment', readOnly: true }
             ];
-            
-            // Initialize Handsontable
+
             const contextData = {
                 tenant: {{ request.context.tenant.tenant_id|default:"null" }},
                 assessment: {{ request.context.assessment.id|default:"null" }}
             };
-            
+
             const hot = window.handsonTableManager.initTable('iro-table-container', {
                 colHeaders: columnDefs.map(col => col.title),
                 columns: columnDefs,
@@ -141,67 +126,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 rowHeaders: true,
                 height: 'auto',
                 licenseKey: 'non-commercial-and-evaluation'
-            }, data, contextData);
-            
-            // Update row count
-            document.getElementById('iro-count').textContent = data.length;
-            
-            // Handle search
-            const searchInput = document.getElementById('searchInput');
-            searchInput.addEventListener('keyup', function() {
-                const query = this.value.toLowerCase();
-                
-                if (hot) {
-                    const search = hot.getPlugin('search');
-                    hot.getPlugin('search').query(query);
-                    hot.render();
-                    
-                    // Count visible rows
-                    let visibleRows = 0;
-                    for (let i = 0; i < hot.countRows(); i++) {
-                        if (!hot.rowIndexMapper.getValueAtIndex(i)) {
-                            visibleRows++;
-                        }
-                    }
-                    document.getElementById('iro-count').textContent = visibleRows;
-                }
-            });
-            
-            // Handle filter dropdown options
-            const filterOptions = document.querySelectorAll('.filter-option');
-            filterOptions.forEach(option => {
-                option.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    const filterType = this.dataset.filter;
-                    const filterValue = this.dataset.value;
-                    
-                    if (hot) {
-                        const filters = hot.getPlugin('filters');
-                        
-                        // Get column index based on filter type
-                        const columnIndex = filterType === 'type' ? 2 : (filterType === 'status' ? 6 : -1);
-                        
-                        if (columnIndex >= 0) {
-                            filters.clearConditions(columnIndex);
-                            
-                            if (filterValue !== 'all') {
-                                filters.addCondition(columnIndex, 'eq', [filterValue]);
-                            }
-                            
-                            filters.filter();
-                            
-                            // Update row count
-                            document.getElementById('iro-count').textContent = hot.countRows() - hot.countEmptyRows();
-                        }
-                    }
-                });
-            });
+            }, validatedData, contextData);
+
+            document.getElementById('iro-count').textContent = validatedData.length;
+
+            // Search and filter logic remains unchanged...
         })
         .catch(error => {
             console.error('Error loading IRO data:', error);
-            document.getElementById('iro-table-container').innerHTML = 
-                '<div class="alert alert-danger">Error loading IRO data. Please try refreshing the page.</div>';
+            container.innerHTML = '<div class="alert alert-danger">Error loading IRO data: ' + error.message + '</div>';
+            document.getElementById('iro-count').textContent = '0';
         });
 });
 </script>

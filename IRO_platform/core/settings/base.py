@@ -1,6 +1,6 @@
 # core/settings/base.py
-
 import os
+from datetime import datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -72,7 +72,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',  # Authentication must run BEFORE our middleware
-    'core.middleware.context_middleware.ContextMiddleware',     # Now placed after authentication
+    'core.middleware.context_middleware.ContextMiddleware',     # Context middleware
+    'core.middleware.logging_middleware.LoggingMiddleware',     # Add logging middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -142,8 +143,117 @@ STATICFILES_DIRS = [
 ]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Example Celery or other global settings can remain here
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+
+########################
+# LOGGING CONFIGURATION #
+########################
+
+# Create logs directory if it doesn't exist
+LOG_DIR = os.path.join(BASE_DIR.parent, 'logs')
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Get the current datetime for the log filename
+log_datetime = datetime.now().strftime('%Y%m%d_%H%M%S')
+LOG_FILENAME = f'app_{log_datetime}.log'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+            'style': '%', 
+        },
+        'simple': {
+            'format': '%(levelname)s %(asctime)s %(message)s',
+            'style': '%',
+        },
+        'tenant_aware': {
+            'format': '%(levelname)s %(asctime)s %(module)s [TENANT:%(tenant)s] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+            'style': '%',
+            '()': 'core.middleware.logging_middleware.TenantFormatter',
+        },
+    },
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, LOG_FILENAME),
+            'formatter': 'verbose',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 10,
+        },
+        'tenant_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, LOG_FILENAME),
+            'formatter': 'tenant_aware',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 10,
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'class': 'django.utils.log.AdminEmailHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django.server': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console', 'tenant_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'tenants': {
+            'handlers': ['console', 'tenant_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'frontend': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'core': {
+            'handlers': ['console', 'tenant_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'apps.requests': {
+            'handlers': ['console', 'tenant_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    }
+}

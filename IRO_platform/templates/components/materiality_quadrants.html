@@ -1,0 +1,114 @@
+<!-- templates/components/materiality_quadrants.html -->
+<div class="card">
+    <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Topic-Level Double Materiality Quadrants</h5>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="quadrantDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    Last 12 Months
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="quadrantDropdown">
+                    <li><a class="dropdown-item" href="#">Last 6 Months</a></li>
+                    <li><a class="dropdown-item" href="#">Last 3 Months</a></li>
+                    <li><a class="dropdown-item" href="#">Custom Range</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="materiality-quadrants-container">
+            <div class="row g-0">
+                <!-- Top Left Quadrant: Financially Material, Not Impact Material -->
+                <div class="col-md-6 quadrant financially-material">
+                    <div class="quadrant-header">
+                        <h6 class="mb-0">Financially Material</h6>
+                        <p class="text-muted small mb-0">Not Impact Material</p>
+                    </div>
+                    <div class="quadrant-content">
+                        <ul class="topic-list list-unstyled">
+                            {% for topic in topic_quadrants.financially_material %}
+                            <li class="topic-item">
+                                <a href="#" class="d-flex align-items-center" data-bs-toggle="tooltip" title="Impact: {{ topic.impact_score|floatformat:1 }}, Financial: {{ topic.financial_score|floatformat:1 }}">
+                                    <span class="topic-name">{{ topic.name }}</span>
+                                    <span class="topic-count ms-auto badge bg-secondary">{{ topic.iro_count }}</span>
+                                </a>
+                            </li>
+                            {% empty %}
+                            <li class="empty-message text-muted">No topics in this quadrant</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Top Right Quadrant: Double Material -->
+                <div class="col-md-6 quadrant double-material">
+                    <div class="quadrant-header">
+                        <h6 class="mb-0">Double Material</h6>
+                        <p class="text-muted small mb-0">Impact & Financial</p>
+                    </div>
+                    <div class="quadrant-content">
+                        <ul class="topic-list list-unstyled">
+                            {% for topic in topic_quadrants.double_material %}
+                            <li class="topic-item">
+                                <a href="#" class="d-flex align-items-center" data-bs-toggle="tooltip" title="Impact: {{ topic.impact_score|floatformat:1 }}, Financial: {{ topic.financial_score|floatformat:1 }}">
+                                    <span class="topic-name">{{ topic.name }}</span>
+                                    <span class="topic-count ms-auto badge bg-danger">{{ topic.iro_count }}</span>
+                                </a>
+                            </li>
+                            {% empty %}
+                            <li class="empty-message text-muted">No topics in this quadrant</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Bottom Left Quadrant: Not Material -->
+                <div class="col-md-6 quadrant not-material">
+                    <div class="quadrant-header">
+                        <h6 class="mb-0">Not Material</h6>
+                        <p class="text-muted small mb-0">Neither Impact nor Financial</p>
+                    </div>
+                    <div class="quadrant-content">
+                        <ul class="topic-list list-unstyled">
+                            {% for topic in topic_quadrants.not_material %}
+                            <li class="topic-item">
+                                <a href="#" class="d-flex align-items-center" data-bs-toggle="tooltip" title="Impact: {{ topic.impact_score|floatformat:1 }}, Financial: {{ topic.financial_score|floatformat:1 }}">
+                                    <span class="topic-name">{{ topic.name }}</span>
+                                    <span class="topic-count ms-auto badge bg-light text-dark">{{ topic.iro_count }}</span>
+                                </a>
+                            </li>
+                            {% empty %}
+                            <li class="empty-message text-muted">No topics in this quadrant</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Bottom Right Quadrant: Impact Material, Not Financial Material -->
+                <div class="col-md-6 quadrant impact-material">
+                    <div class="quadrant-header">
+                        <h6 class="mb-0">Impact Material</h6>
+                        <p class="text-muted small mb-0">Not Financial Material</p>
+                    </div>
+                    <div class="quadrant-content">
+                        <ul class="topic-list list-unstyled">
+                            {% for topic in topic_quadrants.impact_material %}
+                            <li class="topic-item">
+                                <a href="#" class="d-flex align-items-center" data-bs-toggle="tooltip" title="Impact: {{ topic.impact_score|floatformat:1 }}, Financial: {{ topic.financial_score|floatformat:1 }}">
+                                    <span class="topic-name">{{ topic.name }}</span>
+                                    <span class="topic-count ms-auto badge bg-success">{{ topic.iro_count }}</span>
+                                </a>
+                            </li>
+                            {% empty %}
+                            <li class="empty-message text-muted">No topics in this quadrant</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="quadrant-note text-center p-2 small text-muted">
+            <i class="fas fa-info-circle me-1"></i> Each topic aggregates multiple IROs. Individual IROs are either Impact OR Financial, but topics can be both.
+        </div>
+    </div>
+</div>

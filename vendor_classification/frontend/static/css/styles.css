@@ -1,0 +1,86 @@
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+}
+
+.btn {
+    border-radius: 5px;
+    padding: 8px 20px;
+    font-weight: 500;
+}
+
+.progress {
+    height: 20px;
+    border-radius: 10px;
+}
+
+footer {
+    margin-top: 50px;
+    color: #6c757d;
+}
+
+.stage-indicator {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.stage {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    border-radius: 5px;
+    margin: 0 5px;
+    background-color: #e9ecef;
+    font-size: 0.8rem;
+}
+
+.stage.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.stage.completed {
+    background-color: #28a745;
+    color: white;
+}
+
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+#downloadLink {
+    width: 100%;
+}
+
+.error-message {
+    color: #dc3545;
+    margin-top: 5px;
+    font-size: 0.9rem;
+}
+
+.success-message {
+    color: #28a745;
+    margin-top: 5px;
+    font-size: 0.9rem;
+}

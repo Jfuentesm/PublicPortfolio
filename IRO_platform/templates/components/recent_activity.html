@@ -1,0 +1,42 @@
+<!-- templates/components/recent_activity.html -->
+<div class="card">
+    <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Recent Activity</h5>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#recentActivityCollapse" aria-expanded="true" aria-controls="recentActivityCollapse">
+                <i class="fas fa-chevron-up"></i>
+            </button>
+        </div>
+    </div>
+    <div class="collapse show" id="recentActivityCollapse">
+        <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+                {% for activity in recent_activities %}
+                <div class="list-group-item border-0 py-3" data-status="{{ activity.action }}">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-{{ activity.icon_color }} rounded-circle p-2 me-3">
+                            <i class="fas fa-{{ activity.icon }} text-white small"></i>
+                        </div>
+                        <div>
+                            <p class="mb-0 fw-medium">{{ activity.description }}</p>
+                            <p class="text-muted small mb-0">{{ activity.timestamp|timesince }} ago</p>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="list-group-item border-0 py-3">
+                    <p class="text-center text-muted my-3">No recent activity</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card-footer bg-white py-2 px-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i> Showing latest {{ recent_activities|length }} activities
+                </small>
+                <a href="#" class="small">View All</a>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,129 @@
+{
+    "scenario": {
+        "overview": "In 2025, the rapid increase in satellite launches has created a crisis in Earth's orbit. With over 100,000 active satellites and millions of debris pieces, orbital space has become dangerously congested. The International Space Traffic Management Authority (ISTMA) must develop a comprehensive framework for managing orbital resources and debris mitigation. This comes as multiple companies announce plans for mega-constellations of 10,000+ satellites each, and space tourism companies plan regular orbital flights. Recent near-misses between satellites have highlighted the urgency of the situation.",
+        "tags": ["space", "technology", "governance", "environment"],
+        "prompts": {
+            "scenario_introduction_prompt": "You are the lead policy advisor to ISTMA, tasked with developing a comprehensive orbital space management framework.",
+            "scenario_question1_prompt": {
+                "prompt_goal": "Design an equitable system for orbital resource allocation across nations and private entities",
+                "prompt_structured_JSON_output_instructions": {
+                    "allocation_framework": {
+                        "orbital_zones": [{
+                            "zone_type": "string",
+                            "altitude_range": "string",
+                            "primary_use": "string",
+                            "access_criteria": ["string"]
+                        }],
+                        "allocation_rules": [{
+                            "stakeholder_type": "string",
+                            "resource_limits": "string",
+                            "priority_criteria": ["string"]
+                        }],
+                        "dispute_resolution": {
+                            "mechanism_type": "string",
+                            "enforcement_measures": ["string"]
+                        }
+                    }
+                },
+                "prompt_guidelines": "Consider equitable access across developed and developing nations, while ensuring sustainable use of orbital space",
+                "prompt_relevant_sub-dimensions": ["Direct Human Stakeholders", "Intergenerational Equity", "Global Effects"]
+            },
+            "scenario_question2_prompt": {
+                "prompt_goal": "Develop a comprehensive debris mitigation and removal strategy",
+                "prompt_structured_JSON_output_instructions": {
+                    "debris_management": {
+                        "prevention_measures": [{
+                            "measure_type": "string",
+                            "implementation_timeline": "string",
+                            "stakeholder_requirements": ["string"]
+                        }],
+                        "removal_operations": [{
+                            "technology_type": "string",
+                            "target_debris_class": "string",
+                            "resource_requirements": ["string"]
+                        }],
+                        "monitoring_system": {
+                            "detection_capabilities": ["string"],
+                            "tracking_methods": ["string"],
+                            "data_sharing_protocols": ["string"]
+                        }
+                    }
+                },
+                "prompt_guidelines": "Address both existing debris and prevention of future debris creation",
+                "prompt_relevant_sub-dimensions": ["Systemic Interconnectivity", "Evidence-Based Decision-Making", "Path Dependency"]
+            },
+            "scenario_question3_prompt": {
+                "prompt_goal": "Analyze the long-term sustainability challenges of increased orbital activity",
+                "prompt_structured_JSON_output_instructions": {
+                    "sustainability_analysis": {
+                        "environmental_impacts": [{
+                            "impact_type": "string",
+                            "affected_domains": ["string"],
+                            "mitigation_approaches": ["string"]
+                        }],
+                        "capacity_limits": [{
+                            "resource_type": "string",
+                            "current_usage": "string",
+                            "projected_threshold": "string"
+                        }],
+                        "technological_dependencies": [{
+                            "dependency_type": "string",
+                            "vulnerability_assessment": "string",
+                            "resilience_measures": ["string"]
+                        }]
+                    }
+                },
+                "prompt_guidelines": "Consider both space-based and Earth-based impacts of orbital activities",
+                "prompt_relevant_sub-dimensions": ["Long-Term Impacts", "Holistic Analysis", "Emergent Properties"]
+            },
+            "scenario_question4_prompt": {
+                "prompt_goal": "Create an international cooperation framework for space traffic management",
+                "prompt_structured_JSON_output_instructions": {
+                    "cooperation_framework": {
+                        "governance_structure": {
+                            "decision_making_bodies": ["string"],
+                            "representation_rules": ["string"],
+                            "voting_procedures": ["string"]
+                        },
+                        "operational_protocols": [{
+                            "activity_type": "string",
+                            "coordination_requirements": ["string"],
+                            "emergency_procedures": ["string"]
+                        }],
+                        "data_sharing": {
+                            "required_data_types": ["string"],
+                            "access_levels": ["string"],
+                            "security_measures": ["string"]
+                        }
+                    }
+                },
+                "prompt_guidelines": "Balance national interests with global safety and sustainability requirements",
+                "prompt_relevant_sub-dimensions": ["Cultural Sensitivity", "Interdisciplinary Thinking", "Moral Philosophy"]
+            },
+            "scenario_question5_prompt": {
+                "prompt_goal": "Develop contingency plans for orbital emergencies and cascading debris events",
+                "prompt_structured_JSON_output_instructions": {
+                    "emergency_response": {
+                        "scenario_types": [{
+                            "emergency_category": "string",
+                            "risk_level": "string",
+                            "immediate_actions": ["string"]
+                        }],
+                        "coordination_procedures": [{
+                            "stakeholder_role": "string",
+                            "responsibilities": ["string"],
+                            "communication_protocols": ["string"]
+                        }],
+                        "recovery_plans": [{
+                            "phase": "string",
+                            "objectives": ["string"],
+                            "resource_allocation": ["string"]
+                        }]
+                    }
+                },
+                "prompt_guidelines": "Address both immediate crisis response and long-term recovery strategies",
+                "prompt_relevant_sub-dimensions": ["Scenario Planning", "Robustness", "Flexibility"]
+            }
+        }
+    }
+}
