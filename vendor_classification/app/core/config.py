@@ -35,10 +35,10 @@ class Settings(BaseSettings):
     OUTPUT_DATA_DIR: str = "/data/output"
     TAXONOMY_DATA_DIR: str = "/data/taxonomy"
     
-    # Azure OpenAI - HARDCODED API KEYS FOR TESTING
-    AZURE_OPENAI_API_KEY: str = "KiYhgtCno1DsY8vkKqbN6m3zNCrs6ZaC"
-    AZURE_OPENAI_ENDPOINT: str = "https://DeepSeek-V3-muifm.eastus2.models.ai.azure.com/chat/completions"
-    AZURE_OPENAI_DEPLOYMENT: str = "DeepSeek-V3-muifm"
+    # OpenRouter - HARDCODED API KEY FOR TESTING
+    OPENROUTER_API_KEY: str = "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"  # Replace with your OpenRouter API key
+    OPENROUTER_API_BASE: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL: str = "microsoft/phi-3-medium-128k-instruct:free"  # Default model to use
     
     # Tavily Search API - HARDCODED API KEY FOR TESTING
     TAVILY_API_KEY: str = "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"
@@ -55,10 +55,10 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         logger.info(f"Settings initialized with DATABASE_URL: {self.DATABASE_URL}")
-        logger.info(f"AZURE_OPENAI_DEPLOYMENT: {self.AZURE_OPENAI_DEPLOYMENT}")
+        logger.info(f"OPENROUTER_MODEL: {self.OPENROUTER_MODEL}")
         # Log if keys are present but not their actual values for security
-        logger.info(f"AZURE_OPENAI_API_KEY present: {bool(self.AZURE_OPENAI_API_KEY)}")
-        logger.info(f"AZURE_OPENAI_ENDPOINT present: {bool(self.AZURE_OPENAI_ENDPOINT)}")
+        logger.info(f"OPENROUTER_API_KEY present: {bool(self.OPENROUTER_API_KEY)}")
+        logger.info(f"OPENROUTER_API_BASE present: {bool(self.OPENROUTER_API_BASE)}")
         logger.info(f"TAVILY_API_KEY present: {bool(self.TAVILY_API_KEY)}")
 
 settings = Settings()

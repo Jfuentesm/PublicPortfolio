@@ -1,3 +1,5 @@
+# Dockerfile.worker
+
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -33,5 +35,11 @@ RUN echo "Pandas version:" && python -c "import pandas; print(f'Pandas: {pandas.
 RUN echo "Checking pandas installation details:" && pip show pandas | grep Version || echo "Pandas package details not available"
 RUN echo "Directory structure:" && find /app -type f -name "*.py" | sort
 
-# Run Celery worker with better error reporting
-CMD ["sh", "-c", "cd /app && PYTHONPATH=/app celery -A tasks.celery_app worker --loglevel=debug"]
+# --- UPDATED CMD ---
+# Run Celery worker with corrected app path relative to WORKDIR/PYTHONPATH
+CMD ["sh", "-c", "echo 'Worker starting...' && \
+                  echo 'Current directory:' $(pwd) && \
+                  echo 'PYTHONPATH:' $PYTHONPATH && \
+                  echo 'Running command: celery -A tasks.celery_app worker --loglevel=debug' && \
+                  celery -A tasks.celery_app worker --loglevel=debug"]
+# --- END UPDATED CMD ---

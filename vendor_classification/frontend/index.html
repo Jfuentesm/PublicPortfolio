@@ -12,6 +12,7 @@
         <div class="container">
             <a class="navbar-brand" href="/">NAICS Vendor Classification</a>
         </div>
+        <!-- Added ID 'userInfo' -->
         <div class="ms-auto text-white d-none" id="userInfo">
             Welcome, <span id="usernameDisplay"></span>
             <button id="logoutButton" class="btn btn-sm btn-outline-light ms-2">Logout</button>
@@ -19,6 +20,7 @@
     </nav>
 
     <div class="container mt-5">
+        <!-- Added ID 'loginCard' -->
         <div id="loginCard" class="card mb-4">
             <div class="card-header bg-primary text-white">
                 <h4 class="mb-0">Login</h4>
@@ -38,9 +40,11 @@
                 </form>
             </div>
         </div>
+
         <div class="row">
             <div class="col-md-8 offset-md-2">
-                <div class="card">
+                <!-- **** ADDED id="uploadCard" HERE **** -->
+                <div id="uploadCard" class="card d-none">
                     <div class="card-header bg-primary text-white">
                         <h4 class="mb-0">Upload Vendor File</h4>
                     </div>
@@ -55,11 +59,13 @@
                                 <input type="file" class="form-control" id="vendorFile" name="file" accept=".xlsx,.xls" required>
                                 <div class="form-text">Upload an Excel file with a 'vendor_name' column.</div>
                             </div>
-                            <button type="submit" class="btn btn-primary">Upload and Process</button>
+                            <!-- Added ID to the button for potential specific targeting if needed -->
+                            <button type="submit" id="uploadButton" class="btn btn-primary">Upload and Process</button>
                         </form>
                     </div>
                 </div>
 
+                <!-- Added ID 'jobStatus' -->
                 <div id="jobStatus" class="card mt-4 d-none">
                     <div class="card-header bg-info text-white">
                         <h4 class="mb-0">Job Status</h4>
@@ -96,12 +102,14 @@
                             </div>
                             <div class="form-text">We'll notify you when processing is complete.</div>
                         </div>
+                        <!-- Added ID 'downloadDiv' -->
                         <div class="mb-3" id="downloadDiv" style="display: none;">
                             <a id="downloadLink" href="#" class="btn btn-success">Download Results</a>
                         </div>
                     </div>
                 </div>
 
+                <!-- Added ID 'jobStats' -->
                 <div id="jobStats" class="card mt-4 d-none">
                     <div class="card-header bg-success text-white">
                         <h4 class="mb-0">Job Statistics</h4>
@@ -133,7 +141,7 @@
 
     <footer class="mt-5 py-3 bg-light">
         <div class="container text-center">
-            <p>&copy; 2025 NAICS Vendor Classification</p>
+            <p>© 2025 NAICS Vendor Classification</p>
         </div>
     </footer>
 
