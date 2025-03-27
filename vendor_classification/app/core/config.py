@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # OpenRouter - HARDCODED API KEY FOR TESTING
     OPENROUTER_API_KEY: str = "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"  # Replace with your OpenRouter API key
     OPENROUTER_API_BASE: str = "https://openrouter.ai/api/v1"
-    OPENROUTER_MODEL: str = "microsoft/phi-3-medium-128k-instruct:free"  # Default model to use
+    OPENROUTER_MODEL: str = "google/gemma-3-27b-it:free"  # Default model to use
     
     # Tavily Search API - HARDCODED API KEY FOR TESTING
     TAVILY_API_KEY: str = "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"
