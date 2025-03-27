@@ -1,13 +1,15 @@
+# file path='app/services/llm_service.py'
 # app/services/llm_service.py
 import httpx
 import json
 from typing import List, Dict, Any, Optional
 import logging # <<< Ensure logging is imported
 import time
+import uuid # <<< Added import
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from core.config import settings
-from models.taxonomy import Taxonomy, TaxonomyCategory
+from models.taxonomy import Taxonomy, TaxonomyCategory # <<< Added TaxonomyCategory
 from core.logging_config import get_logger, LogTimer, log_function_call, set_log_context
 from utils.log_utils import log_api_request, log_method # <<< Ensure log_method is imported if used
 
@@ -26,6 +28,11 @@ class LLMService:
         logger.debug("LLM service initialized",
                     extra={"api_base": settings.OPENROUTER_API_BASE,
                           "model": settings.OPENROUTER_MODEL})
+        if not self.api_key:
+             logger.error("OpenRouter API key is missing!")
+             # Consider raising an error if the key is essential for operation
+             # raise ValueError("OpenRouter API key not configured")
+
 
     @retry(stop=stop_after_attempt(settings.MAX_RETRIES), wait=wait_exponential(multiplier=1, min=settings.RETRY_DELAY, max=10))
     @log_function_call(logger, include_args=False) # Keep False to avoid logging potentially large batches
@@ -35,7 +42,7 @@ class LLMService:
         batch: List[str],
         level: int,
         taxonomy: Taxonomy,
-        parent_category: Optional[str] = None
+        parent_category_id: Optional[str] = None # Renamed for clarity
     ) -> Dict[str, Any]:
         """
         Send a batch of vendors to LLM for classification.
@@ -44,7 +51,7 @@ class LLMService:
             batch: List of vendor names
             level: Classification level (1-4)
             taxonomy: Taxonomy data
-            parent_category: Parent category ID (required for levels 2-4)
+            parent_category_id: Parent category ID (required for levels 2-4)
 
         Returns:
             Classification results and API usage data.
@@ -53,15 +60,36 @@ class LLMService:
                    extra={
                        "batch_size": len(batch),
                        "level": level,
-                       "parent_category": parent_category
+                       "parent_category_id": parent_category_id
                    })
         set_log_context({"vendor_count": len(batch), "taxonomy_level": level})
-        batch_id = f"batch-{level}-{len(batch)}-{time.time_ns()}" # Add timestamp for uniqueness
+        batch_id = str(uuid.uuid4()) # Use UUID for uniqueness
+        logger.debug(f"Generated batch ID", extra={"batch_id": batch_id})
+
+        if not self.api_key:
+            logger.error("Cannot classify batch: OpenRouter API key is missing.")
+            # Return an error structure consistent with expected output but indicating failure
+            return {
+                "result": {
+                    "level": level,
+                    "batch_id": batch_id,
+                    "parent_category_id": parent_category_id,
+                    "classifications": [
+                        {
+                            "vendor_name": vendor, "category_id": "ERROR", "category_name": "ERROR",
+                            "confidence": 0.0, "classification_not_possible": True,
+                            "classification_not_possible_reason": "API key missing"
+                        } for vendor in batch
+                    ]
+                },
+                "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+            }
 
         # --- UPDATED PROMPT CREATION ---
         logger.debug(f"Creating classification prompt")
         with LogTimer(logger, "Prompt creation", include_in_stats=True):
-            prompt = self._create_classification_prompt(batch, level, taxonomy, parent_category)
+            # Pass parent_category_id instead of parent_category string
+            prompt = self._create_classification_prompt(batch, level, taxonomy, parent_category_id, batch_id)
             # Log prompt length but not full content for security/verbosity
             prompt_length = len(prompt)
             logger.debug(f"Classification prompt created",
@@ -83,14 +111,15 @@ class LLMService:
             payload = {
                 "model": self.model,
                 "messages": [
-                    {"role": "system", "content": "You are a precise vendor classification expert using the NAICS taxonomy. Adhere strictly to the provided categories and JSON output format. Do not guess if unsure."},
+                    {"role": "system", "content": "You are a precise vendor classification expert using the NAICS taxonomy. Adhere strictly to the provided categories and JSON output format. Do not guess if unsure. Ensure the `batch_id` in the output matches the one provided in the prompt."},
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.1, # Lower temperature for more deterministic results
-                "max_tokens": 2048, # Increased slightly for potentially longer JSON
+                "max_tokens": 2048, # Adjusted based on typical JSON size needs
                 "top_p": 0.9, # Adjusted slightly
                 "frequency_penalty": 0,
-                "presence_penalty": 0
+                "presence_penalty": 0,
+                "response_format": {"type": "json_object"} # Request JSON output directly if model supports it
             }
 
             async with httpx.AsyncClient() as client:
@@ -128,15 +157,19 @@ class LLMService:
             # Extract JSON from response
             try:
                 with LogTimer(logger, "JSON parsing", include_in_stats=True):
-                    json_str = content.strip()
-                    # Handle case where JSON is wrapped in markdown code blocks
-                    if json_str.startswith("```json"):
-                        json_str = json_str[len("```json"):].strip()
-                    if json_str.endswith("```"):
-                        json_str = json_str[:-len("```")].strip()
-
-                    result = json.loads(json_str)
+                    # If response_format was used, content should already be JSON string
+                    result = json.loads(content)
                     logger.debug(f"Successfully parsed JSON response")
+
+                # --- Validate Batch ID ---
+                response_batch_id = result.get("batch_id")
+                if response_batch_id != batch_id:
+                    logger.warning(f"LLM response batch_id mismatch!",
+                                   extra={"expected_batch_id": batch_id, "received_batch_id": response_batch_id})
+                    # Decide how to handle: raise error, proceed with caution, etc.
+                    # For now, log warning and proceed, but ensure the calling function knows.
+                    result["batch_id_mismatch"] = True # Add a flag
+                # --- End Validate Batch ID ---
 
                 # Track token usage
                 usage_data = {
@@ -198,7 +231,7 @@ class LLMService:
             error_context = {
                 "batch_size": len(batch),
                 "level": level,
-                "parent_category": parent_category,
+                "parent_category_id": parent_category_id,
                 "error": str(e),
                 "model": self.model,
                 "batch_id": batch_id
@@ -232,7 +265,19 @@ class LLMService:
                        "source_count": len(search_results.get("sources", []))
                    })
         set_log_context({"vendor": vendor})
-        batch_id = f"search-{vendor}-{time.time_ns()}" # Unique ID for this attempt
+        attempt_id = str(uuid.uuid4()) # Unique ID for this attempt
+        logger.debug(f"Generated search processing attempt ID", extra={"attempt_id": attempt_id})
+
+        if not self.api_key:
+            logger.error("Cannot process search results: OpenRouter API key is missing.")
+            return {
+                "result": {
+                    "vendor_name": vendor, "category_id": "ERROR", "category_name": "ERROR",
+                    "confidence": 0.0, "classification_not_possible": True,
+                    "classification_not_possible_reason": "API key missing", "notes": ""
+                },
+                "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+            }
 
         # --- UPDATED PROMPT CREATION ---
         with LogTimer(logger, "Search prompt creation", include_in_stats=True):
@@ -267,7 +312,8 @@ class LLMService:
                 "max_tokens": 1024, # Reduced slightly, only need one classification
                 "top_p": 0.9,
                 "frequency_penalty": 0,
-                "presence_penalty": 0
+                "presence_penalty": 0,
+                "response_format": {"type": "json_object"} # Request JSON output directly
             }
 
             async with httpx.AsyncClient() as client:
@@ -296,7 +342,7 @@ class LLMService:
                            "openrouter_prompt_tokens": prompt_tokens,
                            "openrouter_completion_tokens": completion_tokens,
                            "openrouter_total_tokens": total_tokens,
-                           "batch_id": batch_id
+                           "attempt_id": attempt_id
                        })
             # --- END USE CORRECT KEYS FOR LOGGING ---
 
@@ -306,15 +352,17 @@ class LLMService:
             # Extract JSON from response
             try:
                 with LogTimer(logger, "JSON parsing", include_in_stats=True):
-                    json_str = content.strip()
-                    # Handle case where JSON is wrapped in markdown code blocks
-                    if json_str.startswith("```json"):
-                        json_str = json_str[len("```json"):].strip()
-                    if json_str.endswith("```"):
-                        json_str = json_str[:-len("```")].strip()
-
-                    result = json.loads(json_str)
+                    result = json.loads(content)
                     logger.debug(f"Successfully parsed JSON response for search result processing")
+
+                # --- Validate Vendor Name ---
+                response_vendor = result.get("vendor_name")
+                if response_vendor != vendor:
+                    logger.warning(f"LLM search response vendor name mismatch!",
+                                   extra={"expected_vendor": vendor, "received_vendor": response_vendor})
+                    # Overwrite with expected vendor name for consistency downstream
+                    result["vendor_name"] = vendor
+                # --- End Validate Vendor Name ---
 
                 # Track token usage
                 usage_data = {
@@ -343,17 +391,17 @@ class LLMService:
                                 "error": str(e),
                                 "content_preview": content[:500] if content else None,
                                 "vendor": vendor,
-                                "batch_id": batch_id
+                                "attempt_id": attempt_id
                             })
                 raise ValueError(f"LLM response after search was not valid JSON. Preview: {content[:200]}")
 
         except httpx.HTTPStatusError as e:
              logger.error(f"HTTP error during search result processing", exc_info=True,
-                         extra={ "status_code": e.response.status_code, "response_text": e.response.text[:200], "vendor": vendor, "batch_id": batch_id })
+                         extra={ "status_code": e.response.status_code, "response_text": e.response.text[:200], "vendor": vendor, "attempt_id": attempt_id })
              raise # Re-raise after logging
         except httpx.RequestError as e:
              logger.error(f"Network error during search result processing", exc_info=True,
-                         extra={ "error_details": str(e), "vendor": vendor, "batch_id": batch_id })
+                         extra={ "error_details": str(e), "vendor": vendor, "attempt_id": attempt_id })
              raise # Re-raise after logging
         except Exception as e:
             # Capture request parameters for error logging
@@ -361,7 +409,7 @@ class LLMService:
                 "vendor": vendor,
                 "error": str(e),
                 "model": self.model,
-                "batch_id": batch_id
+                "attempt_id": attempt_id
             }
             logger.error(f"Unexpected error during search result processing", exc_info=True, extra=error_context)
             raise # Re-raise after logging
@@ -373,7 +421,8 @@ class LLMService:
         vendors: List[str],
         level: int,
         taxonomy: Taxonomy,
-        parent_category: Optional[str] = None
+        parent_category_id: Optional[str] = None, # Changed parameter name
+        batch_id: str = "unknown-batch"
     ) -> str:
         """
         Create an appropriate prompt for the current classification level,
@@ -383,7 +432,8 @@ class LLMService:
             vendors: List of vendor names
             level: Classification level (1-4)
             taxonomy: Taxonomy data
-            parent_category: Parent category ID (required for levels 2-4)
+            parent_category_id: Parent category ID (required for levels 2-4)
+            batch_id: Unique ID for this batch
 
         Returns:
             Prompt string
@@ -392,7 +442,8 @@ class LLMService:
                     extra={
                         "vendor_count": len(vendors),
                         "level": level,
-                        "parent_category": parent_category
+                        "parent_category_id": parent_category_id,
+                        "batch_id": batch_id
                     })
 
         # --- LEVEL 1 PROMPT ---
@@ -420,7 +471,8 @@ Classify each vendor into ONE of the following Level 1 NAICS categories:
 **Output Format:** Respond *only* with a valid JSON object matching this exact schema. Do not include any text before or after the JSON object.
 {{
   "level": 1,
-  "batch_id": "batch-{len(vendors)}",
+  "batch_id": "{batch_id}",
+  "parent_category_id": null,
   "classifications": [
     {{
       "vendor_name": "Vendor Name Here",
@@ -433,26 +485,54 @@ Classify each vendor into ONE of the following Level 1 NAICS categories:
     // ... more classifications
   ]
 }}
-Ensure every vendor from the list is included in the `classifications` array.
+Ensure every vendor from the list is included in the `classifications` array. Ensure the `batch_id` in the response matches "{batch_id}".
 """
         # --- LEVELS 2-4 PROMPT ---
         else:
-            logger.debug(f"Creating prompt for level {level} with parent category {parent_category}")
-            if level == 2:
-                categories = taxonomy.get_level2_categories(parent_category)
-            elif level == 3:
-                categories = taxonomy.get_level3_categories(parent_category)
-            else:  # level == 4:
-                categories = taxonomy.get_level4_categories(parent_category)
+            logger.debug(f"Creating prompt for level {level} with parent category {parent_category_id}")
+            parent_category_name = "Unknown" # Default
+            parent_category_obj = None
 
-            logger.debug(f"Found {len(categories)} level {level} categories for parent {parent_category}")
+            # --- Get Parent Category Name and Subcategories ---
+            try:
+                if level == 2 and parent_category_id in taxonomy.categories:
+                    parent_category_obj = taxonomy.categories[parent_category_id]
+                    categories = taxonomy.get_level2_categories(parent_category_id)
+                elif level == 3:
+                    parts = parent_category_id.split('.')
+                    if len(parts) == 2 and parts[0] in taxonomy.categories and parts[1] in taxonomy.categories[parts[0]].children:
+                         parent_category_obj = taxonomy.categories[parts[0]].children[parts[1]]
+                         categories = taxonomy.get_level3_categories(parent_category_id)
+                    else: categories = []
+                elif level == 4:
+                    parts = parent_category_id.split('.')
+                    if len(parts) == 3 and parts[0] in taxonomy.categories and \
+                       parts[1] in taxonomy.categories[parts[0]].children and \
+                       parts[2] in taxonomy.categories[parts[0]].children[parts[1]].children:
+                         parent_category_obj = taxonomy.categories[parts[0]].children[parts[1]].children[parts[2]]
+                         categories = taxonomy.get_level4_categories(parent_category_id)
+                    else: categories = []
+                else:
+                    categories = []
+
+                if parent_category_obj:
+                    parent_category_name = parent_category_obj.name
+                else:
+                     logger.warning(f"Could not find parent category object for ID: {parent_category_id}")
+
+            except Exception as e:
+                logger.error(f"Error retrieving categories for level {level}, parent {parent_category_id}", exc_info=True)
+                categories = []
+            # --- End Get Parent Category Name ---
+
+            logger.debug(f"Found {len(categories)} level {level} categories for parent {parent_category_id}")
 
             # --- HANDLE MISSING SUBCATEGORIES ---
             if not categories:
-                 logger.warning(f"No subcategories found for level {level}, parent {parent_category}. Prompt cannot be generated effectively.")
+                 logger.warning(f"No subcategories found for level {level}, parent {parent_category_id}. Prompt cannot be generated effectively.")
                  # Return a prompt that reflects this, forcing 'classification_not_possible'
                  prompt = f"""
-You are a precise vendor classification expert. The parent category '{parent_category}' has no defined subcategories at Level {level} in the provided taxonomy.
+You are a precise vendor classification expert. The parent category ID '{parent_category_id}' (Name: '{parent_category_name}') has no defined subcategories at Level {level} in the provided taxonomy.
 
 For the following vendors, classification at Level {level} is not possible due to missing taxonomy definitions.
 
@@ -462,8 +542,8 @@ Vendor list:
 Respond *only* with a valid JSON object matching this exact schema:
 {{
   "level": {level},
-  "batch_id": "batch-{len(vendors)}",
-  "parent_category_id": "{parent_category}",
+  "batch_id": "{batch_id}",
+  "parent_category_id": "{parent_category_id}",
   "classifications": [
     {{
       "vendor_name": "Vendor Name Here",
@@ -471,26 +551,27 @@ Respond *only* with a valid JSON object matching this exact schema:
       "category_name": "N/A",
       "confidence": 0.0,
       "classification_not_possible": true,
-      "classification_not_possible_reason": "No subcategories defined for parent {parent_category} at Level {level}"
+      "classification_not_possible_reason": "No subcategories defined for parent {parent_category_id} at Level {level}"
     }}
     // ... repeat for all vendors in the list
   ]
 }}
-Ensure every vendor from the list is included in the `classifications` array.
+Ensure every vendor from the list is included in the `classifications` array. Ensure the `batch_id` in the response matches "{batch_id}".
 """
                  return prompt
             # --- END HANDLE MISSING SUBCATEGORIES ---
 
             categories_str = "\n".join(f"- {cat.id}: {cat.name}" for cat in categories)
 
+            # --- ADDED PARENT NAME TO PROMPT ---
             prompt = f"""
-You are a precise vendor classification expert using the NAICS taxonomy. Your task is to classify the vendors below, which belong to the parent category '{parent_category}'.
+You are a precise vendor classification expert using the NAICS taxonomy. Your task is to classify the vendors below, which belong to the parent category '{parent_category_id}: {parent_category_name}'.
 
-Classify each vendor into ONE of the following Level {level} NAICS categories, which are subcategories of '{parent_category}':
+Classify each vendor into ONE of the following Level {level} NAICS categories, which are subcategories of '{parent_category_name}':
 {categories_str}
 
 **Instructions:**
-1.  Consider the vendor name and the fact it belongs to the parent category '{parent_category}'.
+1.  Consider the vendor name and the fact it belongs to the parent category '{parent_category_name}'.
 2.  Assign the most specific and appropriate Level {level} category ID and name. Use context from the parent category to help disambiguate if possible.
 3.  **CRITICAL:** If the name is too generic *even within the context of the parent category* to determine the correct Level {level} subcategory (e.g., "General Supply" under "Wholesale Trade"), or if you lack specific knowledge, **DO NOT GUESS**. Mark `classification_not_possible` as `true` and provide a brief reason (e.g., "Insufficient information for subcategory", "Ambiguous within parent category"). Set confidence to 0.0 in this case.
 4.  Provide a confidence score between 0.0 and 1.0 for each classification attempt. A score of 0.0 *must* correspond to `classification_not_possible: true`.
@@ -501,8 +582,8 @@ Classify each vendor into ONE of the following Level {level} NAICS categories, w
 **Output Format:** Respond *only* with a valid JSON object matching this exact schema. Do not include any text before or after the JSON object.
 {{
   "level": {level},
-  "batch_id": "batch-{len(vendors)}",
-  "parent_category_id": "{parent_category}",
+  "batch_id": "{batch_id}",
+  "parent_category_id": "{parent_category_id}",
   "classifications": [
     {{
       "vendor_name": "Vendor Name Here",
@@ -515,7 +596,7 @@ Classify each vendor into ONE of the following Level {level} NAICS categories, w
     // ... more classifications
   ]
 }}
-Ensure every vendor from the list is included in the `classifications` array.
+Ensure every vendor from the list is included in the `classifications` array. Ensure the `batch_id` in the response matches "{batch_id}".
 """
         # --- END LEVELS 2-4 PROMPT ---
 
@@ -554,10 +635,17 @@ Ensure every vendor from the list is included in the `classifications` array.
         sources_str = ""
         if search_results.get("sources"):
             for i, source in enumerate(search_results["sources"]):
-                content_preview = source.get('content', '')[:800] # Increased preview length
+                # Truncate content here for the prompt if necessary, but provide substantial context
+                content_preview = source.get('content', '')[:1500] # Provide more content to LLM
                 sources_str += f"\nSource {i+1}:\nTitle: {source.get('title', 'N/A')}\nURL: {source.get('url', 'N/A')}\nContent Snippet: {content_preview}...\n"
         else:
             sources_str = "No relevant search results were found."
+
+        # Add summary if available
+        summary_str = search_results.get("summary", "")
+        if summary_str:
+            sources_str += f"\nOverall Summary from Search:\n{summary_str}\n"
+
 
         prompt = f"""
 You are a precise vendor classification expert using the NAICS taxonomy. Your task is to classify the vendor '{vendor}' based *only* on the provided search results. **Do not use any prior knowledge you have about this vendor unless it is confirmed in the search results provided.**
@@ -568,12 +656,12 @@ You are a precise vendor classification expert using the NAICS taxonomy. Your ta
 {sources_str}
 
 **Instructions:**
-1.  Analyze the search results carefully to understand the primary business activity of '{vendor}'. Focus on what the company *does*, not just what it sells if it's a reseller.
+1.  Analyze the search results carefully to understand the primary business activity of '{vendor}'. Focus on what the company *does*, not just what it sells if it's a reseller. Synthesize information across sources if possible.
 2.  Based *only* on the provided search results, classify the vendor into ONE of the following Level 1 NAICS categories:
     {categories_str}
-3.  Provide a confidence score between 0.0 and 1.0. Base confidence on the clarity and consistency of the information in the search results.
+3.  Provide a confidence score between 0.0 and 1.0. Base confidence on the clarity, consistency, and relevance of the information in the search results. Higher confidence requires clear evidence of the primary business activity.
 4.  **CRITICAL:** If the search results are insufficient, contradictory, irrelevant, focus only on products sold rather than the business activity, or do not provide enough detail to confidently determine the business type, set `classification_not_possible` to `true` and provide a brief reason (e.g., "Insufficient information from search", "Conflicting sources", "Search results irrelevant", "Results unclear about primary business activity"). Set confidence to 0.0 in this case.
-5.  Provide brief notes explaining your reasoning, referencing specific details from the search results, especially if confidence is not 1.0 or if classification was not possible.
+5.  Provide brief notes explaining your reasoning, referencing specific details or sources from the search results, especially if confidence is not 1.0 or if classification was not possible.
 
 **Output Format:** Respond *only* with a valid JSON object matching this exact schema. Do not include any text before or after the JSON object.
 {{
@@ -585,6 +673,7 @@ You are a precise vendor classification expert using the NAICS taxonomy. Your ta
   "classification_not_possible_reason": "Reason text or null",
   "notes": "Brief explanation of classification decision based *only* on the provided search results."
 }}
+Ensure the `vendor_name` in the response matches "{vendor}".
 """
         return prompt
     # --- END UPDATED SEARCH RESULTS PROMPT ---

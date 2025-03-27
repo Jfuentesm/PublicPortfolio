@@ -140,8 +140,8 @@ def main():
 
     with open(output_file, 'w', encoding='utf-8') as f:
         # Add goal and output instruction template
-        f.write('<goal>\n\n\n')
-        f.write('</goal>\n\n\n')
+        f.write('<issue to address>\n\n\n')
+        f.write('</issue to address>\n\n\n')
         f.write('<output instruction>\n')
         f.write('1) Reflect on 5-7 different possible sources of the problem, distill those down to the most likely root cause \n')
         f.write('2) Give me the COMPLETE UPDATED VERSION of each script that needs to be updated to adrees the more likely root cause and add logging to confirm the hypothesis\n')

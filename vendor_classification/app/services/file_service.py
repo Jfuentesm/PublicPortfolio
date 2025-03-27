@@ -1,3 +1,4 @@
+# file path='app/services/file_service.py'
 import os
 import pandas as pd
 from fastapi import UploadFile
@@ -140,7 +141,12 @@ def read_vendor_file(file_path: str) -> List[str]:
         # Select column, convert to string, drop NaNs, strip whitespace
         vendors_series = df[vendor_col_name].astype(str).str.strip()
         # Filter out empty strings and common non-value strings like 'nan'
-        vendors = vendors_series.loc[vendors_series.str.len() > 0 & ~vendors_series.str.lower().isin(['nan', 'none', 'null', ''])].tolist()
+        # Use pandas methods for efficiency
+        valid_mask = (vendors_series.str.len() > 0) & \
+                     (~vendors_series.str.lower().isin(['nan', 'none', 'null', ''])) & \
+                     (vendors_series.notna())
+        vendors = vendors_series.loc[valid_mask].tolist()
+
 
         logger.info(f"Extracted {len(vendors)} non-empty vendor names from column '{vendor_col_name}'.")
         if not vendors:
@@ -229,7 +235,8 @@ def generate_output_file(
 
     output_data = []
     # Temporary mapping from normalized name back to results for efficiency
-    normalized_to_result = {vendor.strip().title(): res for vendor, res in classification_results.items()}
+    # Ensure keys in classification_results are also normalized consistently
+    normalized_to_result = {str(vendor).strip().title(): res for vendor, res in classification_results.items() if isinstance(vendor, str)}
 
     with LogTimer(logger, "Mapping results to original vendors"):
         for original_vendor_name in original_vendors:
@@ -247,48 +254,73 @@ def generate_output_file(
             search_classification = search_results_data.get("classification", {})
 
             # Determine final classification status and reason
-            final_classification_possible = level4.get("category_id") and level4.get("category_id") not in ["N/A", "ERROR"]
+            final_classification_possible_l4 = level4.get("category_id") and level4.get("category_id") not in ["N/A", "ERROR"]
             classification_not_possible_flag = True # Assume impossible unless proven otherwise
             reason = "Not fully classified" # Default reason
+            final_notes = ""
+            final_confidence = 0.0
+            final_level1_id = level1.get("category_id", "")
+            final_level1_name = level1.get("category_name", "")
+            final_level2_id = level2.get("category_id", "")
+            final_level2_name = level2.get("category_name", "")
+            final_level3_id = level3.get("category_id", "")
+            final_level3_name = level3.get("category_name", "")
+            final_level4_id = level4.get("category_id", "")
+            final_level4_name = level4.get("category_name", "")
 
-            if final_classification_possible:
+
+            if final_classification_possible_l4:
                 classification_not_possible_flag = False
                 reason = None
+                final_notes = level4.get("notes", "")
+                final_confidence = level4.get("confidence", 0.0)
+                # Keep L1-L4 as they are
             elif search_classification and not search_classification.get("classification_not_possible", True):
                  # If search provided a valid L1 classification, use that as the 'best' result
-                 level1 = search_classification # Overwrite L1 with search result
-                 level1['notes'] = f"Classified via search: {level1.get('notes', '')}"
                  classification_not_possible_flag = False # Mark as classified (at least L1)
                  reason = None
-                 # Clear L2-L4 as they are no longer valid if L1 changed
-                 level2, level3, level4 = {}, {}, {}
+                 final_notes = f"Classified via search: {search_classification.get('notes', '')}"
+                 final_confidence = search_classification.get("confidence", 0.0) # Use L1 confidence from search
+                 # Overwrite L1, clear L2-L4
+                 final_level1_id = search_classification.get("category_id", "")
+                 final_level1_name = search_classification.get("category_name", "")
+                 final_level2_id = ""
+                 final_level2_name = ""
+                 final_level3_id = ""
+                 final_level3_name = ""
+                 final_level4_id = ""
+                 final_level4_name = ""
             else:
                 # Find the first level where classification failed, if any
+                failure_reason_found = False
                 for lvl in range(1, 5):
                      lvl_res = result.get(f"level{lvl}", {})
                      if lvl_res.get("classification_not_possible", False):
                           reason = lvl_res.get("classification_not_possible_reason", f"Classification failed at Level {lvl}")
+                          final_notes = lvl_res.get("notes", "") # Use notes from the failed level if available
+                          failure_reason_found = True
                           break
-                else: # If no level explicitly failed, check search results reason
+                if not failure_reason_found: # If no level explicitly failed, check search results reason
                      if search_classification and search_classification.get("classification_not_possible", False):
                            reason = search_classification.get("classification_not_possible_reason", "Search did not yield classification")
+                           final_notes = search_classification.get("notes", "")
                      elif search_results_data.get("error"):
                            reason = f"Search error: {search_results_data.get('error')}"
                      # else 'Not fully classified' remains
 
             row = {
                 "vendor_name": original_vendor_name, # Use the original name from the input
-                "level1_category_id": level1.get("category_id", ""),
-                "level1_category_name": level1.get("category_name", ""),
-                "level2_category_id": level2.get("category_id", ""),
-                "level2_category_name": level2.get("category_name", ""),
-                "level3_category_id": level3.get("category_id", ""),
-                "level3_category_name": level3.get("category_name", ""),
-                "level4_category_id": level4.get("category_id", ""),
-                "level4_category_name": level4.get("category_name", ""),
-                "final_confidence": level4.get("confidence", 0) if not classification_not_possible_flag else level1.get("confidence", 0), # Use L4 confidence if classified, else L1 (could be from search)
+                "level1_category_id": final_level1_id,
+                "level1_category_name": final_level1_name,
+                "level2_category_id": final_level2_id,
+                "level2_category_name": final_level2_name,
+                "level3_category_id": final_level3_id,
+                "level3_category_name": final_level3_name,
+                "level4_category_id": final_level4_id,
+                "level4_category_name": final_level4_name,
+                "final_confidence": final_confidence,
                 "classification_not_possible": classification_not_possible_flag,
-                "classification_notes_or_reason": reason or level4.get("notes") or level1.get("notes", ""), # Provide reason if failed, else notes
+                "classification_notes_or_reason": reason or final_notes or "", # Provide reason if failed, else notes
                 # Safely extract URLs from sources list (which should contain dicts)
                 "sources": ", ".join(
                     source.get("url", "") for source in search_results_data.get("sources", []) if isinstance(source, dict) and source.get("url")

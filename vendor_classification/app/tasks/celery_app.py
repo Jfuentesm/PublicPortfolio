@@ -1,3 +1,4 @@
+# file path='app/tasks/celery_app.py'
 # app/tasks/celery_app.py
 
 from celery import Celery
