@@ -1,86 +1,108 @@
 body {
     background-color: #f8f9fa;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding-top: 56px; /* Adjust for fixed navbar height */
 }
 
 .navbar {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.mt-nav-fix {
+    margin-top: 2rem; /* Additional margin below navbar */
+}
+
+#hero {
+    background-color: #e9ecef;
+    border-radius: 10px;
+    padding: 4rem 1rem; /* Increased padding */
+    margin-bottom: 2rem;
+}
+
+#how-it-works {
+    border-radius: 10px;
+    margin-bottom: 2rem;
+}
+
+.feature-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    height: 4rem;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    color: #fff;
+    background-color: #0d6efd; /* Bootstrap primary blue */
+    border-radius: 50%; /* Make it circular */
+}
+
+#features .card {
+    border: 1px solid #dee2e6; /* Add subtle border */
+}
+
 .card {
     border: none;
     border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); /* Softer shadow */
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
 .card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
 }
 
 .card-header {
     border-radius: 10px 10px 0 0 !important;
+    font-weight: 500;
 }
 
 .btn {
     border-radius: 5px;
     padding: 8px 20px;
     font-weight: 500;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .progress {
-    height: 20px;
+    height: 25px; /* Slightly taller */
     border-radius: 10px;
+    font-size: 0.9rem; /* Show percentage */
+    background-color: #e9ecef; /* Lighter background */
+}
+
+.progress-bar {
+    font-weight: 500;
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    transition: width .6s ease;
 }
 
 footer {
     margin-top: 50px;
     color: #6c757d;
-}
-
-.stage-indicator {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
-}
-
-.stage {
-    flex: 1;
-    text-align: center;
-    padding: 10px;
-    border-radius: 5px;
-    margin: 0 5px;
-    background-color: #e9ecef;
-    font-size: 0.8rem;
-}
-
-.stage.active {
-    background-color: #007bff;
-    color: white;
-}
-
-.stage.completed {
-    background-color: #28a745;
-    color: white;
+    border-top: 1px solid #dee2e6;
 }
 
 .form-control:focus {
-    border-color: #80bdff;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    border-color: #86b7fe; /* Bootstrap focus color */
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25); /* Bootstrap focus shadow */
 }
 
-#downloadLink {
-    width: 100%;
-}
-
+/* Utility Classes */
 .error-message {
-    color: #dc3545;
-    margin-top: 5px;
-    font-size: 0.9rem;
+    color: #dc3545; /* Bootstrap danger red */
+    font-size: 0.875em;
 }
 
 .success-message {
-    color: #28a745;
-    margin-top: 5px;
-    font-size: 0.9rem;
+    color: #198754; /* Bootstrap success green */
+    font-size: 0.875em;
+}
+
+/* Ensure button text is readable when disabled */
+.btn:disabled {
+    opacity: 0.65;
 }

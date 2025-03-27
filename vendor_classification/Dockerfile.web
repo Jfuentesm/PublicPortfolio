@@ -20,6 +20,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir numpy==1.24.4
 RUN pip install --no-cache-dir -r requirements.txt
 
+# --- ADDED LOGGING ---
+# Verify the installed version of pydantic-settings after installation
+RUN echo "Checking pydantic-settings installation details:" && pip show pydantic-settings || echo "pydantic-settings not found after install attempt"
+# --- END ADDED LOGGING ---
+
 # Copy application code
 COPY ./app /app
 COPY ./frontend /frontend

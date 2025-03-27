@@ -4,22 +4,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Elements ---
     const loginForm = document.getElementById('loginForm');
-    const loginCard = document.getElementById('loginCard');
-    const uploadCard = document.getElementById('uploadCard');
+    const loginCard = document.getElementById('loginCard'); // Login card itself
+    const loginErrorEl = document.getElementById('loginError'); // Error message div for login
+    const landingContent = document.getElementById('landingContent'); // Wrapper for landing page sections
+    const appContent = document.getElementById('appContent'); // Wrapper for upload/status/stats cards
+    const uploadCard = document.getElementById('uploadCard'); // Upload card within appContent
     const userInfo = document.getElementById('userInfo');
     const usernameDisplay = document.getElementById('usernameDisplay');
     const logoutButton = document.getElementById('logoutButton');
     const uploadForm = document.getElementById('uploadForm');
+    const uploadSuccessEl = document.getElementById('uploadSuccess'); // Success message for upload
+    const uploadErrorEl = document.getElementById('uploadError'); // Error message for upload
     const jobStatusCard = document.getElementById('jobStatus');
     const jobStatsCard = document.getElementById('jobStats');
     const downloadDiv = document.getElementById('downloadDiv');
-    // --- MODIFICATION: Get the button/link itself ---
-    const downloadButton = document.getElementById('downloadLink'); // Treat it as a button now
-    // --- END MODIFICATION ---
+    const downloadButton = document.getElementById('downloadLink'); // The button/link element
+    const downloadErrorEl = document.getElementById('downloadError'); // Error message div for download
     const notifyButton = document.getElementById('notifyButton');
+    const notifyMessageEl = document.getElementById('notifyMessage'); // Message div for notification
     const uploadButton = document.getElementById('uploadButton');
     const jobIdEl = document.getElementById('jobId');
     const statusEl = document.getElementById('status');
+    const jobErrorMsgEl = document.getElementById('jobErrorMsg'); // Error message span within job status
     const stageEl = document.getElementById('currentStage');
     const progressEl = document.getElementById('progressBar');
     const createdEl = document.getElementById('createdAt');
@@ -31,11 +37,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const tokensUsedEl = document.getElementById('tokensUsed');
     const tavilySearchesEl = document.getElementById('tavilySearches');
     const processingTimeEl = document.getElementById('processingTime');
+    const statsErrorEl = document.getElementById('statsError'); // Error message div for stats
 
-    console.log('Verifying initial elements:', { loginForm: !!loginForm, loginCard: !!loginCard, uploadCard: !!uploadCard, userInfo: !!userInfo, usernameDisplay: !!usernameDisplay, logoutButton: !!logoutButton, uploadForm: !!uploadForm, jobStatusCard: !!jobStatusCard, jobStatsCard: !!jobStatsCard, uploadButton: !!uploadButton, downloadDiv: !!downloadDiv, downloadButton: !!downloadButton, notifyButton: !!notifyButton }); // Changed downloadLink to downloadButton
-    if (!loginCard || !uploadCard || !userInfo || !uploadForm || !jobStatusCard || !jobStatsCard || !uploadButton || !downloadButton) { // Added downloadButton check
+    console.log('Verifying initial elements:', { landingContent: !!landingContent, appContent: !!appContent, loginForm: !!loginForm, loginCard: !!loginCard, uploadCard: !!uploadCard, userInfo: !!userInfo, usernameDisplay: !!usernameDisplay, logoutButton: !!logoutButton, uploadForm: !!uploadForm, jobStatusCard: !!jobStatusCard, jobStatsCard: !!jobStatsCard, uploadButton: !!uploadButton, downloadDiv: !!downloadDiv, downloadButton: !!downloadButton, notifyButton: !!notifyButton });
+    if (!landingContent || !appContent || !loginCard || !uploadCard || !userInfo || !uploadForm || !jobStatusCard || !jobStatsCard || !uploadButton || !downloadButton) {
          console.error("CRITICAL: One or more essential UI elements are missing.");
          alert("UI Error: Essential page elements could not be found.");
+         return; // Stop execution if essential elements are missing
     }
 
     // --- State ---
@@ -45,37 +53,74 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentJobId = null; // Store the current job ID
 
     // --- Constants ---
-    const stageNames = { 'ingestion': 'File Ingestion', 'normalization': 'Vendor Name Normalization', 'classification_level_1': 'Level 1 Classification', 'classification_level_2': 'Level 2 Classification', 'classification_level_3': 'Level 3 Classification', 'classification_level_4': 'Level 4 Classification', 'search_unknown_vendors': 'Vendor Research', 'result_generation': 'Result Generation' };
-    const POLLING_INTERVAL = 5000;
-    const POLLING_RETRY_INTERVAL = 15000;
+    const stageNames = { 'ingestion': 'File Ingestion', 'normalization': 'Vendor Name Normalization', 'classification_level_1': 'Level 1 Classification', 'classification_level_2': 'Level 2 Classification', 'classification_level_3': 'Level 3 Classification', 'classification_level_4': 'Level 4 Classification', 'search_unknown_vendors': 'Vendor Research', 'result_generation': 'Result Generation', 'completed': 'Completed', 'failed': 'Failed' };
+    const POLLING_INTERVAL = 5000; // 5 seconds
+    const POLLING_RETRY_INTERVAL = 15000; // 15 seconds
+
+    // --- Utility Functions ---
+    function displayMessage(element, message, isError = true) {
+        if (!element) return;
+        element.textContent = message;
+        element.classList.remove('d-none', isError ? 'success-message' : 'error-message');
+        element.classList.add(isError ? 'error-message' : 'success-message');
+    }
+
+    function hideMessage(element) {
+         if (!element) return;
+         element.textContent = '';
+         element.classList.add('d-none');
+         element.classList.remove('error-message', 'success-message');
+    }
 
     // --- Auth Functions ---
     function isAuthenticated() {
+        // Optionally add token validation/decoding here if needed
         return authToken !== null;
     }
 
     function updateAuthUI() {
         console.log('Updating Auth UI...');
-        if (!loginCard || !uploadCard || !userInfo || !jobStatusCard || !jobStatsCard) {
+        // Check elements again just in case
+        if (!landingContent || !appContent || !userInfo || !jobStatusCard || !jobStatsCard) {
             console.error('One or more UI elements missing in updateAuthUI!'); return;
         }
         console.log('All elements verified in updateAuthUI.');
 
         if (isAuthenticated()) {
             console.log('User IS authenticated.');
-            loginCard.classList.add('d-none');
-            uploadCard.classList.remove('d-none');
-            userInfo.classList.remove('d-none');
+            landingContent.classList.add('d-none'); // Hide landing page content
+            appContent.classList.remove('d-none'); // Show application content (upload, status, stats)
+            userInfo.classList.remove('d-none'); // Show user info in navbar
             if(usernameDisplay) usernameDisplay.textContent = currentUser || 'User';
+            // Check if there's a job ID in the URL from a previous session/link
+            const urlParams = new URLSearchParams(window.location.search);
+            const jobIdFromUrl = urlParams.get('job_id');
+            if (jobIdFromUrl && !currentJobId) { // Only start polling if not already polling a job
+                 console.log(`Found Job ID in URL: ${jobIdFromUrl}. Starting polling.`);
+                 if (jobStatusCard) jobStatusCard.classList.remove('d-none');
+                 if(jobIdEl) jobIdEl.textContent = jobIdFromUrl;
+                 startPolling(jobIdFromUrl);
+            } else {
+                 // If no job in URL, ensure status/stats cards are hidden initially
+                 if (jobStatusCard) jobStatusCard.classList.add('d-none');
+                 if (jobStatsCard) jobStatsCard.classList.add('d-none');
+            }
+
         } else {
             console.log('User IS NOT authenticated.');
-            loginCard.classList.remove('d-none');
-            uploadCard.classList.add('d-none');
-            userInfo.classList.add('d-none');
-            jobStatusCard.classList.add('d-none');
-            jobStatsCard.classList.add('d-none');
+            landingContent.classList.remove('d-none'); // Show landing page content
+            appContent.classList.add('d-none'); // Hide application content
+            userInfo.classList.add('d-none'); // Hide user info in navbar
             stopPolling();
             currentJobId = null; // Clear job ID on logout
+             // Clear any lingering job status UI elements just in case
+            if (jobStatusCard) jobStatusCard.classList.add('d-none');
+            if (jobStatsCard) jobStatsCard.classList.add('d-none');
+            if(uploadForm) uploadForm.reset(); // Reset upload form on logout
+            if(uploadButton) { uploadButton.disabled = false; uploadButton.textContent = 'Upload and Process'; }
+            hideMessage(loginErrorEl); // Hide login errors
+            hideMessage(uploadErrorEl); // Hide upload errors
+            hideMessage(uploadSuccessEl);
         }
         console.log('Auth UI update complete.');
     }
@@ -87,23 +132,26 @@ document.addEventListener('DOMContentLoaded', function() {
         authToken = null;
         currentUser = null;
         updateAuthUI();
-        if(uploadForm) uploadForm.reset();
-        if(uploadButton) uploadButton.disabled = false;
-        if(uploadButton) uploadButton.textContent = 'Upload and Process';
+        // Also clear the job_id from the URL if present
+        if (window.history.pushState) {
+            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+            window.history.pushState({path:newUrl},'',newUrl);
+        }
     }
 
     // --- API Fetch Interceptor ---
     const originalFetch = window.fetch;
     window.fetch = async function(url, options = {}) {
         const newOptions = { ...options };
-        console.log(`Making fetch request: ${options.method || 'GET'} ${url}`);
+        // Avoid logging potentially sensitive bodies
+        // console.log(`Making fetch request: ${options.method || 'GET'} ${url}`);
 
         if (authToken && url.startsWith('/api') && url !== '/token') {
-             console.log(`Adding Auth token for request to: ${url}`);
+            // console.log(`Adding Auth token for request to: ${url}`);
             newOptions.headers = { ...(newOptions.headers || {}), 'Authorization': `Bearer ${authToken}` };
-             console.log('Request headers:', newOptions.headers);
+            // console.log('Request headers:', newOptions.headers);
         } else {
-            console.log(`Skipping Auth token for: ${url}`);
+            // console.log(`Skipping Auth token for: ${url}`);
         }
 
         try {
@@ -111,18 +159,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (response.status === 401 && url !== '/token') {
                 console.warn(`Received 401 Unauthorized for ${url}. Token likely expired. Logging out.`);
-                alert("Your session has expired. Please log in again.");
+                displayMessage(loginErrorEl, "Your session has expired. Please log in again.");
                 handleLogout();
                 const error = new Error("Session expired (401)");
-                error.isHandledAuthError = true;
+                error.isHandledAuthError = true; // Flag to prevent duplicate alerts
                 throw error;
             }
 
             return response;
 
         } catch (error) {
-            console.error(`Fetch interceptor error for ${url}:`, error);
-            throw error;
+            // Only log if it's not the handled 401 error
+            if (!error.isHandledAuthError) {
+                console.error(`Fetch interceptor error for ${url}:`, error);
+            }
+            throw error; // Re-throw the error
         }
     };
 
@@ -132,6 +183,10 @@ document.addEventListener('DOMContentLoaded', function() {
         loginForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             console.log('Login form submitted.');
+            hideMessage(loginErrorEl); // Clear previous errors
+            const submitButton = loginForm.querySelector('button[type="submit"]');
+            if(submitButton) submitButton.disabled = true;
+
             const usernameInput = document.getElementById('username');
             const passwordInput = document.getElementById('password');
             const username = usernameInput ? usernameInput.value : '';
@@ -139,29 +194,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
             try {
                 console.log('Attempting login request...');
-                const response = await fetch('/token', { // Login uses non-intercepted fetch logic for 401
+                // Use originalFetch directly for login to handle 401 specifically here
+                const response = await originalFetch('/token', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: new URLSearchParams({ 'username': username, 'password': password })
                 });
 
                 console.log('Login response status:', response.status);
+                const responseData = await response.json(); // Try to parse JSON regardless of status
+
                 if (!response.ok) {
                     let errorMsg = 'Login failed. Please check credentials.';
-                    try { const errorData = await response.json(); errorMsg = errorData.detail || errorMsg; } catch (jsonError) {}
+                    if (responseData && responseData.detail) {
+                         errorMsg = responseData.detail;
+                    } else if (response.status === 401) {
+                         errorMsg = 'Incorrect username or password.';
+                    }
                     throw new Error(errorMsg);
                 }
 
-                const data = await response.json();
-                console.log('Login successful:', data);
-                authToken = data.access_token;
-                currentUser = data.username;
+                console.log('Login successful:', responseData);
+                authToken = responseData.access_token;
+                currentUser = responseData.username;
                 localStorage.setItem('authToken', authToken);
                 localStorage.setItem('currentUser', currentUser);
                 updateAuthUI();
             } catch (error) {
                 console.error('Login error:', error);
-                alert(`Login Error: ${error.message}`);
+                displayMessage(loginErrorEl, `Login Error: ${error.message}`);
+            } finally {
+                 if(submitButton) submitButton.disabled = false;
             }
         });
     } else { console.error("Login form not found!"); }
@@ -174,8 +237,15 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             console.log('Upload form submitted.');
+            hideMessage(uploadErrorEl);
+            hideMessage(uploadSuccessEl);
             if(uploadButton) uploadButton.disabled = true;
-            if(uploadButton) uploadButton.textContent = 'Processing...';
+            if(uploadButton) uploadButton.textContent = 'Uploading...';
+
+            // Hide previous job status/stats if any
+            if (jobStatusCard) jobStatusCard.classList.add('d-none');
+            if (jobStatsCard) jobStatsCard.classList.add('d-none');
+            stopPolling(); // Stop polling for any previous job
 
             const formData = new FormData(uploadForm);
             const fileInput = document.getElementById('vendorFile');
@@ -183,7 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log('Form Data prepared:', { company_name: formData.get('company_name'), file_name: file?.name, file_size: file?.size, file_type: file?.type });
             if (!file) {
-                alert("Please select a file to upload.");
+                displayMessage(uploadErrorEl, "Please select a file to upload.");
                 if(uploadButton) uploadButton.disabled = false;
                 if(uploadButton) uploadButton.textContent = 'Upload and Process';
                 return;
@@ -209,9 +279,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         } else if (errorData.detail) { errorMsg = errorData.detail; }
                         else { errorMsg = JSON.stringify(errorData); }
                     } catch (jsonError) {
-                        const errorText = await response.text();
-                        console.error('Upload failed with non-JSON response:', errorText);
-                        errorMsg = `Server returned status ${response.status}. Response: ${errorText.substring(0, 200)}`;
+                        try {
+                            const errorText = await response.text();
+                            console.error('Upload failed with non-JSON response:', errorText);
+                            errorMsg = `Server returned status ${response.status}. Response: ${errorText.substring(0, 200)}`;
+                        } catch (textError) {
+                            console.error('Upload failed and could not read error response body.');
+                            errorMsg = `Server returned status ${response.status}. Could not read error details.`;
+                        }
                     }
                     const error = new Error(errorMsg);
                     error.status = response.status;
@@ -221,18 +296,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const data = await response.json();
                 console.log('Upload successful, job started:', data);
+                displayMessage(uploadSuccessEl, `Upload successful! Job ${data.job_id} started.`, false);
                 currentJobId = data.job_id; // Store current job ID
 
+                // Update URL with job ID
+                if (window.history.pushState) {
+                    const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + `?job_id=${currentJobId}`;
+                    window.history.pushState({path:newUrl},'',newUrl);
+                }
+
                 if (jobStatusCard) jobStatusCard.classList.remove('d-none');
+                // Ensure stats card is hidden until job completes
                 if (jobStatsCard) jobStatsCard.classList.add('d-none');
-                if (downloadDiv) downloadDiv.style.display = 'none';
+                if (downloadDiv) downloadDiv.style.display = 'none'; // Hide download initially
+                hideMessage(jobErrorMsgEl); // Clear previous job errors
+                hideMessage(downloadErrorEl); // Clear previous download errors
+                hideMessage(statsErrorEl); // Clear previous stats errors
+                hideMessage(notifyMessageEl); // Clear previous notify messages
+                if(document.getElementById('notificationEmail')) document.getElementById('notificationEmail').value = ''; // Clear email field
 
                 if(jobIdEl) jobIdEl.textContent = data.job_id;
                 if(statusEl) statusEl.textContent = data.status || 'N/A';
-                if(stageEl) stageEl.textContent = stageNames[data.current_stage] || data.current_stage || 'N/A';
-                if(progressEl) { progressEl.style.width = `${(data.progress || 0) * 100}%`; progressEl.classList.remove('bg-danger'); }
+                if(stageEl) stageEl.textContent = stageNames[data.current_stage] || data.current_stage || 'Pending';
+                if(progressEl) {
+                    const progressPercent = Math.round((data.progress || 0) * 100);
+                    progressEl.style.width = `${progressPercent}%`;
+                    progressEl.textContent = `${progressPercent}%`;
+                    progressEl.classList.remove('bg-danger', 'bg-success');
+                    progressEl.classList.add('progress-bar-animated');
+                }
                 if(createdEl) createdEl.textContent = data.created_at ? new Date(data.created_at).toLocaleString() : 'N/A';
-                if(updatedEl) updatedEl.textContent = data.updated_at ? new Date(data.updated_at).toLocaleString() : 'N/A';
+                if(updatedEl) updatedEl.textContent = 'Pending...'; // Reset updated time
+                if(estimatedEl) estimatedEl.textContent = 'Calculating...'; // Reset estimate
 
                 startPolling(data.job_id);
 
@@ -245,7 +340,7 @@ document.addEventListener('DOMContentLoaded', function() {
                          alertMessage = `Validation Error:\n${validationErrors}`;
                          console.error("Detailed Validation Errors:", error.details);
                     } else if (error.status) { alertMessage = `Upload Error (Status ${error.status}): ${error.message}`; }
-                    alert(alertMessage);
+                    displayMessage(uploadErrorEl, alertMessage);
                 }
                 if(uploadButton) uploadButton.disabled = false;
                 if(uploadButton) uploadButton.textContent = 'Upload and Process';
@@ -256,13 +351,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (notifyButton) {
         notifyButton.addEventListener('click', async function() {
             console.log('Notify button clicked.');
+            hideMessage(notifyMessageEl); // Clear previous messages
             const emailInput = document.getElementById('notificationEmail');
-            const email = emailInput ? emailInput.value : null;
+            const email = emailInput ? emailInput.value.trim() : null;
             // Use stored currentJobId
-            if (!email) { alert('Please enter an email address'); return; }
-            if (!currentJobId) { alert('Job ID not found.'); return; }
+            if (!email) { displayMessage(notifyMessageEl, 'Please enter a valid email address'); return; }
+            if (!currentJobId) { displayMessage(notifyMessageEl, 'Job ID not found.'); return; }
 
             console.log(`Requesting notification for Job ID: ${currentJobId} to Email: ${email}`);
+            notifyButton.disabled = true;
 
             try {
                 console.log('Attempting notification request...');
@@ -273,34 +370,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 console.log('Notification response status:', response.status);
+                const responseData = await response.json(); // Try parsing JSON
+
                 if (!response.ok) { // Interceptor handles 401
                      let errorMsg = 'Error setting notification';
-                     try { const errorData = await response.json(); errorMsg = errorData.detail || errorMsg; } catch (jsonError) {}
+                     if (responseData && responseData.detail) { errorMsg = responseData.detail; }
                     throw new Error(errorMsg);
                 }
                 console.log('Notification request successful.');
-                alert('Notification set! You will receive an email when processing is complete.');
+                displayMessage(notifyMessageEl, 'Notification request sent!', false);
+                if(emailInput) emailInput.value = ''; // Clear field on success
+
             } catch (error) {
                  console.error('Notification error:', error);
                  if (!error.isHandledAuthError) {
-                     alert(`Error: ${error.message}`);
+                     displayMessage(notifyMessageEl, `Error: ${error.message}`);
                  }
+            } finally {
+                notifyButton.disabled = false;
             }
         });
     } else { console.error("Notify button not found!"); }
 
-    // --- MODIFICATION: Add event listener for download button ---
     if (downloadButton) {
         downloadButton.addEventListener('click', async function(e) {
             e.preventDefault(); // Prevent default link navigation
             console.log('Download button clicked.');
+            hideMessage(downloadErrorEl); // Clear previous errors
 
             if (!currentJobId) {
-                alert('Cannot download results: No active Job ID found.');
+                displayMessage(downloadErrorEl, 'Cannot download results: No active Job ID found.');
                 return;
             }
             if (!isAuthenticated()) {
-                alert('Please log in to download results.');
+                 displayMessage(downloadErrorEl, 'Please log in to download results.');
                 handleLogout(); // Ensure user is logged out
                 return;
             }
@@ -311,8 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
             downloadButton.disabled = true;
 
             try {
-                // Use intercepted fetch to get the file blob
-                const response = await fetch(downloadUrl); // GET request by default
+                const response = await fetch(downloadUrl); // GET request by default, uses interceptor
 
                 console.log('Download response status:', response.status);
 
@@ -322,8 +424,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         const errorData = await response.json(); // Try parsing error
                         errorMsg = errorData.detail || JSON.stringify(errorData);
                     } catch (jsonError) {
-                        const errorText = await response.text(); // Fallback to text
-                        errorMsg = `Server returned status ${response.status}. ${errorText.substring(0,100)}`;
+                        try {
+                             const errorText = await response.text(); // Fallback to text
+                             errorMsg = `Server returned status ${response.status}. ${errorText.substring(0,100)}`;
+                        } catch(textError) {
+                             errorMsg = `Server returned status ${response.status}. Could not read error details.`;
+                        }
                     }
                     throw new Error(errorMsg);
                 }
@@ -340,7 +446,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 console.log(`Attempting to save file as: ${filename}`);
 
-                // Get the file data as a Blob
                 const blob = await response.blob();
 
                 // Create a temporary link to trigger the download
@@ -348,114 +453,152 @@ document.addEventListener('DOMContentLoaded', function() {
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
-                a.download = filename; // Use the extracted or default filename
+                a.download = filename;
                 document.body.appendChild(a);
-                a.click(); // Simulate click
-                window.URL.revokeObjectURL(url); // Clean up the object URL
-                document.body.removeChild(a); // Clean up the link
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
                 console.log('File download triggered.');
 
             } catch (error) {
                 console.error('Download error:', error);
-                if (!error.isHandledAuthError) { // Only alert if not handled by interceptor
-                    alert(`Download failed: ${error.message}`);
+                if (!error.isHandledAuthError) {
+                    displayMessage(downloadErrorEl, `Download failed: ${error.message}`);
                 }
             } finally {
-                // Re-enable button
                 downloadButton.textContent = 'Download Results';
                 downloadButton.disabled = false;
             }
         });
     } else { console.error("Download button/link not found!"); }
-    // --- END MODIFICATION ---
+
 
     // --- Polling Functions ---
     function startPolling(jobId) {
-        stopPolling();
+        stopPolling(); // Clear any existing interval
         console.log(`Starting polling for Job ID: ${jobId}`);
         currentJobId = jobId; // Store the job ID being polled
-        pollJobStatus(jobId); // Initial poll
+        pollJobStatus(jobId); // Initial poll immediately
         pollingIntervalId = setInterval(() => pollJobStatus(jobId), POLLING_INTERVAL);
     }
 
     function stopPolling() {
         if (pollingIntervalId) {
-            console.log("Stopping polling.");
+            console.log(`Stopping polling for interval ID: ${pollingIntervalId}.`);
             clearInterval(pollingIntervalId);
             pollingIntervalId = null;
-            // Don't clear currentJobId here, might be needed for download
+        } else {
+             // console.log("Stop polling called, but no active interval found.");
         }
     }
 
     async function pollJobStatus(jobId) {
+        // If user logs out while polling, stop
         if (!isAuthenticated()) {
-            console.log("Not authenticated, stopping polling.");
+            console.log("Not authenticated during poll, stopping polling.");
             stopPolling();
             return;
         }
-        if (jobId !== currentJobId) { // Stop polling if a new job was started
-            console.log(`Polling stopped for ${jobId} because a new job (${currentJobId}) was started.`);
-            stopPolling();
+        // If a new job was started, stop polling the old one
+        if (jobId !== currentJobId) {
+            console.log(`Polling stopped for ${jobId} because current job is now ${currentJobId}.`);
+            // No need to call stopPolling() here, as startPolling() already does it.
             return;
         }
 
+        console.log(`Polling status for Job ID: ${jobId}`);
         try {
             const response = await fetch(`/api/v1/jobs/${jobId}`); // Uses interceptor
 
             if (!response.ok) { // Interceptor handles 401
                  let errorMsg = 'Error fetching job status';
                  try { const errorData = await response.json(); errorMsg = errorData.detail || JSON.stringify(errorData); }
-                 catch (jsonError) { const errorText = await response.text(); errorMsg = `Server returned status ${response.status}. ${errorText.substring(0,100)}`; }
+                 catch (jsonError) {
+                     try { const errorText = await response.text(); errorMsg = `Server returned status ${response.status}. ${errorText.substring(0,100)}`; }
+                     catch(textError){ errorMsg = `Server returned status ${response.status}. Could not read error details.`; }
+                 }
                  console.error(`Polling error for Job ID ${jobId}: ${errorMsg}. Stopping polling.`);
-                 if(statusEl) statusEl.textContent = `Error polling: ${errorMsg}`;
-                 if(progressEl) progressEl.classList.add('bg-danger');
+                 if(statusEl) statusEl.textContent = `Error`;
+                 displayMessage(jobErrorMsgEl, `Polling Error: ${errorMsg}`);
+                 if(progressEl) { progressEl.classList.add('bg-danger'); progressEl.textContent = 'Error'; progressEl.classList.remove('progress-bar-animated');}
                  stopPolling();
-                 if(uploadButton) uploadButton.disabled = false;
-                 if(uploadButton) uploadButton.textContent = 'Upload and Process';
+                 if(uploadButton) { uploadButton.disabled = false; uploadButton.textContent = 'Upload and Process'; }
                  return;
             }
 
             const data = await response.json();
+            console.log(`Poll response for ${jobId}:`, data);
 
+            // Update UI elements only if they exist
             if(statusEl) statusEl.textContent = data.status || 'N/A';
             if(stageEl) stageEl.textContent = stageNames[data.current_stage] || data.current_stage || 'N/A';
-            if(progressEl) progressEl.style.width = `${(data.progress || 0) * 100}%`;
+            if(progressEl) {
+                const progressPercent = Math.round((data.progress || 0) * 100);
+                progressEl.style.width = `${progressPercent}%`;
+                progressEl.textContent = `${progressPercent}%`;
+                // Ensure animation stops only when final
+                if (data.status === 'completed' || data.status === 'failed') {
+                    progressEl.classList.remove('progress-bar-animated');
+                } else {
+                    progressEl.classList.add('progress-bar-animated'); // Keep animating if processing
+                }
+            }
             if(updatedEl) updatedEl.textContent = data.updated_at ? new Date(data.updated_at).toLocaleString() : 'N/A';
-            if (estimatedEl) { estimatedEl.textContent = data.estimated_completion ? new Date(data.estimated_completion).toLocaleString() : 'Calculating...'; }
+            if (estimatedEl) {
+                estimatedEl.textContent = data.estimated_completion ? new Date(data.estimated_completion).toLocaleString() : (data.status === 'processing' ? 'Calculating...' : 'N/A');
+            }
 
+            // Handle final states
             if (data.status === 'completed' || data.status === 'failed') {
                 console.log(`Job ${jobId} finished with status: ${data.status}`);
                 stopPolling();
-                if(uploadButton) uploadButton.disabled = false;
-                if(uploadButton) uploadButton.textContent = 'Upload and Process';
+                if(uploadButton) { uploadButton.disabled = false; uploadButton.textContent = 'Upload and Process'; }
 
                 if (data.status === 'completed') {
                     if (downloadDiv) downloadDiv.style.display = 'block';
-                    // No need to set href anymore, button click handles it
-                    if(progressEl) progressEl.classList.remove('bg-danger');
-                    fetchJobStats(jobId);
-                } else {
+                    if(progressEl) { progressEl.classList.add('bg-success'); progressEl.classList.remove('bg-danger'); } // Ensure success styling
+                    hideMessage(jobErrorMsgEl); // Clear any previous errors
+                    fetchJobStats(jobId); // Fetch stats on completion
+                } else { // Failed state
                      const errorMsg = data.error_message || 'Processing failed.';
-                     if(statusEl) statusEl.textContent = `Failed: ${errorMsg.substring(0, 100)}${errorMsg.length > 100 ? '...' : ''}`;
-                     if(progressEl) progressEl.classList.add('bg-danger');
+                     if(statusEl) statusEl.textContent = `Failed`;
+                     displayMessage(jobErrorMsgEl, errorMsg.substring(0, 150) + (errorMsg.length > 150 ? '...' : ''));
+                     if(progressEl) { progressEl.classList.add('bg-danger'); progressEl.classList.remove('bg-success'); progressEl.textContent = 'Failed'; }
                      console.error(`Job ${jobId} Failed: ${errorMsg}`);
-                     alert(`Job Failed: ${errorMsg}`);
+                     // Optionally show a more prominent alert for failure
+                     // alert(`Job Failed: ${errorMsg}`);
                 }
-                return;
+                return; // Exit polling loop
+            } else {
+                 // Still processing, ensure progress bar is not red/green
+                 if(progressEl) progressEl.classList.remove('bg-danger', 'bg-success');
+                 hideMessage(jobErrorMsgEl); // Clear error message while processing
             }
         } catch (error) {
             console.error(`Error during pollJobStatus execution for ${jobId}:`, error);
-             if (!error.isHandledAuthError) {
-                if(statusEl) statusEl.textContent = `Polling Error: ${error.message}`;
+             if (!error.isHandledAuthError) { // Only handle if not already handled by interceptor
+                displayMessage(jobErrorMsgEl, `Polling Error: ${error.message}`);
                 console.warn(`Retrying polling for ${jobId} in ${POLLING_RETRY_INTERVAL/1000} seconds after error.`);
-                stopPolling();
-                setTimeout(() => startPolling(jobId), POLLING_RETRY_INTERVAL);
+                stopPolling(); // Stop the current interval
+                // Schedule a single retry attempt after a delay
+                setTimeout(() => {
+                    // Check authentication again before retrying
+                    if (isAuthenticated() && jobId === currentJobId) {
+                        startPolling(jobId);
+                    } else {
+                        console.log("Polling retry aborted due to logout or new job.");
+                    }
+                }, POLLING_RETRY_INTERVAL);
+            } else {
+                // Auth error handled by interceptor, polling should have stopped
+                console.log("Auth error during polling, polling stopped by interceptor.");
             }
         }
     }
 
     async function fetchJobStats(jobId) {
          console.log(`Fetching stats for Job ID: ${jobId}`);
+         hideMessage(statsErrorEl); // Clear previous errors
         try {
             const response = await fetch(`/api/v1/jobs/${jobId}/stats`); // Uses interceptor
 
@@ -463,7 +606,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) { // Interceptor handles 401
                 let errorMsg = 'Error fetching job statistics';
                  try { const errorData = await response.json(); errorMsg = errorData.detail || JSON.stringify(errorData); }
-                 catch (jsonError) { const errorText = await response.text(); errorMsg = `Server returned status ${response.status}. ${errorText.substring(0,100)}`; }
+                 catch (jsonError) {
+                     try{ const errorText = await response.text(); errorMsg = `Server returned status ${response.status}. ${errorText.substring(0,100)}`; }
+                     catch(textError){ errorMsg = `Server returned status ${response.status}. Could not read error details.`; }
+                 }
                 throw new Error(errorMsg);
             }
 
@@ -471,6 +617,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`Received job stats for ${jobId}:`, stats);
 
             if (jobStatsCard) jobStatsCard.classList.remove('d-none');
+            // Use nullish coalescing for safer defaults
             if(vendorsProcessedEl) vendorsProcessedEl.textContent = stats.vendors_processed ?? 'N/A';
             if(uniqueVendorsEl) uniqueVendorsEl.textContent = stats.unique_vendors ?? 'N/A';
             if(apiCallsEl) apiCallsEl.textContent = stats.api_calls ?? 'N/A';
@@ -481,23 +628,15 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error(`Error fetching job statistics for ${jobId}:`, error);
              if (!error.isHandledAuthError) {
-                 if (jobStatsCard) jobStatsCard.classList.add('d-none');
-                 alert(`Could not load job statistics: ${error.message}`);
+                 if (jobStatsCard) jobStatsCard.classList.add('d-none'); // Hide card on error
+                 displayMessage(statsErrorEl, `Could not load job statistics: ${error.message}`);
              }
         }
     }
 
     // --- Initial Load ---
-    updateAuthUI();
+    console.log("Running initial UI setup...");
+    updateAuthUI(); // Set initial UI state based on stored token
+    console.log("Initial UI setup complete.");
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const jobIdFromUrl = urlParams.get('job_id');
-    if (jobIdFromUrl && isAuthenticated()) {
-        console.log(`Found Job ID in URL: ${jobIdFromUrl}. Starting polling.`);
-        if (jobStatusCard) jobStatusCard.classList.remove('d-none');
-        if(jobIdEl) jobIdEl.textContent = jobIdFromUrl;
-        startPolling(jobIdFromUrl);
-    } else if (jobIdFromUrl && !isAuthenticated()) {
-         console.log(`Found Job ID in URL: ${jobIdFromUrl}, but user not authenticated.`);
-    }
 });

@@ -8,136 +8,209 @@
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
         <div class="container">
             <a class="navbar-brand" href="/">NAICS Vendor Classification</a>
-        </div>
-        <!-- Added ID 'userInfo' -->
-        <div class="ms-auto text-white d-none" id="userInfo">
-            Welcome, <span id="usernameDisplay"></span>
-            <button id="logoutButton" class="btn btn-sm btn-outline-light ms-2">Logout</button>
+            <!-- User Info / Logout Button Area -->
+            <div class="ms-auto text-white d-none" id="userInfo">
+                Welcome, <span id="usernameDisplay"></span>
+                <button id="logoutButton" class="btn btn-sm btn-outline-light ms-2">Logout</button>
+            </div>
         </div>
     </nav>
 
-    <div class="container mt-5">
-        <!-- Added ID 'loginCard' -->
-        <div id="loginCard" class="card mb-4">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">Login</h4>
-            </div>
-            <div class="card-body">
-                <form id="loginForm">
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
-                        <div class="form-text">Default credentials: admin / password</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Login</button>
-                </form>
-            </div>
-        </div>
+    <div class="container mt-nav-fix"> <!-- Add margin-top to avoid overlap with fixed navbar -->
 
-        <div class="row">
-            <div class="col-md-8 offset-md-2">
-                <!-- **** ADDED id="uploadCard" HERE **** -->
-                <div id="uploadCard" class="card d-none">
-                    <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">Upload Vendor File</h4>
+        <!-- Landing Page Content (Shown when logged out) -->
+        <div id="landingContent">
+            <!-- Hero Section -->
+            <section id="hero" class="text-center py-5">
+                <h1 class="display-4">Automate Vendor Classification</h1>
+                <p class="lead">Effortlessly classify your vendors using NAICS codes with our powerful AI-driven tool.</p>
+                <p>Save time, ensure accuracy, and gain valuable insights.</p>
+                <a href="#loginCard" class="btn btn-primary btn-lg mt-3">Login or Get Started</a>
+            </section>
+
+            <!-- How It Works Section -->
+            <section id="how-it-works" class="py-5 bg-light">
+                <h2 class="text-center mb-4">How It Works</h2>
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <div class="feature-icon mb-3"><i class="bi bi-cloud-upload-fill"></i>1</div>
+                        <h4>Upload Your Data</h4>
+                        <p>Simply upload your vendor list as an Excel file (.xlsx or .xls) containing a 'vendor_name' column.</p>
                     </div>
-                    <div class="card-body">
-                        <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="col-md-4">
+                        <div class="feature-icon mb-3">2</div>
+                        <h4>AI Classification</h4>
+                        <p>Our system uses advanced AI and web search to accurately classify each vendor based on the NAICS taxonomy.</p>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="feature-icon mb-3">3</div>
+                        <h4>Download Results</h4>
+                        <p>Receive a detailed Excel file with vendor names mapped to their corresponding NAICS codes across all levels.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Features Section -->
+            <section id="features" class="py-5">
+                <h2 class="text-center mb-4">Key Features</h2>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Accurate Classification</h5>
+                                <p class="card-text">Leverages Large Language Models (LLMs) for precise NAICS code assignment.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Hierarchical Detail</h5>
+                                <p class="card-text">Provides classification across all 4 levels of the NAICS taxonomy.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                         <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Intelligent Search</h5>
+                                <p class="card-text">Automatically researches unknown vendors using web search for better results.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                         <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Simple Workflow</h5>
+                                <p class="card-text">Easy upload/download process via a user-friendly interface.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+             <!-- Login Card (Part of Landing Content) -->
+            <div id="loginCard" class="card mb-4 mt-5"> <!-- Added mt-5 for spacing -->
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Login to Access</h4>
+                </div>
+                <div class="card-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                            <div class="form-text">Default credentials: admin / password</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Login</button>
+                        <div id="loginError" class="error-message mt-2 d-none"></div> <!-- Added for login errors -->
+                    </form>
+                </div>
+            </div>
+
+        </div> <!-- End landingContent -->
+
+
+        <!-- Application Content (Shown when logged in) -->
+        <div id="appContent" class="d-none">
+            <div class="row">
+                <div class="col-md-8 offset-md-2">
+                    <!-- Upload Card -->
+                    <div id="uploadCard" class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="mb-0">Upload Vendor File</h4>
+                        </div>
+                        <div class="card-body">
+                             <div id="uploadSuccess" class="success-message mb-3 d-none"></div> <!-- Success Message -->
+                             <div id="uploadError" class="error-message mb-3 d-none"></div> <!-- Error Message -->
+                            <form id="uploadForm" enctype="multipart/form-data">
+                                <div class="mb-3">
+                                    <label for="companyName" class="form-label">Company Name</label>
+                                    <input type="text" class="form-control" id="companyName" name="company_name" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="vendorFile" class="form-label">Vendor Excel File</label>
+                                    <input type="file" class="form-control" id="vendorFile" name="file" accept=".xlsx,.xls" required>
+                                    <div class="form-text">Upload an Excel file with a 'vendor_name' column.</div>
+                                </div>
+                                <button type="submit" id="uploadButton" class="btn btn-primary">Upload and Process</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Job Status Card -->
+                    <div id="jobStatus" class="card mt-4 d-none">
+                        <div class="card-header bg-info text-white">
+                            <h4 class="mb-0">Job Status</h4>
+                        </div>
+                        <div class="card-body">
                             <div class="mb-3">
-                                <label for="companyName" class="form-label">Company Name</label>
-                                <input type="text" class="form-control" id="companyName" name="company_name" required>
+                                <strong>Job ID:</strong> <span id="jobId"></span>
                             </div>
                             <div class="mb-3">
-                                <label for="vendorFile" class="form-label">Vendor Excel File</label>
-                                <input type="file" class="form-control" id="vendorFile" name="file" accept=".xlsx,.xls" required>
-                                <div class="form-text">Upload an Excel file with a 'vendor_name' column.</div>
+                                <strong>Status:</strong> <span id="status"></span>
+                                <span id="jobErrorMsg" class="error-message ms-2"></span> <!-- For job failure messages -->
                             </div>
-                            <!-- Added ID to the button for potential specific targeting if needed -->
-                            <button type="submit" id="uploadButton" class="btn btn-primary">Upload and Process</button>
-                        </form>
+                            <div class="mb-3">
+                                <strong>Current Stage:</strong> <span id="currentStage"></span>
+                            </div>
+                            <div class="mb-3">
+                                <div class="progress">
+                                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Created:</strong> <span id="createdAt"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Updated:</strong> <span id="updatedAt"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Estimated Completion:</strong> <span id="estimatedCompletion"></span>
+                            </div>
+                            <div class="mb-3" id="notificationDiv">
+                                <label for="notificationEmail" class="form-label">Email Notification</label>
+                                <div class="input-group">
+                                    <input type="email" class="form-control" id="notificationEmail" placeholder="Enter your email">
+                                    <button class="btn btn-outline-primary" type="button" id="notifyButton">Notify Me</button>
+                                </div>
+                                <div id="notifyMessage" class="form-text">We'll notify you when processing is complete.</div>
+                            </div>
+                            <div class="mb-3" id="downloadDiv" style="display: none;">
+                                <button id="downloadLink" class="btn btn-success w-100">Download Results</button> <!-- Changed to button -->
+                                <div id="downloadError" class="error-message mt-1"></div> <!-- For download errors -->
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Added ID 'jobStatus' -->
-                <div id="jobStatus" class="card mt-4 d-none">
-                    <div class="card-header bg-info text-white">
-                        <h4 class="mb-0">Job Status</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <strong>Job ID:</strong> <span id="jobId"></span>
+                    <!-- Job Statistics Card -->
+                    <div id="jobStats" class="card mt-4 d-none">
+                        <div class="card-header bg-success text-white">
+                            <h4 class="mb-0">Job Statistics</h4>
                         </div>
-                        <div class="mb-3">
-                            <strong>Status:</strong> <span id="status"></span>
-                        </div>
-                        <div class="mb-3">
-                            <strong>Current Stage:</strong> <span id="currentStage"></span>
-                        </div>
-                        <div class="mb-3">
-                            <div class="progress">
-                                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-sm-6 mb-2"><strong>Vendors Processed:</strong> <span id="vendorsProcessed"></span></div>
+                                <div class="col-sm-6 mb-2"><strong>Unique Vendors:</strong> <span id="uniqueVendors"></span></div>
+                                <div class="col-sm-6 mb-2"><strong>API Calls:</strong> <span id="apiCalls"></span></div>
+                                <div class="col-sm-6 mb-2"><strong>Tokens Used:</strong> <span id="tokensUsed"></span></div>
+                                <div class="col-sm-6 mb-2"><strong>Tavily Searches:</strong> <span id="tavilySearches"></span></div>
+                                <div class="col-sm-6 mb-2"><strong>Processing Time:</strong> <span id="processingTime"></span> seconds</div>
                             </div>
-                        </div>
-                        <div class="mb-3">
-                            <strong>Created:</strong> <span id="createdAt"></span>
-                        </div>
-                        <div class="mb-3">
-                            <strong>Updated:</strong> <span id="updatedAt"></span>
-                        </div>
-                        <div class="mb-3">
-                            <strong>Estimated Completion:</strong> <span id="estimatedCompletion"></span>
-                        </div>
-                        <div class="mb-3" id="notificationDiv">
-                            <label for="notificationEmail" class="form-label">Email Notification</label>
-                            <div class="input-group">
-                                <input type="email" class="form-control" id="notificationEmail" placeholder="Enter your email">
-                                <button class="btn btn-outline-primary" type="button" id="notifyButton">Notify Me</button>
-                            </div>
-                            <div class="form-text">We'll notify you when processing is complete.</div>
-                        </div>
-                        <!-- Added ID 'downloadDiv' -->
-                        <div class="mb-3" id="downloadDiv" style="display: none;">
-                            <a id="downloadLink" href="#" class="btn btn-success">Download Results</a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Added ID 'jobStats' -->
-                <div id="jobStats" class="card mt-4 d-none">
-                    <div class="card-header bg-success text-white">
-                        <h4 class="mb-0">Job Statistics</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <strong>Vendors Processed:</strong> <span id="vendorsProcessed"></span>
-                        </div>
-                        <div class="mb-3">
-                            <strong>Unique Vendors:</strong> <span id="uniqueVendors"></span>
-                        </div>
-                        <div class="mb-3">
-                            <strong>API Calls:</strong> <span id="apiCalls"></span>
-                        </div>
-                        <div class="mb-3">
-                            <strong>Tokens Used:</strong> <span id="tokensUsed"></span>
-                        </div>
-                        <div class="mb-3">
-                            <strong>Tavily Searches:</strong> <span id="tavilySearches"></span>
-                        </div>
-                        <div class="mb-3">
-                            <strong>Processing Time:</strong> <span id="processingTime"></span> seconds
+                            <div id="statsError" class="error-message mt-2"></div> <!-- For stats errors -->
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+        </div> <!-- End appContent -->
+
+    </div> <!-- End container -->
 
     <footer class="mt-5 py-3 bg-light">
         <div class="container text-center">
