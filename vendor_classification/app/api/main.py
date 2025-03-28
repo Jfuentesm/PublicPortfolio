@@ -1,5 +1,6 @@
-# file path='app/api/main.py'
 # app/api/main.py
+import socket # Ensure socket is imported
+import sqlalchemy # Ensure sqlalchemy is imported
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
@@ -9,9 +10,7 @@ from fastapi.responses import JSONResponse
 from typing import Dict, Any, Optional
 import uuid
 import os
-import socket
 from datetime import datetime, timedelta
-import sqlalchemy # <--- ADDED IMPORT
 
 from models.job import Job, JobStatus, ProcessingStage
 from models.user import User
@@ -525,7 +524,15 @@ async def startup_event():
     """Initialize application on startup."""
     # Setup logging first
     log_dir = "/data/logs" if os.path.exists("/data") else "./logs" # Use local dir if /data absent
-    setup_logging(log_level=None, log_to_file=True, log_dir=log_dir, async_logging=True) # Use async logging
+    # --- MODIFIED: Pass llm_trace_log_file name ---
+    setup_logging(
+        log_level=None,
+        log_to_file=True,
+        log_dir=log_dir,
+        async_logging=True,
+        llm_trace_log_file="llm_api_trace.log" # Specify the trace log filename
+    )
+    # --- END MODIFIED ---
     logger.info("*********************************************")
     logger.info("          Application starting up...         ")
     logger.info("*********************************************")

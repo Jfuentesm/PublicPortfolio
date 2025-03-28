@@ -1,12 +1,13 @@
+# app/services/file_service.py
 # file path='app/services/file_service.py'
 import os
 import pandas as pd
 from fastapi import UploadFile
 import shutil
-from typing import List, Dict, Any, Optional # <--- Added Optional
+from typing import List, Dict, Any, Optional
 import uuid
 import logging # Make sure logging is imported
-from datetime import datetime # <--- ADDED IMPORT
+from datetime import datetime
 
 from core.config import settings
 from core.logging_config import get_logger, LogTimer, log_function_call, set_log_context
@@ -16,9 +17,15 @@ logger = get_logger("vendor_classification.file_service")
 
 # --- Define expected column names (case-insensitive matching) ---
 VENDOR_NAME_COL = 'vendor_name'
-OPTIONAL_DESC_COL = 'optional_vendor_description'
+# --- REMOVED: OPTIONAL_DESC_COL ---
 OPTIONAL_EXAMPLE_COL = 'optional_example_good_serviced_purchased'
-# ---
+# --- ADDED: New optional column names ---
+OPTIONAL_ADDRESS_COL = 'vendor_address'
+OPTIONAL_WEBSITE_COL = 'vendor_website'
+OPTIONAL_INTERNAL_CAT_COL = 'internal_category'
+OPTIONAL_PARENT_CO_COL = 'parent_company'
+OPTIONAL_SPEND_CAT_COL = 'spend_category'
+# --- END ADDED ---
 
 @log_function_call(logger, include_args=False) # Keep args=False for UploadFile
 def save_upload_file(file: UploadFile, job_id: str) -> str:
@@ -82,17 +89,17 @@ def save_upload_file(file: UploadFile, job_id: str) -> str:
 
 
 @log_function_call(logger)
-def read_vendor_file(file_path: str) -> List[Dict[str, Any]]: # <--- MODIFIED RETURN TYPE
+def read_vendor_file(file_path: str) -> List[Dict[str, Any]]:
     """
     Read vendor data from Excel file, looking for mandatory 'vendor_name'
-    and optional description and example columns (case-insensitively).
+    and several optional context columns (case-insensitively).
 
     Args:
         file_path: Path to Excel file
 
     Returns:
-        List of dictionaries, each containing vendor data.
-        Example: [{'vendor_name': 'Acme Inc', 'description': '...', 'example': '...'}]
+        List of dictionaries, each containing vendor data including optional fields.
+        Example: [{'vendor_name': 'Acme Inc', 'vendor_address': '...', 'vendor_website': '...'}]
 
     Raises:
         FileNotFoundError: If the file_path does not exist.
@@ -119,8 +126,15 @@ def read_vendor_file(file_path: str) -> List[Dict[str, Any]]: # <--- MODIFIED RE
     # --- Find columns case-insensitively ---
     column_map: Dict[str, Optional[str]] = {
         'vendor_name': None,
-        'description': None,
-        'example': None
+        # --- REMOVED: description ---
+        'example': None,
+        # --- ADDED: Keys for new optional columns ---
+        'address': None,
+        'website': None,
+        'internal_cat': None,
+        'parent_co': None,
+        'spend_cat': None
+        # --- END ADDED ---
     }
     normalized_detected_columns = {str(col).strip().lower(): str(col) for col in detected_columns if isinstance(col, str)}
 
@@ -133,18 +147,45 @@ def read_vendor_file(file_path: str) -> List[Dict[str, Any]]: # <--- MODIFIED RE
                     extra={"available_columns": detected_columns})
         raise ValueError(f"Input Excel file must contain a column named '{VENDOR_NAME_COL}' (case-insensitive). Found columns: {', '.join(map(str, detected_columns))}")
 
-    # Find optional columns
-    if OPTIONAL_DESC_COL in normalized_detected_columns:
-        column_map['description'] = normalized_detected_columns[OPTIONAL_DESC_COL]
-        logger.info(f"Found optional column '{OPTIONAL_DESC_COL}' as: '{column_map['description']}'")
-    else:
-        logger.info(f"Optional column '{OPTIONAL_DESC_COL}' not found.")
+    # --- REMOVED: Description column lookup ---
 
     if OPTIONAL_EXAMPLE_COL in normalized_detected_columns:
         column_map['example'] = normalized_detected_columns[OPTIONAL_EXAMPLE_COL]
         logger.info(f"Found optional column '{OPTIONAL_EXAMPLE_COL}' as: '{column_map['example']}'")
     else:
          logger.info(f"Optional column '{OPTIONAL_EXAMPLE_COL}' not found.")
+
+    # --- ADDED: Find new optional columns ---
+    if OPTIONAL_ADDRESS_COL in normalized_detected_columns:
+        column_map['address'] = normalized_detected_columns[OPTIONAL_ADDRESS_COL]
+        logger.info(f"Found optional column '{OPTIONAL_ADDRESS_COL}' as: '{column_map['address']}'")
+    else:
+        logger.info(f"Optional column '{OPTIONAL_ADDRESS_COL}' not found.")
+
+    if OPTIONAL_WEBSITE_COL in normalized_detected_columns:
+        column_map['website'] = normalized_detected_columns[OPTIONAL_WEBSITE_COL]
+        logger.info(f"Found optional column '{OPTIONAL_WEBSITE_COL}' as: '{column_map['website']}'")
+    else:
+        logger.info(f"Optional column '{OPTIONAL_WEBSITE_COL}' not found.")
+
+    if OPTIONAL_INTERNAL_CAT_COL in normalized_detected_columns:
+        column_map['internal_cat'] = normalized_detected_columns[OPTIONAL_INTERNAL_CAT_COL]
+        logger.info(f"Found optional column '{OPTIONAL_INTERNAL_CAT_COL}' as: '{column_map['internal_cat']}'")
+    else:
+        logger.info(f"Optional column '{OPTIONAL_INTERNAL_CAT_COL}' not found.")
+
+    if OPTIONAL_PARENT_CO_COL in normalized_detected_columns:
+        column_map['parent_co'] = normalized_detected_columns[OPTIONAL_PARENT_CO_COL]
+        logger.info(f"Found optional column '{OPTIONAL_PARENT_CO_COL}' as: '{column_map['parent_co']}'")
+    else:
+        logger.info(f"Optional column '{OPTIONAL_PARENT_CO_COL}' not found.")
+
+    if OPTIONAL_SPEND_CAT_COL in normalized_detected_columns:
+        column_map['spend_cat'] = normalized_detected_columns[OPTIONAL_SPEND_CAT_COL]
+        logger.info(f"Found optional column '{OPTIONAL_SPEND_CAT_COL}' as: '{column_map['spend_cat']}'")
+    else:
+        logger.info(f"Optional column '{OPTIONAL_SPEND_CAT_COL}' not found.")
+    # --- END ADDED ---
     # --- End Find columns ---
 
     # --- Extract data into list of dictionaries ---
@@ -164,18 +205,46 @@ def read_vendor_file(file_path: str) -> List[Dict[str, Any]]: # <--- MODIFIED RE
 
             vendor_entry: Dict[str, Any] = {'vendor_name': vendor_name}
 
-            # Add optional fields if columns exist and data is present
-            if column_map['description']:
-                desc_raw = row.get(column_map['description'])
-                description = str(desc_raw).strip() if pd.notna(desc_raw) and str(desc_raw).strip() else None
-                if description:
-                    vendor_entry['description'] = description
+            # --- REMOVED: Description extraction ---
 
             if column_map['example']:
                 example_raw = row.get(column_map['example'])
                 example = str(example_raw).strip() if pd.notna(example_raw) and str(example_raw).strip() else None
                 if example:
                     vendor_entry['example'] = example
+
+            # --- ADDED: Add new optional fields ---
+            if column_map['address']:
+                address_raw = row.get(column_map['address'])
+                address = str(address_raw).strip() if pd.notna(address_raw) and str(address_raw).strip() else None
+                if address:
+                    vendor_entry['vendor_address'] = address
+
+            if column_map['website']:
+                website_raw = row.get(column_map['website'])
+                website = str(website_raw).strip() if pd.notna(website_raw) and str(website_raw).strip() else None
+                if website:
+                    # Basic URL validation could be added here if needed
+                    vendor_entry['vendor_website'] = website
+
+            if column_map['internal_cat']:
+                internal_cat_raw = row.get(column_map['internal_cat'])
+                internal_cat = str(internal_cat_raw).strip() if pd.notna(internal_cat_raw) and str(internal_cat_raw).strip() else None
+                if internal_cat:
+                    vendor_entry['internal_category'] = internal_cat
+
+            if column_map['parent_co']:
+                parent_co_raw = row.get(column_map['parent_co'])
+                parent_co = str(parent_co_raw).strip() if pd.notna(parent_co_raw) and str(parent_co_raw).strip() else None
+                if parent_co:
+                    vendor_entry['parent_company'] = parent_co
+
+            if column_map['spend_cat']:
+                spend_cat_raw = row.get(column_map['spend_cat'])
+                spend_cat = str(spend_cat_raw).strip() if pd.notna(spend_cat_raw) and str(spend_cat_raw).strip() else None
+                if spend_cat:
+                    vendor_entry['spend_category'] = spend_cat
+            # --- END ADDED ---
 
             vendors_data.append(vendor_entry)
             processed_count += 1
@@ -199,17 +268,17 @@ def read_vendor_file(file_path: str) -> List[Dict[str, Any]]: # <--- MODIFIED RE
 
 
 @log_function_call(logger)
-def normalize_vendor_data(vendors_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]: # <--- MODIFIED function name and type hint
+def normalize_vendor_data(vendors_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Normalize vendor names within the list of dictionaries by converting
     to title case and stripping whitespace. Filters out entries with
-    empty names after normalization.
+    empty names after normalization. Preserves other fields.
 
     Args:
         vendors_data: List of dictionaries, each containing vendor data.
 
     Returns:
-        List of dictionaries with normalized vendor names.
+        List of dictionaries with normalized vendor names and preserved optional fields.
     """
     start_count = len(vendors_data)
     logger.info(f"Normalizing vendor names for {start_count} entries...")
@@ -225,8 +294,8 @@ def normalize_vendor_data(vendors_data: List[Dict[str, Any]]) -> List[Dict[str, 
                 normalized_name = original_name.strip().title()
                 if normalized_name: # Check if non-empty after stripping/casing
                     # Create a new dict or modify in place - creating new is safer
-                    normalized_entry = entry.copy()
-                    normalized_entry['vendor_name'] = normalized_name
+                    normalized_entry = entry.copy() # --- MODIFIED: Copy entire entry ---
+                    normalized_entry['vendor_name'] = normalized_name # --- MODIFIED: Update only name ---
                     normalized_vendors_data.append(normalized_entry)
                 else:
                     empty_removed_count += 1
@@ -249,16 +318,16 @@ def normalize_vendor_data(vendors_data: List[Dict[str, Any]]) -> List[Dict[str, 
 
 @log_function_call(logger)
 def generate_output_file(
-    original_vendor_data: List[Dict[str, Any]], # <--- MODIFIED: Use original data list
+    original_vendor_data: List[Dict[str, Any]], # Use original data list with optional fields
     classification_results: Dict[str, Dict], # Results keyed by *unique* normalized names
     job_id: str
 ) -> str:
     """
     Generate output Excel file with classification results, mapping back to
-    original vendor data including optional fields.
+    original vendor data including optional fields read from the input.
 
     Args:
-        original_vendor_data: Original list of vendor dictionaries from the input file (normalized names).
+        original_vendor_data: Original list of vendor dictionaries from the input file (normalized names, plus optional fields).
         classification_results: Classification results keyed by unique, normalized vendor names.
         job_id: Job ID
 
@@ -279,8 +348,15 @@ def generate_output_file(
     with LogTimer(logger, "Mapping results to original vendors"):
         for original_entry in original_vendor_data:
             original_vendor_name = original_entry.get('vendor_name', '') # Get normalized name
-            original_description = original_entry.get('description') # Get original optional description
-            original_example = original_entry.get('example') # Get original optional example
+            # --- ADDED: Get original optional fields from the input entry ---
+            # --- REMOVED: original_description ---
+            original_example = original_entry.get('example')
+            original_address = original_entry.get('vendor_address')
+            original_website = original_entry.get('vendor_website')
+            original_internal_cat = original_entry.get('internal_category')
+            original_parent_co = original_entry.get('parent_company')
+            original_spend_cat = original_entry.get('spend_category')
+            # --- END ADDED ---
 
             # The key to lookup results *is* the normalized name
             normalized_key = original_vendor_name
@@ -352,8 +428,15 @@ def generate_output_file(
 
             row = {
                 "vendor_name": original_vendor_name, # Use the normalized name from the input data
-                "Optional_vendor_description": original_description or "", # Include original description
-                "Optional_example_good_serviced_purchased": original_example or "", # Include original example
+                # --- ADDED: Include original optional fields in output row ---
+                "vendor_address": original_address or "",
+                "vendor_website": original_website or "",
+                "internal_category": original_internal_cat or "",
+                "parent_company": original_parent_co or "",
+                "spend_category": original_spend_cat or "",
+                # --- END ADDED ---
+                # --- REMOVED: Optional_vendor_description ---
+                "Optional_example_good_serviced_purchased": original_example or "", # Keep existing optional fields
                 "level1_category_id": final_level1_id,
                 "level1_category_name": final_level1_name,
                 "level2_category_id": final_level2_id,
@@ -380,10 +463,15 @@ def generate_output_file(
         # return "empty_output_generated.xlsx" # Or similar indicator
 
     with LogTimer(logger, "Creating DataFrame for output"):
-        # --- Define column order explicitly ---
+        # --- MODIFIED: Define column order explicitly including new fields, excluding description ---
         output_columns = [
             "vendor_name",
-            "Optional_vendor_description",
+            "vendor_address",
+            "vendor_website",
+            "internal_category",
+            "parent_company",
+            "spend_category",
+            # --- REMOVED: Optional_vendor_description ---
             "Optional_example_good_serviced_purchased",
             "level1_category_id",
             "level1_category_name",
@@ -411,7 +499,7 @@ def generate_output_file(
         raise IOError(f"Could not create output directory for job {job_id}: {e}")
 
     # Generate a unique-ish but potentially more readable filename
-    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S") # <--- datetime used here
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file_name = f"classification_results_{job_id[:8]}_{timestamp_str}.xlsx"
     output_path = os.path.join(output_dir, output_file_name)
 

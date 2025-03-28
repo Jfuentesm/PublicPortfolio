@@ -1,3 +1,4 @@
+<!-- frontend/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,7 +39,8 @@
                     <div class="col-md-4">
                         <div class="feature-icon mb-3"><i class="bi bi-cloud-upload-fill"></i>1</div>
                         <h4>Upload Your Data</h4>
-                        <p>Simply upload your vendor list as an Excel file (.xlsx or .xls) containing a 'vendor_name' column.</p>
+                        <!-- MODIFIED: Removed reference to optional_vendor_description -->
+                        <p>Simply upload your vendor list as an Excel file (.xlsx or .xls) containing a 'vendor_name' column. Other optional columns like address, website, or examples can provide additional context.</p>
                     </div>
                     <div class="col-md-4">
                         <div class="feature-icon mb-3">2</div>
@@ -137,7 +139,8 @@
                                 <div class="mb-3">
                                     <label for="vendorFile" class="form-label">Vendor Excel File</label>
                                     <input type="file" class="form-control" id="vendorFile" name="file" accept=".xlsx,.xls" required>
-                                    <div class="form-text">Upload an Excel file with a 'vendor_name' column.</div>
+                                    <!-- MODIFIED: Removed reference to optional_vendor_description -->
+                                    <div class="form-text">Upload an Excel file with a 'vendor_name' column. Optional columns like 'vendor_address', 'vendor_website', 'optional_example_good_serviced_purchased', etc., can provide helpful context.</div>
                                 </div>
                                 <button type="submit" id="uploadButton" class="btn btn-primary">Upload and Process</button>
                             </form>

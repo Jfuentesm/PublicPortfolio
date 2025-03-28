@@ -3,7 +3,7 @@ import os
 import time
 import asyncio
 import logging # <<< Ensure logging is imported
-from typing import List, Dict, Any, Optional, Set # <<< Added Set
+from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
 from celery import shared_task
 from sqlalchemy.orm import Session
@@ -19,7 +19,7 @@ from models.job import Job, JobStatus, ProcessingStage
 # Import the specific level classes along with the main Taxonomy class
 from models.taxonomy import Taxonomy, TaxonomyLevel1, TaxonomyLevel2, TaxonomyLevel3
 # --- END MODIFIED IMPORT ---
-from services.file_service import read_vendor_file, normalize_vendor_data, generate_output_file # <--- MODIFIED import normalize_vendor_data
+from services.file_service import read_vendor_file, normalize_vendor_data, generate_output_file
 from services.llm_service import LLMService
 from services.search_service import SearchService
 from utils.taxonomy_loader import load_taxonomy
@@ -168,7 +168,9 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
 
         logger.info(f"Reading vendor file")
         with log_duration(logger, "Reading vendor file"):
-            vendors_data = read_vendor_file(file_path) # <--- MODIFIED: Returns List[Dict]
+            # --- MODIFIED: read_vendor_file now returns List[Dict] including optional fields ---
+            vendors_data = read_vendor_file(file_path)
+            # --- END MODIFIED ---
         logger.info(f"Vendor file read successfully",
                    extra={"vendor_count": len(vendors_data)})
 
@@ -180,18 +182,21 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
 
         logger.info(f"Normalizing vendor data")
         with log_duration(logger, "Normalizing vendor data"):
-            normalized_vendors_data = normalize_vendor_data(vendors_data) # <--- MODIFIED function call
+            # --- MODIFIED: normalize_vendor_data now preserves optional fields ---
+            normalized_vendors_data = normalize_vendor_data(vendors_data)
+            # --- END MODIFIED ---
         logger.info(f"Vendor data normalized",
                    extra={"normalized_count": len(normalized_vendors_data)})
 
         logger.info(f"Identifying unique vendors")
-        # --- MODIFIED: Create unique vendor mapping ---
+        # --- MODIFIED: Create unique vendor mapping storing the full dictionary ---
         unique_vendors_map: Dict[str, Dict[str, Any]] = {}
         for entry in normalized_vendors_data:
             name = entry.get('vendor_name')
+            # Store the first occurrence's full data (including optional fields)
             if name and name not in unique_vendors_map:
-                unique_vendors_map[name] = entry # Store the first occurrence's full data
-        # ---
+                unique_vendors_map[name] = entry
+        # --- END MODIFIED ---
 
         logger.info(f"Unique vendors identified",
                    extra={"unique_count": len(unique_vendors_map)})
@@ -207,12 +212,12 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
 
         # --- MODIFIED: Initialize results based on unique map ---
         results: Dict[str, Dict] = {vendor_name: {} for vendor_name in unique_vendors_map.keys()}
-        # ---
+        # --- END MODIFIED ---
 
         logger.info(f"Starting vendor classification process")
         # --- MODIFIED: Pass unique_vendors_map ---
         await process_vendors(unique_vendors_map, taxonomy, results, stats, job, db, llm_service, search_service)
-        # ---
+        # --- END MODIFIED ---
         logger.info(f"Vendor classification process completed")
 
         # --- UPDATE STAGE AND PROGRESS ---
@@ -226,8 +231,9 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
         logger.info(f"Generating output file")
         with log_duration(logger, "Generating output file"):
             # --- MODIFIED: Pass the original (normalized) list of dicts ---
+            # This list contains the optional fields needed for the output file
             output_file_name = generate_output_file(normalized_vendors_data, results, job_id) # Can raise IOError
-            # ---
+            # --- END MODIFIED ---
         logger.info(f"Output file generated",
                    extra={"output_file": output_file_name})
 
@@ -292,7 +298,7 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
 
 @log_function_call(logger, include_args=False) # Keep args=False
 async def process_vendors(
-    unique_vendors_map: Dict[str, Dict[str, Any]], # <--- MODIFIED: Pass map
+    unique_vendors_map: Dict[str, Dict[str, Any]], # Pass map containing full vendor data
     taxonomy: Taxonomy,
     results: Dict[str, Dict],
     stats: Dict[str, Any],
@@ -303,9 +309,9 @@ async def process_vendors(
 ):
     """
     Process vendors through the classification workflow, including search for unknowns.
-    Updates results and stats dictionaries in place.
+    Updates results and stats dictionaries in place. Passes full vendor data to batching/search.
     """
-    unique_vendor_names = list(unique_vendors_map.keys()) # <--- Get names from map
+    unique_vendor_names = list(unique_vendors_map.keys()) # Get names from map
     total_unique_vendors = len(unique_vendor_names)
     processed_count = 0
 
@@ -325,9 +331,8 @@ async def process_vendors(
         if level == 1:
             grouped_vendors_names = { None: vendors_to_process_next_names } # No parent for level 1
         else:
-            # --- MODIFIED: Group names based on results ---
+            # Group names based on results from the previous level
             grouped_vendors_names = group_by_parent_category(results, level - 1, vendors_to_process_next_names)
-            # ---
 
         logger.info(f"Grouped vendors for Level {level}",
                    extra={"group_count": len(grouped_vendors_names)})
@@ -341,19 +346,19 @@ async def process_vendors(
             logger.info(f"Processing Level {level} group",
                        extra={"parent_category_id": parent_category_id, "vendor_count": len(group_vendor_names)})
 
-            # --- MODIFIED: Create batches of vendor *data* ---
+            # --- MODIFIED: Create batches of vendor *data* using the map ---
             group_vendor_data = [unique_vendors_map[name] for name in group_vendor_names if name in unique_vendors_map]
             level_batches_data = create_batches(group_vendor_data, batch_size=settings.BATCH_SIZE)
-            # ---
+            # --- END MODIFIED ---
 
             for i, batch_data in enumerate(level_batches_data):
                 batch_names = [vd['vendor_name'] for vd in batch_data] # Get names for logging
                 logger.info(f"Processing Level {level} batch {i+1}/{len(level_batches_data)} for parent '{parent_category_id or 'None'}'",
                            extra={"batch_size": len(batch_data)})
                 try:
-                    # --- MODIFIED: Pass batch_data ---
+                    # --- MODIFIED: Pass batch_data (list of dicts) ---
                     batch_results = await process_batch(batch_data, level, parent_category_id, taxonomy, llm_service, stats)
-                    # ---
+                    # --- END MODIFIED ---
                     for vendor_name, classification in batch_results.items():
                         if vendor_name in results:
                             results[vendor_name][f"level{level}"] = classification
@@ -400,7 +405,7 @@ async def process_vendors(
 
     # Identify initially unclassifiable vendors after all levels
     # A vendor is unclassifiable if L4 failed OR L4 was never reached due to failure at a higher level
-    unknown_vendors_data_to_search = [] # <--- Store full data dict
+    unknown_vendors_data_to_search = [] # Store full data dict
     for vendor_name in unique_vendor_names:
         is_unclassified = True
         if vendor_name in results:
@@ -408,13 +413,13 @@ async def process_vendors(
             if l4_result and not l4_result.get("classification_not_possible", False):
                  is_unclassified = False # Successfully classified at L4
         if is_unclassified:
-            # --- MODIFIED: Add full vendor data to search list ---
+            # --- MODIFIED: Add full vendor data dictionary to search list ---
             if vendor_name in unique_vendors_map:
                 unknown_vendors_data_to_search.append(unique_vendors_map[vendor_name])
             else:
                 # Fallback if name somehow not in map (shouldn't happen)
-                unknown_vendors_data_to_search.append({'vendor_name': vendor_name})
-            # ---
+                unknown_vendors_data_to_search.append({'vendor_name': vendor_name}) # Include at least the name
+            # --- END MODIFIED ---
 
     stats["classification_not_possible_initial"] = len(unknown_vendors_data_to_search)
     stats["successfully_classified_initial"] = total_unique_vendors - stats["classification_not_possible_initial"]
@@ -429,10 +434,10 @@ async def process_vendors(
 
     if unknown_vendors_data_to_search:
         search_tasks = [
-            # --- MODIFIED: Pass vendor data dict ---
+            # --- MODIFIED: Pass full vendor_data dictionary ---
             search_vendor(vendor_data, taxonomy, llm_service, search_service, stats)
             for vendor_data in unknown_vendors_data_to_search
-            # ---
+            # --- END MODIFIED ---
         ]
         search_results_list = await asyncio.gather(*search_tasks, return_exceptions=True)
 
@@ -506,7 +511,7 @@ async def process_vendors(
 
 @log_function_call(logger, include_args=False) # Keep args=False
 async def process_batch(
-    batch_data: List[Dict[str, Any]], # <--- MODIFIED: Pass list of dicts
+    batch_data: List[Dict[str, Any]], # Pass list of dicts including optional fields
     level: int,
     parent_category_id: Optional[str],
     taxonomy: Taxonomy,
@@ -515,7 +520,7 @@ async def process_batch(
 ) -> Dict[str, Dict]:
     """
     Process a batch of vendors for a specific classification level, including taxonomy validation.
-    Updates stats dictionary in place.
+    Updates stats dictionary in place. Passes full vendor data to LLM.
     Returns results for the batch.
     """
     results = {}
@@ -604,9 +609,9 @@ async def process_batch(
     llm_response_data = None
     try:
         with LogTimer(logger, f"LLM classification - Level {level}", include_in_stats=True):
-            # --- MODIFIED: Pass batch_data ---
+            # --- MODIFIED: Pass full batch_data dictionary list ---
             llm_response_data = await llm_service.classify_batch(batch_data, level, taxonomy, parent_category_id)
-            # ---
+            # --- END MODIFIED ---
 
         # --- USE CORRECT KEYS ---
         stats["api_usage"]["openrouter_calls"] += 1
@@ -726,7 +731,7 @@ async def process_batch(
 
 @log_function_call(logger, include_args=False) # Keep args=False
 async def search_vendor(
-    vendor_data: Dict[str, Any], # <--- MODIFIED: Pass dict
+    vendor_data: Dict[str, Any], # Pass full vendor dict including optional fields
     taxonomy: Taxonomy,
     llm_service: LLMService,
     search_service: SearchService,
@@ -769,9 +774,9 @@ async def search_vendor(
             llm_response = None
             try:
                 with LogTimer(logger, "LLM classification from search", include_in_stats=True):
-                    # --- MODIFIED: Pass vendor_data ---
+                    # --- MODIFIED: Pass full vendor_data dictionary ---
                     llm_response = await llm_service.process_search_results(vendor_data, search_result_data, taxonomy)
-                    # ---
+                    # --- END MODIFIED ---
 
                 # --- Usage Stats ---
                 stats["api_usage"]["openrouter_calls"] += 1
@@ -854,7 +859,7 @@ def create_batches(items: List[Any], batch_size: int) -> List[List[Any]]:
     return [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
 
 
-def group_by_parent_category(results: Dict[str, Dict], parent_level: int, vendors_to_group_names: List[str]) -> Dict[Optional[str], List[str]]: # <--- MODIFIED: Input is list of names
+def group_by_parent_category(results: Dict[str, Dict], parent_level: int, vendors_to_group_names: List[str]) -> Dict[Optional[str], List[str]]:
     """
     Group a specific list of vendor names based on their classification at the parent_level.
     Handles vendors that might not have a result for the parent level yet or were unclassifiable.
@@ -873,7 +878,7 @@ def group_by_parent_category(results: Dict[str, Dict], parent_level: int, vendor
             if category_id and category_id not in ["N/A", "ERROR"]: # Ensure valid category ID
                 if category_id not in grouped:
                     grouped[category_id] = []
-                grouped[category_id].append(vendor_name) # <--- Store name
+                grouped[category_id].append(vendor_name) # Store name
             else:
                 # Treat vendors classified without a valid category ID at parent level as unclassifiable for next level grouping
                 logger.debug(f"Vendor '{vendor_name}' had successful parent level ({parent_key}) but invalid category_id '{category_id}', excluding from next level grouping.")

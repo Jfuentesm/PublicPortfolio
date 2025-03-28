@@ -1,3 +1,4 @@
+# docs/1_response_solution design.md
 # NAICS Vendor Classification System Design Document
 
 ## 1. Executive Summary
@@ -39,7 +40,7 @@ Naicsvendorclassification.com is a specialized web application that automates th
 ┌────────────────┐     ┌────────────────────┐     ┌──────────────────────┐
 │                │     │                    │     │                      │
 │  File Storage  │◀───▶│  Security Layer    │     │  External APIs       │
-│                │     │                    │     │  - Azure OpenAI      │
+│                │     │                    │     │  - OpenRouter        │
 └────────────────┘     └────────────────────┘     │  - Tavily Search     │
                                                   └──────────────────────┘
 ```
@@ -78,13 +79,13 @@ Naicsvendorclassification.com is a specialized web application that automates th
    - Encryption management
 
 6. **External APIs**
-   - Azure OpenAI for vendor classification
+   - OpenRouter for vendor classification
    - Tavily Search API for unknown vendor research
 
 #### Technology Stack Recommendations
 
 **Backend:**
-- Python 3.9+ for core processing
+- Python 3.11+ for core processing
 - FastAPI for RESTful API endpoints
 - Pydantic for data validation and modeling
 - Celery for asynchronous task processing
@@ -92,11 +93,10 @@ Naicsvendorclassification.com is a specialized web application that automates th
 - Docker and Docker Compose for containerization
 
 **Frontend:**
-- React.js for user interface components
+- HTML, CSS, JavaScript (Vanilla JS used in current implementation)
 - Bootstrap for responsive styling
-- Axios for API communication
 
-**Cloud Infrastructure (AWS):**
+**Cloud Infrastructure (Example - AWS):**
 - EC2 for application hosting
 - S3 for file storage
 - SES for email delivery
@@ -104,7 +104,7 @@ Naicsvendorclassification.com is a specialized web application that automates th
 - IAM for access control
 
 **External Services:**
-- Azure OpenAI for language model processing
+- OpenRouter for language model processing
 - Tavily API for web searches
 
 #### Data Flow Diagram
@@ -158,9 +158,9 @@ Naicsvendorclassification.com is a specialized web application that automates th
 This component handles the initial file upload, validation, and data extraction:
 
 - **Functionality:**
-  - Accept Excel files (.xlsx) containing vendor data
-  - Validate file format and required columns
-  - Extract vendor names while filtering unnecessary/sensitive fields
+  - Accept Excel files (.xlsx, .xls) containing vendor data
+  - Validate file format and required columns (primarily `vendor_name`)
+  - Extract vendor names and specified optional context fields (e.g., `vendor_address`, `vendor_website`, `internal_category`, `parent_company`, `spend_category`, `optional_example_good_serviced_purchased`)
   - Normalize vendor names (standardize case, remove duplicates, etc.)
   - Store sanitized data for further processing
 
@@ -171,22 +171,24 @@ This component handles the initial file upload, validation, and data extraction:
       try:
           # Read Excel file
           df = pd.read_excel(file_path)
-          
+
           # Check required columns
-          if 'vendor_name' not in df.columns:
+          if 'vendor_name' not in df.columns: # Case-insensitive check done in implementation
               raise ValueError("Required column 'vendor_name' not found")
-          
-          # Extract and sanitize vendor names
-          vendors = df['vendor_name'].astype(str).str.strip()
-          
+
+          # Extract vendor name and optional context fields
+          vendors_data = []
+          # ... logic to extract based on file_service.py ...
+
           # Normalize vendor names (title case, remove duplicates)
-          vendors = vendors.str.title()
-          unique_vendors = vendors.drop_duplicates().tolist()
-          
+          normalized_vendors_data = normalize_vendor_data(vendors_data) # Preserves other fields
+          unique_vendors_map = {entry['vendor_name']: entry for entry in normalized_vendors_data}
+          unique_vendors_list = list(unique_vendors_map.values())
+
           return {
               "total_records": len(df),
-              "unique_vendors": len(unique_vendors),
-              "vendors": unique_vendors
+              "unique_vendors": len(unique_vendors_list),
+              "vendors_data": unique_vendors_list # List of dicts with unique names and context
           }
       except Exception as e:
           logging.error(f"Error processing input file: {e}")
@@ -198,113 +200,139 @@ This component handles the initial file upload, validation, and data extraction:
 This component manages the hierarchical classification process:
 
 - **Functionality:**
-  - Create batches of 10 vendors for processing
-  - Generate appropriate prompts for the LLM
-  - Send batches to Azure OpenAI API
-  - Validate responses using Pydantic models
+  - Create batches of vendors (including context data) for processing
+  - Generate appropriate prompts for the LLM using vendor name and optional context
+  - Send batches to OpenRouter API
+  - Validate responses using Pydantic models and clean/parse JSON
   - Handle the 4-level hierarchical classification process
   - Manage unknown vendor resolution via Tavily Search
 
 - **Classification Workflow:**
   ```python
-  async def classify_vendors(vendors: List[str], taxonomy: Taxonomy) -> Dict[str, Any]:
+  async def classify_vendors(vendors_data: List[Dict[str, Any]], taxonomy: Taxonomy) -> Dict[str, Any]:
       """Execute the full vendor classification workflow."""
-      # Initialize results storage
-      results = {vendor: {} for vendor in vendors}
-      stats = {"api_calls": 0, "tokens": 0, "tavily_searches": 0}
-      
-      # Level 1 classification for all vendors
-      level1_batches = create_batches(vendors, batch_size=10)
-      level1_results = await process_level(level1_batches, 1, None, taxonomy)
-      
+      # Initialize results storage based on unique vendors
+      unique_vendors_map = {vd['vendor_name']: vd for vd in vendors_data}
+      results = {vendor_name: {} for vendor_name in unique_vendors_map.keys()}
+      stats = {"api_calls": 0, "tokens": 0, "tavily_searches": 0} # Simplified stats example
+
+      # Level 1 classification for all unique vendors
+      # Batches contain full vendor dicts
+      level1_batches_data = create_batches(list(unique_vendors_map.values()), batch_size=settings.BATCH_SIZE)
+      level1_results = await process_level(level1_batches_data, 1, None, taxonomy, llm_service, stats) # Pass services/stats
+
       # Update results with Level 1 classifications
-      for vendor, classification in level1_results.items():
-          results[vendor]["level1"] = classification
-      
-      # Process subsequent levels (2-4) based on Level 1 groupings
+      for vendor_name, classification in level1_results.items():
+          results[vendor_name]["level1"] = classification
+
+      # Process subsequent levels (2-4) based on previous level groupings
+      vendors_to_process_next_names = list(unique_vendors_map.keys())
       for level in range(2, 5):
-          # Group vendors by previous level classification
-          grouped_vendors = group_by_parent_category(results, level-1)
-          
+          # Group vendor *names* by previous level classification
+          grouped_vendors_names = group_by_parent_category(results, level-1, vendors_to_process_next_names)
+          vendors_classified_in_level_names = []
+
           # Process each group separately
-          for parent_category, group_vendors in grouped_vendors.items():
-              level_batches = create_batches(group_vendors, batch_size=10)
+          for parent_category_id, group_vendor_names in grouped_vendors_names.items():
+              if not group_vendor_names: continue
+              # Get full data for vendors in this group
+              group_vendor_data = [unique_vendors_map[name] for name in group_vendor_names if name in unique_vendors_map]
+              level_batches_data = create_batches(group_vendor_data, batch_size=settings.BATCH_SIZE)
               level_results = await process_level(
-                  level_batches, level, parent_category, taxonomy
+                  level_batches_data, level, parent_category_id, taxonomy, llm_service, stats # Pass services/stats
               )
-              
+
               # Update results with this level's classifications
-              for vendor, classification in level_results.items():
-                  results[vendor][f"level{level}"] = classification
-      
+              for vendor_name, classification in level_results.items():
+                  results[vendor_name][f"level{level}"] = classification
+                  if not classification.get("classification_not_possible", False):
+                      vendors_classified_in_level_names.append(vendor_name)
+
+          vendors_to_process_next_names = vendors_classified_in_level_names # Update list for next iteration
+
       # Handle unknown vendors that couldn't be classified
-      unknown_vendors = identify_unknown_vendors(results)
-      if unknown_vendors:
-          unknown_results = await process_unknown_vendors(unknown_vendors)
+      unknown_vendors_data_to_search = identify_unknown_vendors(results, unique_vendors_map)
+      if unknown_vendors_data_to_search:
+          unknown_results = await process_unknown_vendors(unknown_vendors_data_to_search, taxonomy, llm_service, search_service, stats) # Pass services/stats
           # Update results with findings from Tavily searches
-          for vendor, search_result in unknown_results.items():
-              results[vendor]["search_results"] = search_result
-      
+          for vendor_name, search_result in unknown_results.items():
+              results[vendor_name]["search_results"] = search_result
+
       return {"classifications": results, "stats": stats}
   ```
 
 **3. LLM Integration Component**
 
-This component handles all interactions with Azure OpenAI:
+This component handles all interactions with OpenRouter:
 
 - **Functionality:**
-  - Format appropriate prompts based on taxonomy level
-  - Send requests to Azure OpenAI API
-  - Parse and validate JSON responses
+  - Format appropriate prompts based on taxonomy level and vendor data (name + optional context)
+  - Send requests to OpenRouter API
+  - Parse and validate JSON responses, handling potential LLM formatting issues (e.g., markdown fences, extra text)
   - Handle errors and retries
   - Track token usage and performance
 
-- **Sample Prompt Generation:**
+- **Sample Prompt Generation (Level 1 - Updated):**
   ```python
   def create_classification_prompt(
-      vendors: List[str], 
-      level: int, 
+      vendors_data: List[Dict[str, Any]], # List of vendor dicts
+      level: int,
       parent_category: Optional[str] = None,
-      taxonomy: Taxonomy
+      taxonomy: Taxonomy,
+      batch_id: str = "unique-id"
   ) -> str:
       """Create an appropriate prompt for the current classification level."""
+      vendor_list_str = ""
+      for i, vendor_entry in enumerate(vendors_data):
+          vendor_name = vendor_entry.get('vendor_name', f'UnknownVendor_{i}')
+          # Add optional fields (address, website, example, internal_cat, parent_co, spend_cat) if present
+          # ... logic from llm_service.py ...
+          vendor_list_str += f"\n{i+1}. Vendor Name: {vendor_name}"
+          # ... add context lines ...
+
       if level == 1:
           categories = get_level1_categories(taxonomy)
           categories_str = "\n".join(f"- {cat.id}: {cat.name}" for cat in categories)
-          
+
           prompt = f"""
-          You are a vendor classification expert. Below is a list of company/vendor names.
+          You are a vendor classification expert. Below is a list of vendors with optional context.
           Please classify each vendor according to the following Level 1 categories:
-          
+
           {categories_str}
-          
+
           For each vendor, provide:
           1. The most appropriate category ID and name
           2. A confidence level (0.0-1.0)
-          
+          Use the provided context (Examples, Address, Website, etc.) if available.
+
           If you cannot determine a category with reasonable confidence, mark it as "classification_not_possible".
-          
+
           Vendor list:
-          {', '.join(vendors)}
-          
-          Respond with a JSON object matching this schema:
+          {vendor_list_str}
+
+          **Output Format:** Respond *only* with a valid JSON object matching this exact schema. Do not include any text before or after the JSON object.
+          ```json
           {{
             "level": 1,
-            "batch_id": "unique-id",
+            "batch_id": "{batch_id}",
+            "parent_category_id": null,
             "classifications": [
               {{
                 "vendor_name": "Vendor Name",
-                "category_id": "ID",
-                "category_name": "Category Name",
+                "category_id": "ID or N/A",
+                "category_name": "Category Name or N/A",
                 "confidence": 0.95,
                 "classification_not_possible": false,
                 "classification_not_possible_reason": null
               }}
+              // ... more classifications
             ]
           }}
+          ```
+          Ensure every vendor from the list is included in the `classifications` array with the exact vendor name provided. Ensure the `batch_id` in the response matches "{batch_id}".
           """
       else:
-          # Similar logic for levels 2-4, but including parent category info
+          # Similar logic for levels 2-4, including the explicit JSON output instruction
           # ...
 
       return prompt
@@ -326,36 +354,37 @@ This component handles research for unknown vendors:
   async def search_vendor_information(vendor_name: str) -> Dict[str, Any]:
       """Search for information about an unknown vendor using Tavily API."""
       search_query = f"{vendor_name} company business type industry"
-      
+
       try:
-          client = TavilyClient(api_key=settings.TAVILY_API_KEY)
-          search_results = await client.search(
-              query=search_query,
-              search_depth="advanced",
-              include_domains=[
-                  "linkedin.com", "bloomberg.com", "dnb.com", 
-                  "zoominfo.com", "crunchbase.com"
-              ],
-              max_results=5
-          )
-          
+          # Use httpx directly as in search_service.py
+          payload = {
+              "api_key": settings.TAVILY_API_KEY,
+              "query": search_query,
+              # ... other parameters ...
+          }
+          async with httpx.AsyncClient() as client:
+              response = await client.post(f"{settings.TAVILY_API_BASE}/search", json=payload, timeout=30.0) # Assuming TAVILY_API_BASE is set
+              response.raise_for_status()
+              search_results = response.json()
+
           # Extract relevant information from search results
           processed_results = {
               "vendor": vendor_name,
               "search_query": search_query,
               "sources": [
                   {
-                      "title": result["title"],
-                      "url": result["url"],
-                      "content": result["content"][:500]  # Limit content size
+                      "title": result.get("title", ""),
+                      "url": result.get("url", ""),
+                      "content": result.get("content", "")[:1500] # Increased limit for LLM
                   }
-                  for result in search_results.get("results", [])
+                  for result in search_results.get("results", []) if result.get("url")
               ],
-              "summary": search_results.get("answer", "")
+              "summary": search_results.get("answer", ""),
+              "error": None
           }
-          
+
           return processed_results
-      
+
       except Exception as e:
           logging.error(f"Tavily API error for vendor '{vendor_name}': {e}")
           return {
@@ -372,26 +401,36 @@ This component compiles and formats the final output:
 
 - **Functionality:**
   - Aggregate classification results from all levels
-  - Format data according to output specifications
+  - Format data according to output specifications, including original optional fields provided in input
   - Generate the output Excel file
   - Create logs and usage statistics
 
 - **Result Compilation:**
   ```python
   def generate_output_file(
-      original_vendors: List[str],
-      classification_results: Dict[str, Dict],
+      original_vendor_data: List[Dict[str, Any]], # Original list of dicts from input
+      classification_results: Dict[str, Dict], # Results keyed by unique, normalized name
       output_path: str
   ) -> None:
       """Generate the final output Excel file with classification results."""
       # Prepare data for Excel
       output_data = []
-      
-      for vendor in original_vendors:
-          result = classification_results.get(vendor, {})
-          
+
+      for original_entry in original_vendor_data:
+          vendor_name = original_entry.get('vendor_name') # Use the normalized name
+          result = classification_results.get(vendor_name, {})
+
+          # Combine original context with classification results
           row = {
-              "vendor_name": vendor,
+              "vendor_name": vendor_name,
+              # Include original optional fields (address, website, example, etc.) from original_entry
+              "vendor_address": original_entry.get("vendor_address", ""),
+              "vendor_website": original_entry.get("vendor_website", ""),
+              "internal_category": original_entry.get("internal_category", ""),
+              "parent_company": original_entry.get("parent_company", ""),
+              "spend_category": original_entry.get("spend_category", ""),
+              "Optional_example_good_serviced_purchased": original_entry.get("example", ""),
+              # Classification results
               "level1_category_id": result.get("level1", {}).get("category_id", ""),
               "level1_category_name": result.get("level1", {}).get("category_name", ""),
               "level2_category_id": result.get("level2", {}).get("category_id", ""),
@@ -400,18 +439,23 @@ This component compiles and formats the final output:
               "level3_category_name": result.get("level3", {}).get("category_name", ""),
               "level4_category_id": result.get("level4", {}).get("category_id", ""),
               "level4_category_name": result.get("level4", {}).get("category_name", ""),
-              "confidence": result.get("level4", {}).get("confidence", 0),
-              "classification_not_possible": any(
-                  level.get("classification_not_possible", False) 
-                  for level in result.values()
-              ),
-              "sources": ", ".join(result.get("search_results", {}).get("sources", []))
+              # Determine final confidence/status based on logic in file_service.py
+              # ... final confidence, classification_not_possible, notes/reason ...
+              "sources": ", ".join(
+                  source.get("url", "") for source in result.get("search_results", {}).get("sources", []) if isinstance(source, dict) and source.get("url")
+              ) if isinstance(result.get("search_results", {}).get("sources"), list) else ""
           }
-          
           output_data.append(row)
-      
-      # Create DataFrame and write to Excel
-      df = pd.DataFrame(output_data)
+
+      # Create DataFrame and write to Excel using explicit column order
+      output_columns = [
+          "vendor_name", "vendor_address", "vendor_website", "internal_category",
+          "parent_company", "spend_category", "Optional_example_good_serviced_purchased",
+          "level1_category_id", "level1_category_name", "level2_category_id", "level2_category_name",
+          "level3_category_id", "level3_category_name", "level4_category_id", "level4_category_name",
+          "final_confidence", "classification_not_possible", "classification_notes_or_reason", "sources"
+      ]
+      df = pd.DataFrame(output_data, columns=output_columns)
       df.to_excel(output_path, index=False)
   ```
 
@@ -422,8 +466,8 @@ This component compiles and formats the final output:
 ```
 POST /api/v1/upload
 - Purpose: Upload vendor Excel file for processing
-- Request: multipart/form-data with file
-- Response: {job_id: str, status: str, message: str}
+- Request: multipart/form-data with file and company_name
+- Response: {job_id: str, status: str, message: str, created_at: datetime, progress: float, current_stage: str}
 
 GET /api/v1/jobs/{job_id}
 - Purpose: Check job status
@@ -434,7 +478,8 @@ GET /api/v1/jobs/{job_id}
     current_stage: str,
     created_at: datetime,
     updated_at: datetime,
-    estimated_completion: datetime
+    estimated_completion: Optional[datetime],
+    error_message: Optional[str]
   }
 
 GET /api/v1/jobs/{job_id}/download
@@ -456,39 +501,36 @@ GET /api/v1/jobs/{job_id}/stats
     tavily_searches: int,
     processing_time: float
   }
+
+POST /token
+- Purpose: Authenticate user and get JWT token
+- Request: OAuth2PasswordRequestForm (username, password)
+- Response: {access_token: str, token_type: str, username: str}
+
+GET /health
+- Purpose: Health check endpoint
+- Response: {status: str, ...}
 ```
 
 **2. Internal Component Interfaces**
 
 ```python
-# TaskQueue Interface
-class TaskQueue:
-    async def enqueue_job(self, job_id: str, company_name: str, file_path: str) -> None:
-        """Enqueue a new classification job."""
-        pass
-    
-    async def get_job_status(self, job_id: str) -> JobStatus:
-        """Get the current status of a job."""
-        pass
-    
-    async def update_job_progress(self, job_id: str, progress: float, stage: str) -> None:
-        """Update job progress."""
-        pass
-
+# TaskQueue Interface (Simplified via Celery)
 # LLM Service Interface
 class LLMService:
     async def classify_batch(
         self,
-        batch: List[str],
+        batch_data: List[Dict[str, Any]], # List of vendor dicts
         level: int,
+        taxonomy: Taxonomy,
         parent_category: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Send a batch of vendors to LLM for classification."""
+        """Send a batch of vendors (with context) to LLM for classification."""
         pass
-    
+
     async def process_search_results(
         self,
-        vendor: str,
+        vendor_data: Dict[str, Any], # Vendor dict with context
         search_results: Dict[str, Any],
         taxonomy: Taxonomy
     ) -> Dict[str, Any]:
@@ -514,7 +556,7 @@ class TaxonomyCategory(BaseModel):
     id: str
     name: str
     description: Optional[str] = None
-    
+
 class TaxonomyLevel4(TaxonomyCategory):
     pass
 
@@ -559,6 +601,9 @@ class ClassificationBatchResponse(BaseModel):
 ```python
 from enum import Enum
 from datetime import datetime
+from sqlalchemy import Column, String, Float, DateTime, Enum as SQLEnum, JSON, Text
+from sqlalchemy.sql import func
+from core.database import Base # Assuming Base is defined in database.py
 
 class JobStatus(str, Enum):
     PENDING = "pending"
@@ -576,43 +621,50 @@ class ProcessingStage(str, Enum):
     SEARCH = "search_unknown_vendors"
     RESULT_GENERATION = "result_generation"
 
-class Job(BaseModel):
-    id: str
-    company_name: str
-    input_file_name: str
-    output_file_name: Optional[str] = None
-    status: JobStatus = JobStatus.PENDING
-    current_stage: ProcessingStage = ProcessingStage.INGESTION
-    progress: float = 0.0
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
-    completed_at: Optional[datetime] = None
-    notification_email: Optional[str] = None
-    error_message: Optional[str] = None
-    stats: Dict[str, Any] = Field(default_factory=dict)
+class Job(Base): # SQLAlchemy model
+    __tablename__ = "jobs"
+
+    id = Column(String, primary_key=True, index=True)
+    company_name = Column(String, nullable=False)
+    input_file_name = Column(String, nullable=False)
+    output_file_name = Column(String, nullable=True)
+    status = Column(String, default=JobStatus.PENDING.value)
+    current_stage = Column(String, default=ProcessingStage.INGESTION.value)
+    progress = Column(Float, default=0.0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    notification_email = Column(String, nullable=True)
+    error_message = Column(Text, nullable=True)
+    stats = Column(JSON, default={})
+    created_by = Column(String, nullable=False) # Store username of creator
+
+    # Methods to update status/progress/completion/failure
 ```
 
 **4. Usage Statistics Model**
 
 ```python
+from typing import Any # For start/end time flexibility
+
 class ApiUsage(BaseModel):
-    azure_openai_calls: int = 0
-    azure_openai_tokens_input: int = 0
-    azure_openai_tokens_output: int = 0
-    azure_openai_tokens_total: int = 0
+    openrouter_calls: int = 0 # Renamed from azure_openai_calls
+    openrouter_prompt_tokens: int = 0 # Renamed
+    openrouter_completion_tokens: int = 0 # Renamed
+    openrouter_total_tokens: int = 0 # Renamed
     tavily_search_calls: int = 0
     cost_estimate_usd: float = 0.0
 
-class ProcessingStats(BaseModel):
+class ProcessingStats(BaseModel): # Used within the Job model's JSON field
     job_id: str
     company_name: str
-    start_time: datetime
-    end_time: Optional[datetime] = None
+    start_time: Any # Can be datetime or ISO string
+    end_time: Optional[Any] = None
     processing_duration_seconds: Optional[float] = None
     total_vendors: int = 0
     unique_vendors: int = 0
-    successfully_classified: int = 0
-    classification_not_possible: int = 0
+    successfully_classified: int = 0 # This may need refinement (e.g., initially vs after search)
+    classification_not_possible: int = 0 # See above
     tavily_searches: int = 0
     tavily_search_successful_classifications: int = 0
     api_usage: ApiUsage = Field(default_factory=ApiUsage)
@@ -623,17 +675,17 @@ class ProcessingStats(BaseModel):
 **1. Data Protection**
 
 - **Input Data Sanitization:**
-  - Automated scanning for PII (SSNs, credit cards, etc.)
-  - Field validation to ensure only necessary data is retained
+  - Automated scanning for PII (SSNs, credit cards, etc.) - *Future Enhancement*
+  - Field validation to ensure only necessary data is retained (e.g., vendor name, optional context)
   - Input scrubbing to remove potential injection attacks
 
 - **Storage Security:**
-  - All data stored with AES-256 encryption at rest
-  - S3 bucket policies restricting access
+  - All data stored with AES-256 encryption at rest (S3 default or equivalent)
+  - Storage bucket policies restricting access
   - Temporary file management with secure deletion
 
 - **Access Controls:**
-  - Strict IAM roles and permissions
+  - Strict IAM roles and permissions (if using cloud provider)
   - Least privilege access principles
   - Regular access audits
 
@@ -645,14 +697,14 @@ class ProcessingStats(BaseModel):
   - Rate limiting to prevent abuse
 
 - **External API Protection:**
-  - Secure storage of API keys in AWS Secrets Manager
+  - Secure storage of API keys (currently hardcoded, move to environment variables or secrets manager)
   - Regular rotation of API credentials
   - API access monitoring and alerting
 
 **3. Compliance and Privacy**
 
 - **Data Retention:**
-  - Automated purging of data after processing (configurable retention period)
+  - Automated purging of data after processing (configurable retention period) - *Future Enhancement*
   - Clear data handling policies
   - Audit logs for all data access and operations
 
@@ -665,96 +717,42 @@ class ProcessingStats(BaseModel):
 
 **1. Scalability**
 - Support for processing files with up to 10,000 vendor entries
-- Ability to handle multiple concurrent jobs
-- Dynamic batch sizing based on system load
+- Ability to handle multiple concurrent jobs via Celery workers
+- Dynamic batch sizing based on system load (currently fixed)
 
 **2. Processing Speed**
-- Average processing time of <5 seconds per vendor
-- Complete job turnaround within 1 hour for files with up to 1,000 vendors
+- Average processing time target: <5 seconds per vendor
+- Complete job turnaround target: < 1 hour for files with up to 1,000 vendors
 
 **3. API Usage Efficiency**
-- Optimal batch sizing to minimize API calls
-- Caching of common vendors to reduce duplicate searches
-- Intelligent retry mechanisms for failed API calls
+- Optimal batch sizing to minimize API calls (currently fixed at 5)
+- Caching of common vendors to reduce duplicate searches - *Future Enhancement*
+- Intelligent retry mechanisms for failed API calls (using Tenacity)
 
 **4. Resource Requirements**
-- Minimum EC2 instance: t3.medium for web service
+- Minimum EC2 instance (or equivalent): t3.medium for web service and worker (separate or combined depends on load)
 - Recommended: t3.large for production workloads
-- Memory: Minimum 4GB RAM
-- Storage: 20GB base + 100MB per job
+- Memory: Minimum 4GB RAM per service
+- Storage: 20GB base + ~1MB per job (input/output/logs)
 
 ## 4. Implementation Plan
 
 #### Development Phases
 
-**Phase 1: Core Infrastructure (2 weeks)**
-- Set up development environment with Docker Compose
-- Establish project structure and core dependencies
-- Implement basic API framework and storage components
-- Create data models and validation schemas
-
-**Phase 2: Data Processing Pipeline (3 weeks)**
-- Develop file ingestion and normalization components
-- Implement vendor batching logic
-- Create taxonomy models and validation
-- Build basic processing workflow
-
-**Phase 3: LLM Integration (2 weeks)**
-- Implement Azure OpenAI API integration
-- Develop prompt engineering for classification
-- Create response parsing and validation
-- Build hierarchical classification logic
-
-**Phase 4: Unknown Vendor Resolution (2 weeks)**
-- Implement Tavily Search API integration
-- Develop search query formulation
-- Create result processing and interpretation
-- Build feedback loop for classification attempts
-
-**Phase 5: Web Interface and Job Management (2 weeks)**
-- Develop web UI for file upload and management
-- Implement job tracking and status updates
-- Create user authentication and security
-- Build email notification system
-
-**Phase 6: Testing and Optimization (2 weeks)**
-- Comprehensive testing with varied datasets
-- Performance optimization
-- Security hardening
-- Documentation and knowledge transfer
-
-**Phase 7: Deployment and Monitoring (1 week)**
-- AWS infrastructure setup
-- Deployment automation
-- Monitoring and alerting configuration
-- Final QA and validation
+**Phase 1: Core Infrastructure (2 weeks)** - Done
+**Phase 2: Data Processing Pipeline (3 weeks)** - Done
+**Phase 3: LLM Integration (2 weeks)** - Done (using OpenRouter)
+**Phase 4: Unknown Vendor Resolution (2 weeks)** - Done (using Tavily)
+**Phase 5: Web Interface and Job Management (2 weeks)** - Done (basic UI/Job tracking)
+**Phase 6: Testing and Optimization (2 weeks)** - Ongoing
+**Phase 7: Deployment and Monitoring (1 week)** - Done (basic Docker deployment)
 
 #### Dependencies and Prerequisites
 
-**1. Technical Dependencies**
-- Azure OpenAI API access and credentials
-- Tavily API key and account setup
-- AWS account with appropriate services enabled
-- Docker and Docker Compose for local development
-- Python 3.9+ environment
-
-**2. Data Dependencies**
-- Complete taxonomy definition for all 4 levels
-- Sample vendor data for testing
-- Validation dataset with known classifications
-
-**3. Knowledge Requirements**
-- Expertise in Python and asynchronous programming
-- Understanding of LLM prompt engineering
-- Familiarity with vendor classification taxonomies
-- AWS deployment experience
-- Security best practices knowledge
-
-**4. External Services Setup**
-- Email service configuration for notifications
-- DNS configuration for naicsvendorclassification.com
-- SSL certificate acquisition and configuration
-- AWS VPC and security group setup
+**1. Technical Dependencies** - Met
+**2. Data Dependencies** - Met (using provided NAICS JSON)
+**3. Knowledge Requirements** - Met by current team
+**4. External Services Setup** - Met (OpenRouter/Tavily keys hardcoded for now)
 
 ## 5. Risks and Mitigation Strategies
 
@@ -762,55 +760,48 @@ class ProcessingStats(BaseModel):
 
 | Risk | Impact | Likelihood | Mitigation Strategy |
 |------|--------|------------|---------------------|
-| LLM response inconsistency | High | Medium | Implement structured prompts, validation checks, and review workflows for low-confidence classifications |
-| API rate limiting or downtime | High | Medium | Add robust retries with exponential backoff, circuit breakers, and fallback mechanisms |
-| Performance bottlenecks with large files | Medium | Medium | Implement asynchronous processing, optimize batch sizes, and add progress tracking |
-| Data format inconsistencies | Medium | High | Create comprehensive input validation, flexible parsing, and error handling |
+| LLM response inconsistency/invalid category/format | High | Medium | Implement structured prompts with explicit JSON-only instruction, JSON response format request, robust JSON parsing (handling fences/extra text), post-validation against taxonomy, error handling for invalid JSON/structure, review workflows for low-confidence classifications. |
+| API rate limiting or downtime | High | Medium | Use Tenacity for robust retries with exponential backoff, implement API call monitoring, consider fallback mechanisms if critical. |
+| Performance bottlenecks with large files | Medium | Medium | Use Celery for asynchronous processing, optimize Pandas operations, monitor resource usage, consider database indexing. |
+| Data format inconsistencies in input | Medium | High | Implement robust input validation (e.g., checking for `vendor_name`), flexible parsing (case-insensitive columns), clear error messages to user. |
 
 #### Security Risks
 
 | Risk | Impact | Likelihood | Mitigation Strategy |
 |------|--------|------------|---------------------|
-| Sensitive data exposure | Critical | Low | Implement automated PII scanning, data sanitization, and strict access controls |
-| API credential compromise | High | Low | Use AWS Secrets Manager, implement credential rotation, and add access logging |
-| Unauthorized system access | High | Low | Implement strong authentication, role-based access, and security monitoring |
-| Data retention compliance issues | Medium | Medium | Create clear data retention policies with automated enforcement |
+| Sensitive data exposure in input/output | Critical | Medium | Remove unnecessary columns during ingestion (`file_service.py`), implement data sanitization checks (*Future*), strict access controls, encryption at rest/transit. |
+| API credential compromise | High | Low | Move API keys from config to environment variables/secrets manager, implement credential rotation, add access logging. |
+| Unauthorized system access | High | Low | Implement strong authentication (JWT), role-based access (*Future*), security monitoring, regular dependency scanning. |
+| Data retention compliance issues | Medium | Medium | Create clear data retention policies with automated enforcement (*Future*), ensure secure deletion of job files. |
 
 #### Operational Risks
 
 | Risk | Impact | Likelihood | Mitigation Strategy |
 |------|--------|------------|---------------------|
-| Cost overruns from API usage | Medium | Medium | Implement usage limits, monitoring, and cost optimization of API calls |
-| Classification accuracy below expectations | High | Medium | Develop feedback mechanisms, continuous prompt improvement, and human review options |
-| User adoption challenges | Medium | Medium | Create intuitive UI, comprehensive documentation, and responsive support |
-| Dependency on external APIs | High | Medium | Add caching mechanisms, fallback options, and service monitoring |
+| Cost overruns from API usage | Medium | Medium | Implement detailed usage tracking per job (stats), monitor API costs, optimize batch sizes/prompts, set budget alerts. |
+| Classification accuracy below expectations | High | Medium | Develop feedback mechanisms (*Future*), continuous prompt improvement based on errors/low confidence results, allow manual override (*Future*). |
+| User adoption challenges | Medium | Medium | Create intuitive UI, provide clear instructions, add error handling feedback, offer user support channel. |
+| Dependency on external APIs | High | Medium | Add caching mechanisms (*Future*), monitor API status, have contingency plans if APIs become unavailable. |
 
 #### Mitigation Approaches
 
 **For LLM Classification Accuracy:**
-- Implement confidence thresholds for automated vs. human review
-- Create feedback mechanisms to improve classification over time
-- Maintain a database of previously classified vendors
-- Allow for manual override of classifications when needed
+- Validate LLM category IDs against the loaded taxonomy at each level.
+- Set confidence thresholds for flagging uncertain results.
+- Log failed/low-confidence classifications for prompt tuning.
+- *Future:* Implement user feedback loop or manual review queue.
 
 **For API Dependency Issues:**
-- Implement comprehensive error handling and retry logic
-- Create monitoring and alerting for API performance
-- Develop caching for common vendors and searches
-- Implement graceful degradation of service during API outages
+- Use Tenacity for retries on network/server errors.
+- Implement health checks for external services (*Future*).
+- Log detailed API request/response metrics for troubleshooting.
 
 **For Security and Compliance:**
-- Conduct regular security audits of code and infrastructure
-- Implement automated scanning for sensitive data
-- Create clear data handling and retention policies
-- Train team members on security best practices
+- Regularly update dependencies (e.g., `pip-audit`).
+- Move secrets out of code into environment variables or a secrets manager.
+- Implement data lifecycle management (*Future*).
 
 **For Cost Management:**
-- Implement budget controls and alerts in AWS
-- Optimize API usage through batching and caching
-- Create detailed usage tracking and reporting
-- Conduct regular cost-performance reviews
-
----
-
-This design document provides a comprehensive blueprint for the development of naicsvendorclassification.com. The system leverages advanced AI capabilities to automate the tedious process of vendor classification while maintaining high accuracy, security, and efficiency. By following the implementation plan and addressing the identified risks, the development team can create a robust solution that delivers significant value to organizations needing vendor classification services.
+- Track token usage per job in the `Job.stats` field.
+- Analyze usage patterns to potentially optimize prompts or batching.
+- Set up billing alerts for cloud provider and API services.
