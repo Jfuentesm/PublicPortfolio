@@ -1,3 +1,6 @@
+
+# --- file path='Dockerfile.worker' ---
+
 # Dockerfile.worker
 
 FROM python:3.11-slim
@@ -24,6 +27,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # --- ADDED LOGGING ---
 # Verify the installed version of pydantic-settings after installation
 RUN echo "Checking pydantic-settings installation details:" && pip show pydantic-settings || echo "pydantic-settings not found after install attempt"
+RUN echo "Checking Celery installation details:" && pip show celery || echo "Celery not found after install attempt"
 # --- END ADDED LOGGING ---
 
 # Copy application code
@@ -42,9 +46,13 @@ RUN echo "Directory structure:" && find /app -type f -name "*.py" | sort
 
 # --- UPDATED CMD ---
 # Run Celery worker with corrected app path relative to WORKDIR/PYTHONPATH
+# Use -A app.tasks.celery_app:celery_app if app module structure requires it
+# Based on current imports, tasks.celery_app seems correct as PYTHONPATH=/app
 CMD ["sh", "-c", "echo 'Worker starting...' && \
                   echo 'Current directory:' $(pwd) && \
                   echo 'PYTHONPATH:' $PYTHONPATH && \
+                  echo 'Contents of /app/tasks:' && ls -la /app/tasks && \
                   echo 'Running command: celery -A tasks.celery_app worker --loglevel=debug' && \
                   celery -A tasks.celery_app worker --loglevel=debug"]
+
 # --- END UPDATED CMD ---

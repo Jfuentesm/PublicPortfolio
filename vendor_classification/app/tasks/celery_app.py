@@ -1,3 +1,4 @@
+
 # file path='app/tasks/celery_app.py'
 # app/tasks/celery_app.py
 
@@ -6,12 +7,33 @@ import logging
 import sys
 import os
 
-from core.logging_config import setup_logging, get_logger
+# --- MODIFIED: Call setup_logging early ---
+# Attempt to setup logging as soon as possible, although task-specific might be better
+# Note: This might run *before* settings are fully loaded depending on import order,
+# but it ensures *some* logging is configured for the worker process itself.
+# A more robust approach is within the task or using worker_process_init signal.
+try:
+    from core.logging_config import setup_logging
+    # Use defaults suitable for worker, force synchronous for debugging
+    log_dir_worker = "/data/logs" if os.path.exists("/data") else "./logs_worker" # Use different dir to isolate
+    os.makedirs(log_dir_worker, exist_ok=True) # Ensure it exists
+    print(f"WORKER: Attempting initial logging setup to {log_dir_worker}")
+    setup_logging(log_to_file=True, log_dir=log_dir_worker, async_logging=False, llm_trace_log_file="llm_api_trace_worker.log") # Force sync, maybe separate file
+    print("WORKER: Initial logging setup attempted.")
+except Exception as setup_err:
+    print(f"WORKER: CRITICAL ERROR during initial logging setup: {setup_err}")
+    # Fallback to basic config if setup fails
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+from core.logging_config import get_logger # Now get logger *after* potential setup
 
 # Use direct signal imports from celery.signals
 from celery.signals import task_prerun, task_postrun, task_failure
 
+# --- Ensure get_logger is called *after* setup_logging attempt ---
 logger = get_logger("vendor_classification.celery")
+# --- END MODIFICATION ---
+
 
 # Log diagnostic information to help debug import issues
 logger.info( # Changed to info for visibility
@@ -145,5 +167,5 @@ logger.info("Celery app initialization finished.") # Changed to info
 
 # Ensure the logger works even if run standalone
 if __name__ == "__main__":
-    setup_logging()
+    # setup_logging() # Call the potentially modified setup
     logger.warning("celery_app.py run directly (likely for testing/debugging)")

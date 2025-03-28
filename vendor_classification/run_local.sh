@@ -45,7 +45,11 @@ fi
 # ----- REGULAR SETUP CONTINUES -----
 # Create necessary directories
 echo "Creating data directories..."
-mkdir -p data/input data/output data/taxonomy
+mkdir -p data/input data/output data/taxonomy data/logs
+
+# **ADDED CHMOD IN RUN_LOCAL.SH**
+echo "Setting permissions for log directory..."
+chmod -R 777 data/logs
 
 # Export the port as an environment variable
 export WEB_PORT
