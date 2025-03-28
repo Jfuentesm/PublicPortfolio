@@ -3,7 +3,7 @@ import os
 import pandas as pd
 from fastapi import UploadFile
 import shutil
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional # <--- Added Optional
 import uuid
 import logging # Make sure logging is imported
 from datetime import datetime # <--- ADDED IMPORT
@@ -13,6 +13,12 @@ from core.logging_config import get_logger, LogTimer, log_function_call, set_log
 
 # Configure logger
 logger = get_logger("vendor_classification.file_service")
+
+# --- Define expected column names (case-insensitive matching) ---
+VENDOR_NAME_COL = 'vendor_name'
+OPTIONAL_DESC_COL = 'optional_vendor_description'
+OPTIONAL_EXAMPLE_COL = 'optional_example_good_serviced_purchased'
+# ---
 
 @log_function_call(logger, include_args=False) # Keep args=False for UploadFile
 def save_upload_file(file: UploadFile, job_id: str) -> str:
@@ -72,36 +78,27 @@ def save_upload_file(file: UploadFile, job_id: str) -> str:
         logger.warning(f"Could not get size of saved file", exc_info=False, extra={"file_path": file_path, "error": str(e)})
         file_size = -1 # Indicate unknown size
 
-    # Optional: Basic content check (e.g., is it a valid Excel file?)
-    # This could be done here or in read_vendor_file
-    # try:
-    #     pd.ExcelFile(file_path).close() # Try opening without reading all data
-    #     logger.debug("File appears to be a valid Excel file.")
-    # except Exception as ex:
-    #     logger.error("Uploaded file does not appear to be a valid Excel file", exc_info=False, extra={"file_path": file_path, "error": str(ex)})
-    #     # Clean up invalid file
-    #     os.remove(file_path)
-    #     raise ValueError(f"Uploaded file is not a valid Excel file: {ex}")
-
     return file_path
 
 
 @log_function_call(logger)
-def read_vendor_file(file_path: str) -> List[str]:
+def read_vendor_file(file_path: str) -> List[Dict[str, Any]]: # <--- MODIFIED RETURN TYPE
     """
-    Read vendor names from Excel file, looking for 'vendor_name' column case-insensitively.
+    Read vendor data from Excel file, looking for mandatory 'vendor_name'
+    and optional description and example columns (case-insensitively).
 
     Args:
         file_path: Path to Excel file
 
     Returns:
-        List of vendor names (stripped, non-empty)
+        List of dictionaries, each containing vendor data.
+        Example: [{'vendor_name': 'Acme Inc', 'description': '...', 'example': '...'}]
 
     Raises:
         FileNotFoundError: If the file_path does not exist.
-        ValueError: If the file cannot be parsed or the required column is missing.
+        ValueError: If the file cannot be parsed or the required vendor_name column is missing.
     """
-    logger.info(f"Reading Excel file", extra={"file_path": file_path})
+    logger.info(f"Reading Excel file for vendor data", extra={"file_path": file_path})
 
     if not os.path.exists(file_path):
          logger.error(f"Input file not found at path", extra={"file_path": file_path})
@@ -119,87 +116,127 @@ def read_vendor_file(file_path: str) -> List[str]:
             # Raise a clearer error message
             raise ValueError(f"Could not parse the Excel file. Please ensure it is a valid .xlsx or .xls file. Error details: {str(e)}")
 
-    # --- Robust Column Finding ---
-    target_col_normalized = 'vendor_name'
-    vendor_col_name = None
-    for col in df.columns:
-        # Ensure col is a string before processing
-        if isinstance(col, str) and col.strip().lower() == target_col_normalized:
-            vendor_col_name = col # Store the original column name as found
-            logger.info(f"Found '{target_col_normalized}' column as: '{vendor_col_name}'")
-            break # Stop after finding the first match
+    # --- Find columns case-insensitively ---
+    column_map: Dict[str, Optional[str]] = {
+        'vendor_name': None,
+        'description': None,
+        'example': None
+    }
+    normalized_detected_columns = {str(col).strip().lower(): str(col) for col in detected_columns if isinstance(col, str)}
 
-    if vendor_col_name is None:
-        logger.error(f"Required column like '{target_col_normalized}' not found in file.",
+    # Find vendor_name (mandatory)
+    if VENDOR_NAME_COL in normalized_detected_columns:
+        column_map['vendor_name'] = normalized_detected_columns[VENDOR_NAME_COL]
+        logger.info(f"Found mandatory column '{VENDOR_NAME_COL}' as: '{column_map['vendor_name']}'")
+    else:
+        logger.error(f"Required column '{VENDOR_NAME_COL}' not found in file.",
                     extra={"available_columns": detected_columns})
-        # Raise a specific, user-friendly error
-        raise ValueError(f"Input Excel file must contain a column named 'vendor_name' (case-insensitive). Found columns: {', '.join(map(str, detected_columns))}")
-    # --- End Robust Column Finding ---
+        raise ValueError(f"Input Excel file must contain a column named '{VENDOR_NAME_COL}' (case-insensitive). Found columns: {', '.join(map(str, detected_columns))}")
 
-    # Extract vendor names using the found column name
+    # Find optional columns
+    if OPTIONAL_DESC_COL in normalized_detected_columns:
+        column_map['description'] = normalized_detected_columns[OPTIONAL_DESC_COL]
+        logger.info(f"Found optional column '{OPTIONAL_DESC_COL}' as: '{column_map['description']}'")
+    else:
+        logger.info(f"Optional column '{OPTIONAL_DESC_COL}' not found.")
+
+    if OPTIONAL_EXAMPLE_COL in normalized_detected_columns:
+        column_map['example'] = normalized_detected_columns[OPTIONAL_EXAMPLE_COL]
+        logger.info(f"Found optional column '{OPTIONAL_EXAMPLE_COL}' as: '{column_map['example']}'")
+    else:
+         logger.info(f"Optional column '{OPTIONAL_EXAMPLE_COL}' not found.")
+    # --- End Find columns ---
+
+    # --- Extract data into list of dictionaries ---
+    vendors_data: List[Dict[str, Any]] = []
+    processed_count = 0
+    skipped_count = 0
+
     try:
-        # Select column, convert to string, drop NaNs, strip whitespace
-        vendors_series = df[vendor_col_name].astype(str).str.strip()
-        # Filter out empty strings and common non-value strings like 'nan'
-        # Use pandas methods for efficiency
-        valid_mask = (vendors_series.str.len() > 0) & \
-                     (~vendors_series.str.lower().isin(['nan', 'none', 'null', ''])) & \
-                     (vendors_series.notna())
-        vendors = vendors_series.loc[valid_mask].tolist()
+        for index, row in df.iterrows():
+            vendor_name_raw = row.get(column_map['vendor_name'])
+            vendor_name = str(vendor_name_raw).strip() if pd.notna(vendor_name_raw) and str(vendor_name_raw).strip() else None
 
+            # Skip row if vendor name is missing or empty after stripping
+            if not vendor_name or vendor_name.lower() in ['nan', 'none', 'null']:
+                skipped_count += 1
+                continue
 
-        logger.info(f"Extracted {len(vendors)} non-empty vendor names from column '{vendor_col_name}'.")
-        if not vendors:
-             logger.warning(f"No valid vendor names found in column '{vendor_col_name}'.")
+            vendor_entry: Dict[str, Any] = {'vendor_name': vendor_name}
+
+            # Add optional fields if columns exist and data is present
+            if column_map['description']:
+                desc_raw = row.get(column_map['description'])
+                description = str(desc_raw).strip() if pd.notna(desc_raw) and str(desc_raw).strip() else None
+                if description:
+                    vendor_entry['description'] = description
+
+            if column_map['example']:
+                example_raw = row.get(column_map['example'])
+                example = str(example_raw).strip() if pd.notna(example_raw) and str(example_raw).strip() else None
+                if example:
+                    vendor_entry['example'] = example
+
+            vendors_data.append(vendor_entry)
+            processed_count += 1
+
+        logger.info(f"Extracted data for {processed_count} vendors. Skipped {skipped_count} rows due to missing/invalid vendor name.")
+        if not vendors_data:
+             logger.warning(f"No valid vendor data found in the file after processing rows.")
              # Depending on requirements, could raise an error here or return empty list
-             # raise ValueError(f"No valid vendor names found in column '{vendor_col_name}'.")
+             # raise ValueError(f"No valid vendor names found in column '{column_map['vendor_name']}'.")
 
-    except KeyError:
-        # This check is somewhat redundant due to the robust finding above, but good failsafe
-        logger.error(f"Internal Error: KeyError accessing column '{vendor_col_name}' after it was seemingly found.",
-                     extra={"available_columns": detected_columns})
-        raise ValueError(f"Internal error accessing vendor column '{vendor_col_name}'.")
+    except KeyError as e:
+        logger.error(f"Internal Error: KeyError accessing column '{e}' after it was seemingly mapped.",
+                     extra={"column_map": column_map, "available_columns": detected_columns})
+        raise ValueError(f"Internal error accessing column '{e}'.")
     except Exception as e:
-        logger.error(f"Error extracting or processing data from column '{vendor_col_name}'", exc_info=True)
-        raise ValueError(f"Could not extract vendor names from column '{vendor_col_name}'. Please check data format. Error: {e}")
+        logger.error(f"Error extracting or processing data from file rows", exc_info=True)
+        raise ValueError(f"Could not extract vendor data. Please check data format. Error: {e}")
 
-    return vendors
+    return vendors_data
+    # --- End Extract data ---
 
 
 @log_function_call(logger)
-def normalize_vendor_names(vendors: List[str]) -> List[str]:
+def normalize_vendor_data(vendors_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]: # <--- MODIFIED function name and type hint
     """
-    Normalize vendor names by converting to title case and stripping whitespace.
-    Filters out any resulting empty strings.
+    Normalize vendor names within the list of dictionaries by converting
+    to title case and stripping whitespace. Filters out entries with
+    empty names after normalization.
 
     Args:
-        vendors: List of raw vendor names
+        vendors_data: List of dictionaries, each containing vendor data.
 
     Returns:
-        List of normalized, non-empty vendor names
+        List of dictionaries with normalized vendor names.
     """
-    start_count = len(vendors)
-    logger.info(f"Normalizing {start_count} vendor names...")
+    start_count = len(vendors_data)
+    logger.info(f"Normalizing vendor names for {start_count} entries...")
 
-    normalized_vendors = []
+    normalized_vendors_data = []
     empty_removed_count = 0
 
     with LogTimer(logger, "Vendor name normalization", include_in_stats=True):
-        for vendor in vendors:
-            if isinstance(vendor, str):
+        for entry in vendors_data:
+            original_name = entry.get('vendor_name')
+            if isinstance(original_name, str):
                 # Strip whitespace first, then title case
-                normalized = vendor.strip().title()
-                if normalized: # Check if non-empty after stripping/casing
-                    normalized_vendors.append(normalized)
+                normalized_name = original_name.strip().title()
+                if normalized_name: # Check if non-empty after stripping/casing
+                    # Create a new dict or modify in place - creating new is safer
+                    normalized_entry = entry.copy()
+                    normalized_entry['vendor_name'] = normalized_name
+                    normalized_vendors_data.append(normalized_entry)
                 else:
                     empty_removed_count += 1
+                    logger.warning("Skipping vendor entry due to empty name after normalization", extra={"original_name": original_name})
             else:
-                # Handle non-string inputs if necessary (e.g., log warning, skip)
-                logger.warning("Skipping non-string vendor value during normalization", extra={"value": vendor})
+                # Handle non-string or missing names
+                logger.warning("Skipping vendor entry due to missing or non-string name during normalization", extra={"entry": entry})
                 empty_removed_count += 1
 
-
-    final_count = len(normalized_vendors)
+    final_count = len(normalized_vendors_data)
     logger.info(f"Vendor names normalized.",
                extra={
                    "original_count": start_count,
@@ -207,20 +244,21 @@ def normalize_vendor_names(vendors: List[str]) -> List[str]:
                    "empty_or_skipped": empty_removed_count
                })
 
-    return normalized_vendors
+    return normalized_vendors_data
 
 
 @log_function_call(logger)
 def generate_output_file(
-    original_vendors: List[str], # Use the original list (including duplicates)
+    original_vendor_data: List[Dict[str, Any]], # <--- MODIFIED: Use original data list
     classification_results: Dict[str, Dict], # Results keyed by *unique* normalized names
     job_id: str
 ) -> str:
     """
-    Generate output Excel file with classification results, mapping back to original vendor names.
+    Generate output Excel file with classification results, mapping back to
+    original vendor data including optional fields.
 
     Args:
-        original_vendors: Original list of vendors from the input file (raw, possibly with duplicates).
+        original_vendor_data: Original list of vendor dictionaries from the input file (normalized names).
         classification_results: Classification results keyed by unique, normalized vendor names.
         job_id: Job ID
 
@@ -230,7 +268,7 @@ def generate_output_file(
     Raises:
         IOError: If the file cannot be written.
     """
-    logger.info(f"Generating output file for {len(original_vendors)} original vendor entries",
+    logger.info(f"Generating output file for {len(original_vendor_data)} original vendor entries",
                extra={"job_id": job_id})
 
     output_data = []
@@ -239,9 +277,13 @@ def generate_output_file(
     normalized_to_result = {str(vendor).strip().title(): res for vendor, res in classification_results.items() if isinstance(vendor, str)}
 
     with LogTimer(logger, "Mapping results to original vendors"):
-        for original_vendor_name in original_vendors:
-            # Normalize the original name *in the same way* as done for classification
-            normalized_key = str(original_vendor_name).strip().title() if isinstance(original_vendor_name, str) else ""
+        for original_entry in original_vendor_data:
+            original_vendor_name = original_entry.get('vendor_name', '') # Get normalized name
+            original_description = original_entry.get('description') # Get original optional description
+            original_example = original_entry.get('example') # Get original optional example
+
+            # The key to lookup results *is* the normalized name
+            normalized_key = original_vendor_name
 
             result = normalized_to_result.get(normalized_key, {}) # Get results using normalized key
 
@@ -309,7 +351,9 @@ def generate_output_file(
                      # else 'Not fully classified' remains
 
             row = {
-                "vendor_name": original_vendor_name, # Use the original name from the input
+                "vendor_name": original_vendor_name, # Use the normalized name from the input data
+                "Optional_vendor_description": original_description or "", # Include original description
+                "Optional_example_good_serviced_purchased": original_example or "", # Include original example
                 "level1_category_id": final_level1_id,
                 "level1_category_name": final_level1_name,
                 "level2_category_id": final_level2_id,
@@ -336,7 +380,27 @@ def generate_output_file(
         # return "empty_output_generated.xlsx" # Or similar indicator
 
     with LogTimer(logger, "Creating DataFrame for output"):
-        df = pd.DataFrame(output_data)
+        # --- Define column order explicitly ---
+        output_columns = [
+            "vendor_name",
+            "Optional_vendor_description",
+            "Optional_example_good_serviced_purchased",
+            "level1_category_id",
+            "level1_category_name",
+            "level2_category_id",
+            "level2_category_name",
+            "level3_category_id",
+            "level3_category_name",
+            "level4_category_id",
+            "level4_category_name",
+            "final_confidence",
+            "classification_not_possible",
+            "classification_notes_or_reason",
+            "sources"
+        ]
+        df = pd.DataFrame(output_data, columns=output_columns)
+        # --- End Define column order ---
+
 
     output_dir = os.path.join(settings.OUTPUT_DATA_DIR, job_id)
     try:
