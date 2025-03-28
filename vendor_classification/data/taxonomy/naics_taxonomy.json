@@ -1459,6 +1459,774 @@
         }
       }
     },
+    "31": {
+      "id": "31",
+      "name": "Manufacturing",
+      "description": "The Sector as a Whole\n\nThe Manufacturing sector comprises establishments engaged in the mechanical, physical, or chemical transformation of materials, substances, or components into new products.  The assembling of component parts of manufactured products is considered manufacturing, except in cases where the activity is appropriately classified in Sector 23, Construction.\n\nEstablishments in the Manufacturing sector are often described as plants, factories, or mills and characteristically use power-driven machines and material handling equipment.  However, establishments that transform materials or substances into new products by hand or in the worker's home and those engaged in selling to the general public products made on the same premises from which they are sold, such as bakeries, candy stores, and custom tailors, may also be included in this sector.  Manufacturing establishments may process materials or may contract with other establishments to process their materials for them.  Both types of establishments are included in manufacturing.  Selected industries in the Manufacturing sector are comprised solely of establishments that process materials for other establishments on a contract or fee basis.  Beyond these dedicated contract manufacturing industries, establishments that process materials for other establishments are generally classified in the Manufacturing industry of the processed materials.\n\nThe materials, substances, or components transformed by manufacturing establishments are raw materials that are products of agriculture, forestry, fishing, mining, or quarrying as well as products of other manufacturing establishments.  The materials used may be purchased directly from producers, obtained through customary trade channels, or secured without recourse to the market by transferring the product from one establishment to another, under the same ownership.\n\nThe new product of a manufacturing establishment may be finished in the sense that it is ready for utilization or consumption, or it may be semi-finished to become an input for an establishment engaged in further manufacturing.  For example, the product of the alumina refinery is the input used in the primary production of aluminum; primary aluminum is the input to an aluminum wire drawing plant; and aluminum wire is the input for a fabricated wire product manufacturing establishment.\n\nThe subsectors in the Manufacturing sector generally reflect distinct production processes related to material inputs, production equipment, and employee skills.  In the machinery area, where assembling is a key activity, parts and accessories for manufactured products are classified in the industry of the finished manufactured item when they are made for separate sale.  For example, an attachment for a piece of metalworking machinery would be classified with metalworking machinery.  However, component inputs from other manufacturing establishments are classified based on the production function of the component manufacturer.  For example, electronic components are classified in Subsector 334, Computer and Electronic Product Manufacturing, and stampings are classified in Subsector 332, Fabricated Metal Product Manufacturing.\n\nManufacturing establishments often perform one or more activities that are classified outside the Manufacturing sector of NAICS.  For instance, almost all manufacturing has some captive research and development or administrative operations, such as accounting, payroll, or management.  These captive services are treated the same as captive manufacturing activities.  When the services are provided by separate establishments, they are classified in the NAICS sector where such services are primary, not in manufacturing. \n\nThe boundaries of manufacturing and the other sectors of the classification system can be somewhat blurry.  The establishments in the Manufacturing sector are engaged in the transformation of materials into new products.  Their output is a new product.  However, the definition of what constitutes a new product can be somewhat subjective.  As clarification, the following activities are considered manufacturing in NAICS:\n<table width=100%><tr><td width=10%> </td><td><dl><dt style='padding-left: 10px; text-indent: -10px;'>Milk bottling and pasteurizing;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Water bottling and processing;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Fresh fish packaging (oyster<br/> shucking, fish filleting);</dt><dt style='padding-left: 10px; text-indent: -10px;'>Apparel jobbing (assigning<br/> materials to contract<br/> factories or shops for<br/>  fabrication or other contract<br/> operations) as well as<br/> contracting on materials<br/> owned by others;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Printing and related activities;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Ready-mix concrete production;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Leather converting;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Grinding lenses to<br/> prescription;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Wood preserving;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Lapidary work for the trade;</dt></dl></td><td width=10%> </td><td><dl><dt style='padding-left: 10px; text-indent: -10px;'>Electroplating, plating, metal<br/> heat treating, and<br/> polishing for the trade;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Fabricating signs and<br/> advertising displays;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Rebuilding or remanufacturing<br/> machinery (i.e., automotive<br/> parts);</dt><dt style='padding-left: 10px; text-indent: -10px;'>Making manufactured homes<br/> (i.e., mobile homes) or<br/> prefabricated buildings,<br/> whether or not assembling/<br/> erecting at the customers'<br/> site;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Ship repair and renovation;</dt><dt style='padding-left: 10px; text-indent: -10px;'>Machine shops; and</dt><dt style='padding-left: 10px; text-indent: -10px;'>Tire retreading.</dt></dl></td><td width=10%> </td></tr></table>\nConversely, there are activities that are sometimes considered manufacturing, but which for NAICS are classified in another sector (i.e., not classified as manufacturing). They include:\n\n1. Logging, classified in Sector 11, Agriculture, Forestry, Fishing and Hunting, is considered a harvesting operation;\n2. Beneficiating ores and other minerals, classified in Sector 21, Mining, Quarrying, and Oil and Gas Extraction, is considered part of the activity of mining;\n3. Constructing structures, assembling prefabricated buildings, and fabricating at the construction site by contractors are classified in Sector 23, Construction;\n4. Breaking bulk and reselling in smaller lots, including packaging, repackaging, or bottling products, such as liquors or chemicals; assembling and selling computers on a custom basis; sorting and reselling scrap; mixing and selling paints to customer order; and cutting metals to customer order for resale are classified in Sector 42, Wholesale Trade, or Sector 44-45, Retail Trade; and\n5. Publishing and the combined activity of publishing and printing, classified in Sector 51, Information, transform information into a product for which the value to the consumer lies in the information content, not in the format in which it is distributed (i.e., the book or software compact disc).",
+      "children": {
+        "311": {
+          "id": "311",
+          "name": "Food Manufacturing",
+          "description": "Industries in the Food Manufacturing subsector transform livestock and agricultural products into products for intermediate or final consumption.  The industry groups are distinguished by the raw materials (generally of animal or vegetable origin) processed into food products.\n\nThe food products manufactured in these establishments are typically sold to wholesalers or retailers for distribution to consumers, but establishments primarily engaged in retailing bakery and candy products made on the premises not for immediate consumption are included.\n\nEstablishments primarily engaged in manufacturing beverages are classified in Subsector 312, Beverage and Tobacco Product Manufacturing.",
+          "children": {
+            "3111": {
+              "id": "3111",
+              "name": "Animal Food Manufacturing",
+              "description": "",
+              "children": {
+                "31111": {
+                  "id": "31111",
+                  "name": "Animal Food Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing food and feed for animals from ingredients, such as grains, oilseed mill products, and meat products.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311111": {
+                  "id": "311111",
+                  "name": "Dog and Cat Food Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing dog and cat food from ingredients, such as grains, oilseed mill products, and meat products.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311119": {
+                  "id": "311119",
+                  "name": "Other Animal Food Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing animal food (except dog and cat) from ingredients, such as grains, oilseed mill products, and meat products.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3112": {
+              "id": "3112",
+              "name": "Grain and Oilseed Milling",
+              "description": "This industry group comprises establishments primarily engaged in milling flour or meal from grains or vegetables, manufacturing malt, wet milling corn and other vegetables, crushing oilseeds and tree nuts, refining and/or blending vegetable oils, and manufacturing breakfast cereals.",
+              "children": {
+                "31121": {
+                  "id": "31121",
+                  "name": "Flour Milling and Malt Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) milling flour or meal from grains or vegetables; (2) preparing flour mixes or doughs from flour milled in the same establishment; (3) milling, cleaning, and polishing rice; and (4) manufacturing malt from barley, rye, or other grains.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311211": {
+                  "id": "311211",
+                  "name": "Flour Milling",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) milling flour or meal from grains (except rice) or vegetables and/or (2) milling flour and preparing flour mixes or doughs.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311212": {
+                  "id": "311212",
+                  "name": "Rice Milling",
+                  "description": "This U.S. industry comprises establishments primarily engaged in one of the following: (1) milling rice; (2) cleaning and polishing rice; or (3) milling, cleaning, and polishing rice.  The establishments in this industry may package the rice they mill with other ingredients.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311213": {
+                  "id": "311213",
+                  "name": "Malt Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing malt from barley, rye, or other grains.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31122": {
+                  "id": "31122",
+                  "name": "Starch and Vegetable Fats and Oils Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) wet milling corn and vegetables; (2) crushing oilseeds and tree nuts; (3) refining and/or blending vegetable oils; (4) manufacturing shortening and margarine; and (5) blending purchased animal fats with vegetable fats.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311221": {
+                  "id": "311221",
+                  "name": "Wet Corn Milling and Starch Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in wet milling corn and other vegetables (except to make ethyl alcohol).  Examples of products made in these establishments are corn sweeteners, such as glucose, dextrose, and fructose; corn oil; and starches (except laundry).\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311224": {
+                  "id": "311224",
+                  "name": "Soybean and Other Oilseed Processing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in crushing oilseeds and tree nuts, such as soybeans, cottonseeds, linseeds, peanuts, and sunflower seeds.  Examples of products produced in these establishments are oilseed oils, cakes, meals, and protein isolates and concentrates.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311225": {
+                  "id": "311225",
+                  "name": "Fats and Oils Refining and Blending",
+                  "description": "This U.S. industry comprises establishments primarily engaged in one or more of the following: (1) manufacturing shortening and margarine from purchased fats and oils; (2) refining and/or blending vegetable, oilseed, and tree nut oils from purchased oils; and (3) blending purchased animal fats with purchased vegetable fats.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31123": {
+                  "id": "31123",
+                  "name": "Breakfast Cereal Manufacturing",
+                  "description": "See industry description for 311230."
+                },
+                "311230": {
+                  "id": "311230",
+                  "name": "Breakfast Cereal Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing breakfast cereal foods.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3113": {
+              "id": "3113",
+              "name": "Sugar and Confectionery Product Manufacturing",
+              "description": "This industry group comprises (1) establishments that process agricultural inputs, such as sugarcane, beet, and cacao, to give rise to a new product (sugar or chocolate) and (2) establishments that begin with sugar and chocolate and process these further.",
+              "children": {
+                "31131": {
+                  "id": "31131",
+                  "name": "Sugar Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing raw sugar, liquid sugar, and refined sugar from sugarcane, raw cane sugar and sugar beets.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311313": {
+                  "id": "311313",
+                  "name": "Beet Sugar Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing refined beet sugar from sugar beets.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311314": {
+                  "id": "311314",
+                  "name": "Cane Sugar Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) processing sugarcane and/or (2) refining cane sugar from raw cane sugar.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31134": {
+                  "id": "31134",
+                  "name": "Nonchocolate Confectionery Manufacturing",
+                  "description": "See industry description for 311340."
+                },
+                "311340": {
+                  "id": "311340",
+                  "name": "Nonchocolate Confectionery Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing nonchocolate confectioneries.  Included in this industry are establishments primarily engaged in retailing nonchocolate confectionery products not for immediate consumption made on the premises.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31135": {
+                  "id": "31135",
+                  "name": "Chocolate and Confectionery Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in (1) manufacturing chocolate and chocolate confectioneries from cacao beans or (2) manufacturing chocolate confectioneries from chocolate produced elsewhere.  Included in this industry are establishments primarily engaged in retailing chocolate confectionery products not for immediate consumption made on the premises from chocolate made elsewhere.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311351": {
+                  "id": "311351",
+                  "name": "Chocolate and Confectionery Manufacturing from Cacao Beans",
+                  "description": "This U.S. industry comprises establishments primarily engaged in shelling, roasting, and grinding cacao beans and making chocolate cacao products and chocolate confectioneries.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311352": {
+                  "id": "311352",
+                  "name": "Confectionery Manufacturing from Purchased Chocolate",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing chocolate confectioneries from chocolate produced elsewhere.  Included in this industry are establishments primarily engaged in retailing chocolate confectionery products not for immediate consumption made on the premises from chocolate made elsewhere.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3114": {
+              "id": "3114",
+              "name": "Fruit and Vegetable Preserving and Specialty Food Manufacturing",
+              "description": "This industry group includes (1) establishments that freeze food and (2) establishments that use preservation processes, such as pickling, canning, and dehydrating.  Both types begin their production process with inputs of vegetable or animal origin.",
+              "children": {
+                "31141": {
+                  "id": "31141",
+                  "name": "Frozen Food Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing frozen fruit, frozen juices, frozen vegetables, and frozen specialty foods (except seafood), such as frozen dinners, entrees, and side dishes; frozen pizza; frozen whipped toppings; and frozen waffles, pancakes, and French toast.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311411": {
+                  "id": "311411",
+                  "name": "Frozen Fruit, Juice, and Vegetable Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing frozen fruits; frozen vegetables; and frozen fruit juices, ades, drinks, cocktail mixes and concentrates.\n\nCross-References."
+                },
+                "311412": {
+                  "id": "311412",
+                  "name": "Frozen Specialty Food Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing frozen specialty foods (except seafood), such as frozen dinners, entrees, and side dishes; frozen pizza; frozen whipped topping; and frozen waffles, pancakes, and French toast.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31142": {
+                  "id": "31142",
+                  "name": "Fruit and Vegetable Canning, Pickling, and Drying",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing canned, pickled, and dried fruits, vegetables, and specialty foods.  Establishments in this industry may package the dried or dehydrated ingredients they make with other purchased ingredients.  Examples of products made by these establishments are canned juices; canned baby foods; canned soups (except seafood); canned dry beans; canned tomato-based sauces, such as catsup, salsa, chili sauce, spaghetti sauce, barbeque sauce, and tomato paste; pickles and relishes; jams and jellies; dried soup mixes and bouillon; and sauerkraut.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311421": {
+                  "id": "311421",
+                  "name": "Fruit and Vegetable Canning",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing canned, pickled, and brined fruits and vegetables.  Examples of products made in these establishments are canned juices; canned jams and jellies; canned tomato-based sauces, such as catsup, salsa, chili sauce, spaghetti sauce, barbeque sauce, and tomato paste; and pickles, relishes, and sauerkraut.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311422": {
+                  "id": "311422",
+                  "name": "Specialty Canning",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing canned specialty foods.  Examples of products made in these establishments are canned baby food, canned baked beans, canned soups (except seafood), canned spaghetti, and other canned nationality foods.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311423": {
+                  "id": "311423",
+                  "name": "Dried and Dehydrated Food Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) drying (including freeze-dried) and/or dehydrating fruits, vegetables, and soup mixes and bouillon and/or (2) drying and/or dehydrating ingredients and packaging them with other purchased ingredients, such as rice and dry pasta.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3115": {
+              "id": "3115",
+              "name": "Dairy Product Manufacturing",
+              "description": "This industry group comprises establishments that manufacture dairy products from raw milk, processed milk, and dairy substitutes (except butter substitutes).",
+              "children": {
+                "31151": {
+                  "id": "31151",
+                  "name": "Dairy Product (except Frozen) Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) manufacturing dairy products (except frozen) from raw milk and/or processed milk products; (2) manufacturing dairy substitutes (except frozen) from soybeans and other nondairy substances; and (3) manufacturing dry, condensed, concentrated, and evaporated dairy and dairy substitute products.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311511": {
+                  "id": "311511",
+                  "name": "Fluid Milk Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) manufacturing processed milk products, such as pasteurized milk or cream and sour cream and/or (2) manufacturing fluid milk dairy substitutes from soybeans and other nondairy substances.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311512": {
+                  "id": "311512",
+                  "name": "Creamery Butter Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing creamery butter from milk and/or processed milk products.\n\nCross-References."
+                },
+                "311513": {
+                  "id": "311513",
+                  "name": "Cheese Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) manufacturing cheese products (except cottage cheese) from raw milk and/or processed milk products and/or (2) manufacturing cheese substitutes from soybean and other nondairy substances.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311514": {
+                  "id": "311514",
+                  "name": "Dry, Condensed, and Evaporated Dairy Product Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing dry, condensed, and evaporated milk and dairy substitute products.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31152": {
+                  "id": "31152",
+                  "name": "Ice Cream and Frozen Dessert Manufacturing",
+                  "description": "See industry description for 311520."
+                },
+                "311520": {
+                  "id": "311520",
+                  "name": "Ice Cream and Frozen Dessert Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing ice cream, frozen yogurts, frozen ices, sherbets, frozen tofu, and other frozen desserts (except bakery products).\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3116": {
+              "id": "3116",
+              "name": "Animal Slaughtering and Processing",
+              "description": "",
+              "children": {
+                "31161": {
+                  "id": "31161",
+                  "name": "Animal Slaughtering and Processing",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) slaughtering animals; (2) preparing processed meats and meat byproducts; and (3) rendering and/or refining animal fat, bones, and meat scraps.  This industry includes establishments primarily engaged in assembly cutting and packing of meats (i.e., boxed meats) from purchased carcasses.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311611": {
+                  "id": "311611",
+                  "name": "Animal (except Poultry) Slaughtering",
+                  "description": "This U.S. industry comprises establishments primarily engaged in slaughtering animals (except poultry and small game).  Establishments that slaughter and prepare meats are included in this industry.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311612": {
+                  "id": "311612",
+                  "name": "Meat Processed from Carcasses",
+                  "description": "This U.S. industry comprises establishments primarily engaged in processing or preserving meat and meat byproducts (except poultry and small game) from purchased meats.  This industry includes establishments primarily engaged in assembly cutting and packing of meats (i.e., boxed meats) from purchased meats.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311613": {
+                  "id": "311613",
+                  "name": "Rendering and Meat Byproduct Processing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in rendering animal fat, bones, and meat scraps.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311615": {
+                  "id": "311615",
+                  "name": "Poultry Processing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) slaughtering poultry and small game and/or (2) preparing processed poultry and small game meat and meat byproducts.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3117": {
+              "id": "3117",
+              "name": "Seafood Product Preparation and Packaging",
+              "description": "",
+              "children": {
+                "31171": {
+                  "id": "31171",
+                  "name": "Seafood Product Preparation and Packaging",
+                  "description": "See industry description for 311710."
+                },
+                "311710": {
+                  "id": "311710",
+                  "name": "Seafood Product Preparation and Packaging",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) canning seafood (including soup); (2) smoking, salting, and drying seafood; (3) eviscerating fresh fish by removing heads, fins, scales, bones, and entrails; (4) shucking and packing fresh shellfish; (5) processing marine fats and oils; and (6) freezing seafood.  Establishments known as \"floating factory ships\" that are engaged in the gathering and processing of seafood into canned seafood products are included in this industry."
+                }
+              }
+            },
+            "3118": {
+              "id": "3118",
+              "name": "Bakeries and Tortilla Manufacturing",
+              "description": "This industry group comprises establishments primarily engaged in one of the following: (1) manufacturing fresh and frozen bread and other bakery products; (2) retailing bread and other bakery products not for immediate consumption made on the premises from flour, not from prepared dough; (3) manufacturing cookies, crackers, and dry pasta; (4) manufacturing prepared flour mixes or dough from flour ground elsewhere; or (5) manufacturing tortillas.",
+              "children": {
+                "31181": {
+                  "id": "31181",
+                  "name": "Bread and Bakery Product Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing fresh and frozen bread and other bakery products.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311811": {
+                  "id": "311811",
+                  "name": "Retail Bakeries",
+                  "description": "This U.S. industry comprises establishments primarily engaged in retailing bread and other bakery products not for immediate consumption made on the premises from flour, not from prepared dough.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311812": {
+                  "id": "311812",
+                  "name": "Commercial Bakeries",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing fresh and frozen bread and bread-type rolls and other fresh bakery (except cookies and crackers) products.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311813": {
+                  "id": "311813",
+                  "name": "Frozen Cakes, Pies, and Other Pastries Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing frozen bakery products (except bread), such as cakes, pies, and doughnuts.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31182": {
+                  "id": "31182",
+                  "name": "Cookie, Cracker, and Pasta Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in one of the following: (1) manufacturing cookies and crackers; (2) preparing flour and dough mixes and dough from flour ground elsewhere; and (3) manufacturing dry pasta.  The establishments in this industry may package the dry pasta they manufacture with other ingredients.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311821": {
+                  "id": "311821",
+                  "name": "Cookie and Cracker Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing cookies, crackers, and other products, such as ice cream cones.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311824": {
+                  "id": "311824",
+                  "name": "Dry Pasta, Dough, and Flour Mixes Manufacturing from Purchased Flour",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) manufacturing dry pasta and/or (2) manufacturing prepared flour mixes or dough from flour ground elsewhere.  The establishments in this industry may package the dry pasta they manufacture with other ingredients.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31183": {
+                  "id": "31183",
+                  "name": "Tortilla Manufacturing",
+                  "description": "See industry description for 311830."
+                },
+                "311830": {
+                  "id": "311830",
+                  "name": "Tortilla Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing tortillas.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3119": {
+              "id": "3119",
+              "name": "Other Food Manufacturing",
+              "description": "This industry group comprises establishments primarily engaged in manufacturing food (except animal food; grain and oilseed milling; sugar and confectionery products; preserved fruits, vegetables, and specialty foods; dairy products; meat products; seafood products; and bakery products and tortillas).  This industry group includes industries with different production processes, such as snack food manufacturing; coffee and tea manufacturing; concentrate, syrup, condiment, and spice manufacturing; and, in general, an entire range of other miscellaneous food product manufacturing.",
+              "children": {
+                "31191": {
+                  "id": "31191",
+                  "name": "Snack Food Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) salting, roasting, drying, cooking, or canning nuts; (2) processing grains or seeds into snacks; (3) manufacturing peanut butter; and (4) manufacturing potato chips, corn chips, popped popcorn, pretzels (except soft), pork rinds, and similar snacks.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311911": {
+                  "id": "311911",
+                  "name": "Roasted Nuts and Peanut Butter Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in one or more of the following: (1) salting, roasting, drying, cooking, or canning nuts; (2) processing grains or seeds into snacks; and (3) manufacturing peanut butter and other nut butters.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311919": {
+                  "id": "311919",
+                  "name": "Other Snack Food Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing snack foods (except roasted nuts and peanut butter).\n\nIllustrative Examples:\n\nCorn chips and related corn snacks manufacturing\nPopped popcorn (except candy-covered) manufacturing\nPork rinds manufacturing\nPotato chips manufacturing\nPretzels (except soft) manufacturing\nTortilla chips manufacturing\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31192": {
+                  "id": "31192",
+                  "name": "Coffee and Tea Manufacturing",
+                  "description": "See industry description for 311920."
+                },
+                "311920": {
+                  "id": "311920",
+                  "name": "Coffee and Tea Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) roasting coffee; (2) manufacturing coffee and tea concentrates (including instant and freeze-dried); (3) blending tea; (4) manufacturing herbal tea; and (5) manufacturing coffee extracts, flavorings, and syrups.\n\nCross-References."
+                },
+                "31193": {
+                  "id": "31193",
+                  "name": "Flavoring Syrup and Concentrate Manufacturing",
+                  "description": "See industry description for 311930."
+                },
+                "311930": {
+                  "id": "311930",
+                  "name": "Flavoring Syrup and Concentrate Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing flavoring syrup drink concentrates and related products for soda fountain use or for the manufacture of soft drinks.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31194": {
+                  "id": "31194",
+                  "name": "Seasoning and Dressing Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) manufacturing dressings and sauces, such as mayonnaise, salad dressing, vinegar, mustard, horseradish, soy sauce, tartar sauce, Worcestershire sauce, and other prepared sauces (except tomato-based and gravies); (2) manufacturing spices, table salt, seasoning, and flavoring extracts (except coffee and meat), and natural food colorings; and (3) manufacturing dry mix food preparations, such as salad dressing mixes, gravy and sauce mixes, frosting mixes, and other dry mix preparations.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311941": {
+                  "id": "311941",
+                  "name": "Mayonnaise, Dressing, and Other Prepared Sauce Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing mayonnaise, salad dressing, vinegar, mustard, horseradish, soy sauce, tartar sauce, Worcestershire sauce, and other prepared sauces (except tomato-based and gravy).\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311942": {
+                  "id": "311942",
+                  "name": "Spice and Extract Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) manufacturing spices, table salt, seasonings, flavoring extracts (except coffee and meat), and natural food colorings and/or (2) manufacturing dry mix food preparations, such as salad dressing mixes, gravy and sauce mixes, frosting mixes, and other dry mix preparations.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31199": {
+                  "id": "31199",
+                  "name": "All Other Food Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing food (except animal food; grain and oilseed milling; sugar and confectionery products; preserved fruits, vegetables, and specialty foods; dairy products; meat products; seafood products; baked goods and tortillas; snack foods; coffee and tea; flavoring syrups and concentrates; seasonings; and dressings).  Included in this industry are establishments primarily engaged in mixing purchased dried and/or dehydrated ingredients, including those mixing purchased dried and/or dehydrated ingredients for soup mixes and bouillon.\n\nIllustrative Examples:\n\nBaking powder manufacturing\nCut or peeled fresh vegetables manufacturing\nDessert puddings manufacturing\nEgg substitutes manufacturing\nSweetening syrups (except pure maple) manufacturing\nFresh pasta manufacturing\nFresh pizza manufacturing\nHoney processing\nPopcorn (except popped) manufacturing\nPowdered drink mixes (except chocolate, coffee, tea, or milk based) manufacturing\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "311991": {
+                  "id": "311991",
+                  "name": "Perishable Prepared Food Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing perishable prepared foods, such as salads, sandwiches, prepared meals, fresh pizza, fresh pasta, and peeled or cut vegetables.\n\nCross-References."
+                },
+                "311999": {
+                  "id": "311999",
+                  "name": "All Other Miscellaneous Food Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing food (except animal food; grain and oilseed milling; sugar and confectionery products; preserved fruits, vegetables, and specialties; dairy products; meat products; seafood products; bakeries and tortillas; snack foods; coffee and tea; flavoring syrups and concentrates; seasonings and dressings; and perishable prepared food).  Included in this industry are establishments primarily engaged in mixing purchased dried and/or dehydrated ingredients including those mixing purchased dried and/or dehydrated ingredients for soup mixes and bouillon.\n\nIllustrative Examples:\n\nBaking powder manufacturing\nCake frosting, prepared, manufacturing\nDessert puddings manufacturing\nSweetening syrups (except pure maple) manufacturing\nEgg substitutes manufacturing\nGelatin dessert preparations manufacturing \nHoney processing\nPowdered drink mixes (except chocolate, coffee, tea, or milk based) manufacturing\nPopcorn (except popped) manufacturing\nYeast manufacturing\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "312": {
+          "id": "312",
+          "name": "Beverage and Tobacco Product Manufacturing",
+          "description": "Industries in the Beverage and Tobacco Product Manufacturing subsector manufacture beverages and tobacco products.  The Beverage Manufacturing industry group includes three types of establishments: (1) those that manufacture nonalcoholic beverages; (2) those that manufacture alcoholic beverages through the fermentation process; and (3) those that produce distilled alcoholic beverages.  Ice manufacturing, while not a beverage, is included with nonalcoholic beverage manufacturing because it uses the same production process as water purification.\n\nIn the case of activities related to the manufacture of beverages, the structure follows the defined production processes.  Brandy, a distilled beverage, is not placed under distillery product manufacturing, but rather under winery product manufacturing since the production process used in the manufacturing of alcoholic grape-based beverages produces both wines (fermented beverage) and brandies (distilled beverage).\n\nThe Tobacco Manufacturing industry group includes two types of establishments: (1) those engaged in redrying and stemming tobacco and (2) those that manufacture tobacco products, such as cigarettes and cigars.",
+          "children": {
+            "3121": {
+              "id": "3121",
+              "name": "Beverage Manufacturing",
+              "description": "This industry group comprises establishments primarily engaged in manufacturing soft drinks and ice; purifying and bottling water; and manufacturing brewery, winery, and distillery products.",
+              "children": {
+                "31211": {
+                  "id": "31211",
+                  "name": "Soft Drink and Ice Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) manufacturing soft drinks; (2) manufacturing ice; and (3) purifying and bottling water.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "312111": {
+                  "id": "312111",
+                  "name": "Soft Drink Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing soft drinks and artificially carbonated waters.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "312112": {
+                  "id": "312112",
+                  "name": "Bottled Water Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in purifying and bottling water (including naturally carbonated).\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "312113": {
+                  "id": "312113",
+                  "name": "Ice Manufacturing",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing ice.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31212": {
+                  "id": "31212",
+                  "name": "Breweries",
+                  "description": "See industry description for 312120."
+                },
+                "312120": {
+                  "id": "312120",
+                  "name": "Breweries",
+                  "description": "This industry comprises establishments primarily engaged in brewing beer, ale, lager, malt liquors, and nonalcoholic beer.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31213": {
+                  "id": "31213",
+                  "name": "Wineries",
+                  "description": "See industry description for 312130."
+                },
+                "312130": {
+                  "id": "312130",
+                  "name": "Wineries",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) growing grapes and manufacturing wines and brandies; (2) manufacturing wines and brandies from grapes and other fruits grown elsewhere; and (3) blending wines and brandies.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31214": {
+                  "id": "31214",
+                  "name": "Distilleries",
+                  "description": "See industry description for 312140."
+                },
+                "312140": {
+                  "id": "312140",
+                  "name": "Distilleries",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) distilling potable liquors (except brandies); (2) distilling and blending liquors; and (3) blending and mixing liquors and other ingredients.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3122": {
+              "id": "3122",
+              "name": "Tobacco Manufacturing",
+              "description": "",
+              "children": {
+                "31223": {
+                  "id": "31223",
+                  "name": "Tobacco Manufacturing",
+                  "description": "See industry description for 312230."
+                },
+                "312230": {
+                  "id": "312230",
+                  "name": "Tobacco Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in (1) stemming and redrying tobacco and/or (2) manufacturing cigarettes or other tobacco products.\n\nIllustrative Examples:\n\nChewing tobacco manufacturing\nCigar manufacturing\nCigarettes manufacturing (except electronic)\nSnuff manufacturing\nPrepared pipe tobacco manufacturing\nTobacco leaf processing and aging\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "313": {
+          "id": "313",
+          "name": "Textile Mills",
+          "description": "Industries in the Textile Mills subsector group establishments that transform a basic fiber (natural or synthetic) into a product, such as yarn or fabric that is further manufactured into usable items, such as apparel, sheets, towels, and textile bags for individual or industrial consumption.  The further manufacturing may be performed in the same establishment and classified in this subsector, or it may be performed at a separate establishment and be classified elsewhere in the Manufacturing sector.\n\nThe main processes in this subsector include preparation and spinning of fiber, knitting or weaving of fabric, and the finishing of the textile.  The NAICS structure follows and captures this process flow.  Major industries in this flow, such as preparation of fibers, weaving of fabric, knitting of fabric, and fiber and fabric finishing, are uniquely identified.  Texturizing, throwing, twisting, and winding of yarn contain aspects of both fiber preparation and fiber finishing and are classified with preparation of fibers rather than with finishing of fibers.\n\nNAICS separates the manufacturing of primary textiles and the manufacturing of textile products (except apparel) produced from purchased primary textiles, such as fabric.  The manufacturing of textile products (except apparel) from purchased fabric is classified in Subsector 314, Textile Product Mills, and apparel from purchased fabric is classified in Subsector 315, Apparel Manufacturing.\n\nExcluded from this subsector are establishments that weave or knit fabric and make garments.  These establishments are included in Subsector 315, Apparel Manufacturing.",
+          "children": {
+            "3131": {
+              "id": "3131",
+              "name": "Fiber, Yarn, and Thread Mills",
+              "description": "",
+              "children": {
+                "31311": {
+                  "id": "31311",
+                  "name": "Fiber, Yarn, and Thread Mills",
+                  "description": "See industry description for 313110."
+                },
+                "313110": {
+                  "id": "313110",
+                  "name": "Fiber, Yarn, and Thread Mills",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) spinning yarn; (2) manufacturing thread of any fiber; (3) texturizing, throwing, twisting, and winding purchased yarn or manmade fibers and filaments; and (4) producing hemp yarn and further processing into rope or bags.\n\nCross-References."
+                }
+              }
+            },
+            "3132": {
+              "id": "3132",
+              "name": "Fabric Mills",
+              "description": "This industry group comprises establishments primarily engaged in one of the following: (1) weaving broadwoven fabrics and felts (except tire fabrics and rugs); (2) weaving or braiding narrow fabrics; (3) making fabric-covered elastic yarn and thread; (4) manufacturing Schiffli machine embroideries; (5) manufacturing nonwoven fabrics and felts; (6) knitting weft (i.e., circular) and warp (i.e., flat) fabric; (7) knitting and finishing weft and warp fabric; (8) manufacturing lace; or (9) manufacturing, dyeing, and finishing lace and lace goods.",
+              "children": {
+                "31321": {
+                  "id": "31321",
+                  "name": "Broadwoven Fabric Mills",
+                  "description": "See industry description for 313210."
+                },
+                "313210": {
+                  "id": "313210",
+                  "name": "Broadwoven Fabric Mills",
+                  "description": "This industry comprises establishments primarily engaged in weaving broadwoven fabrics and felts (except tire fabrics and rugs).  Establishments in this industry may weave only, weave and finish, or weave, finish, and further fabricate fabric products.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31322": {
+                  "id": "31322",
+                  "name": "Narrow Fabric Mills and Schiffli Machine Embroidery",
+                  "description": "See industry description for 313220."
+                },
+                "313220": {
+                  "id": "313220",
+                  "name": "Narrow Fabric Mills and Schiffli Machine Embroidery",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) weaving or braiding narrow fabrics in their final form or initially made in wider widths that are specially constructed for narrower widths; (2) making fabric-covered elastic yarn and thread; and (3) manufacturing Schiffli machine embroideries.  Establishments in this industry may weave only; weave and finish; or weave, finish, and further fabricate fabric products."
+                },
+                "31323": {
+                  "id": "31323",
+                  "name": "Nonwoven Fabric Mills",
+                  "description": "See industry description for 313230."
+                },
+                "313230": {
+                  "id": "313230",
+                  "name": "Nonwoven Fabric Mills",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing nonwoven fabrics and felts. Processes used include bonding and/or interlocking fibers by mechanical, chemical, thermal, or solvent means, or by combinations thereof."
+                },
+                "31324": {
+                  "id": "31324",
+                  "name": "Knit Fabric Mills",
+                  "description": "See industry description for 313240."
+                },
+                "313240": {
+                  "id": "313240",
+                  "name": "Knit Fabric Mills",
+                  "description": "This industry comprises establishments primarily engaged in one of the following: (1) knitting weft (i.e., circular) and warp (i.e., flat) fabric; (2) knitting and finishing weft and warp fabric; (3) manufacturing lace; or (4) manufacturing, dyeing, and finishing lace and lace goods.  Establishments in this industry may knit only; knit and finish; or knit, finish, and further fabricate fabric products (except apparel).\n\nCross-References."
+                }
+              }
+            },
+            "3133": {
+              "id": "3133",
+              "name": "Textile and Fabric Finishing and Fabric Coating Mills",
+              "description": "This industry group comprises establishments primarily engaged in one of the following: (1) finishing textiles, fabrics, and apparel; (2) converting fabrics and textiles by buying fabric goods in the grey, having them finished on contract, and selling them at wholesale; or (3) coating, laminating, varnishing, waxing, and rubberizing textiles and apparel.",
+              "children": {
+                "31331": {
+                  "id": "31331",
+                  "name": "Textile and Fabric Finishing Mills",
+                  "description": "See industry description for 313310."
+                },
+                "313310": {
+                  "id": "313310",
+                  "name": "Textile and Fabric Finishing Mills",
+                  "description": "This industry comprises (1) establishments primarily engaged in finishing textiles, fabrics, and apparel and (2) establishments of converters who buy fabric goods in the grey, have them finished on contract, and sell at wholesale.  Finishing operations include: bleaching, dyeing, printing (e.g., roller, screen, flock, plisse), stonewashing, and other mechanical finishing, such as preshrinking, shrinking, sponging, calendering, mercerizing, and napping; as well as cleaning, scouring, and the preparation of natural fibers and raw stock.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31332": {
+                  "id": "31332",
+                  "name": "Fabric Coating Mills",
+                  "description": "See industry description for 313320."
+                },
+                "313320": {
+                  "id": "313320",
+                  "name": "Fabric Coating Mills",
+                  "description": "This industry comprises establishments primarily engaged in coating, laminating, varnishing, waxing, and rubberizing textiles and apparel.\n\nCross-References."
+                }
+              }
+            }
+          }
+        },
+        "314": {
+          "id": "314",
+          "name": "Textile Product Mills",
+          "description": "Industries in the Textile Product Mills subsector group establishments that make textile products (except apparel).  With a few exceptions, processes used by these establishments are generally cut and sew (i.e., purchasing fabric and cutting and sewing to make nonapparel textile products, such as sheets and towels).",
+          "children": {
+            "3141": {
+              "id": "3141",
+              "name": "Textile Furnishings Mills",
+              "description": "This industry group comprises establishments primarily engaged in (1) manufacturing woven, tufted, and other carpets and rugs and (2) manufacturing household textile products from purchased materials.  The household textile products may be made on a stock or custom basis for sale to individual retail customers.",
+              "children": {
+                "31411": {
+                  "id": "31411",
+                  "name": "Carpet and Rug Mills",
+                  "description": "See industry description for 314110."
+                },
+                "314110": {
+                  "id": "314110",
+                  "name": "Carpet and Rug Mills",
+                  "description": "This industry comprises establishments primarily engaged in (1) manufacturing woven, tufted, and other carpets and rugs, such as art squares, floor mattings, needlepunch carpeting, and door mats and mattings, from textile materials or from twisted paper, grasses, reeds, sisal, jute, or rags and/or (2) finishing carpets and rugs."
+                },
+                "31412": {
+                  "id": "31412",
+                  "name": "Curtain and Linen Mills",
+                  "description": "See industry description for 314120."
+                },
+                "314120": {
+                  "id": "314120",
+                  "name": "Curtain and Linen Mills",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing household textile products, such as curtains, draperies, linens, bedspreads, sheets, tablecloths, towels, and shower curtains, from purchased materials.  The household textile products may be made on a stock or custom basis for sale to individual retail customers.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3149": {
+              "id": "3149",
+              "name": "Other Textile Product Mills",
+              "description": "This industry group comprises establishments primarily engaged in making textile products (except carpets and rugs, curtains and draperies, and other household textile products) from purchased materials.",
+              "children": {
+                "31491": {
+                  "id": "31491",
+                  "name": "Textile Bag and Canvas Mills",
+                  "description": "See industry description for 314910."
+                },
+                "314910": {
+                  "id": "314910",
+                  "name": "Textile Bag and Canvas Mills",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing textile bags (except luggage) or other canvas and canvas-like products, such as awnings, sails, tarpaulins, and tents from purchased textile fabrics or yarns.\n\nIllustrative Examples:\n\nCovers (e.g., boat, swimming pool, truck) made from purchased fabrics\nLaundry bags made from purchased woven or knitted materials\nSeed bags made from purchased woven or knitted materials\nTextile bags made from purchased woven or knitted materials\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31499": {
+                  "id": "31499",
+                  "name": "All Other Textile Product Mills",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing nonapparel textile products (except carpet, rugs, curtains, linens, bags, and canvas products) from purchased materials.  This industry includes establishments primarily engaged in decorative stitching such as embroidery or other art needlework on textile products, including apparel.\n\nIllustrative Examples:\n\nBatts and batting (except nonwoven fabrics) manufacturing\nCarpet cutting and binding\nDiapers (except disposable) made from purchased materials\nFishing nets made from purchased materials\nEmbroidering on textile products or apparel for the trade\nRopes (except wire rope) manufacturing\nSleeping bags manufacturing\nTire cord and fabric, all materials, manufacturing\nTwines manufacturing\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "314994": {
+                  "id": "314994",
+                  "name": "Rope, Cordage, Twine, Tire Cord, and Tire Fabric Mills",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) manufacturing rope, cable, cordage, twine, and related products from all materials (e.g., abaca, sisal, henequen, cotton, paper, jute, flax, manmade fibers including glass) and/or (2) manufacturing cord and fabric of polyester, rayon, cotton, glass, steel, or other materials for use in reinforcing rubber tires, industrial belting, and similar uses.\n\nCross-References."
+                },
+                "314999": {
+                  "id": "314999",
+                  "name": "All Other Miscellaneous Textile Product Mills",
+                  "description": "This U.S. industry comprises establishments primarily engaged in manufacturing textile products (except carpets and rugs; curtains and linens; textile bags and canvas products; rope, cordage, and twine; and tire cords and tire fabrics) from purchased materials.  These establishments may further embellish the textile products they manufacture with decorative stitching.  Establishments primarily engaged in adding decorative stitching such as embroidery or other art needlework on textile products, including apparel, on a contract or fee basis for the trade, are included in this industry.\n\nIllustrative Examples:\n\nBatts and batting (except nonwoven fabrics) manufacturing\nEmbroidering on textile products or apparel for the trade\nFishing nets made from purchased materials\nCarpet cutting and binding\nSleeping bags manufacturing\nDiapers (except disposable) made from purchased materials\nTextile fire hoses made from purchased materials\nDust cloths made from purchased fabric\nWeatherstripping made from purchased textiles\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "315": {
+          "id": "315",
+          "name": "Apparel Manufacturing",
+          "description": "Industries in the Apparel Manufacturing subsector group establishments with two distinct manufacturing processes: (1) cut and sew (i.e., purchasing fabric and cutting and sewing to make a garment) and (2) the manufacture of garments in establishments that first knit fabric and then cut and sew the fabric into a garment.  The Apparel Manufacturing subsector includes a diverse range of establishments manufacturing full lines of ready-to-wear apparel and custom apparel: apparel contractors, performing cutting or sewing operations on materials owned by others; jobbers, performing entrepreneurial functions involved in apparel manufacturing; and tailors, manufacturing custom garments for individual clients.  Knitting fabric, when done alone, is classified in the Textile Mills subsector, but when knitting is combined with the production of complete garments, the activity is classified in the Apparel Manufacturing subsector.",
+          "children": {
+            "3151": {
+              "id": "3151",
+              "name": "Apparel Knitting Mills",
+              "description": "",
+              "children": {
+                "31512": {
+                  "id": "31512",
+                  "name": "Apparel Knitting Mills",
+                  "description": "See industry description for 315120."
+                },
+                "315120": {
+                  "id": "315120",
+                  "name": "Apparel Knitting Mills",
+                  "description": "This industry comprises establishments primarily engaged in knitting apparel or knitting fabric and then manufacturing apparel.  Jobbers, performing entrepreneurial functions involved in knitting apparel and accessories, are included.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3152": {
+              "id": "3152",
+              "name": "Cut and Sew Apparel Manufacturing",
+              "description": "This industry group comprises establishments primarily engaged in manufacturing cut and sew apparel from woven fabric or purchased knit fabric.  Included in this industry group is a diverse range of establishments manufacturing full lines of ready-to-wear apparel and custom apparel: apparel contractors, performing cutting or sewing operations on materials owned by others; jobbers, performing entrepreneurial functions involved in apparel manufacturing; and tailors, manufacturing custom garments for individual clients.  Establishments weaving or knitting fabric, without manufacturing apparel, are classified in Subsector 313, Textile Mills.",
+              "children": {
+                "31521": {
+                  "id": "31521",
+                  "name": "Cut and Sew Apparel Contractors",
+                  "description": "See industry description for 315210."
+                },
+                "315210": {
+                  "id": "315210",
+                  "name": "Cut and Sew Apparel Contractors",
+                  "description": "This industry comprises establishments commonly referred to as contractors primarily engaged in (1) cutting materials owned by others for apparel and accessories and/or (2) sewing materials owned by others for apparel and accessories.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "31525": {
+                  "id": "31525",
+                  "name": "Cut and Sew Apparel Manufacturing (except Contractors)",
+                  "description": "See industry description for 315250."
+                },
+                "315250": {
+                  "id": "315250",
+                  "name": "Cut and Sew Apparel Manufacturing (except Contractors)",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing cut and sew apparel from purchased fabric.  Clothing jobbers, who perform entrepreneurial functions involved in apparel manufacture, including buying raw materials, designing and preparing samples, arranging for apparel to be made from their materials, and marketing finished apparel, are included.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "3159": {
+              "id": "3159",
+              "name": "Apparel Accessories and Other Apparel Manufacturing",
+              "description": "",
+              "children": {
+                "31599": {
+                  "id": "31599",
+                  "name": "Apparel Accessories and Other Apparel Manufacturing",
+                  "description": "See industry description for 315990."
+                },
+                "315990": {
+                  "id": "315990",
+                  "name": "Apparel Accessories and Other Apparel Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing apparel and accessories (except apparel knitting mills, cut and sew apparel contractors, and cut and sew apparel manufacturing (except contractors)).  Jobbers, who perform entrepreneurial functions involved in apparel accessories manufacture, including buying raw materials, designing and preparing samples, arranging for apparel accessories to be made from their materials, and marketing finished apparel accessories, are included.  Examples of products made by these establishments are belts, caps, gloves (except medical, safety, sporting), hats, and neckties.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "316": {
+          "id": "316",
+          "name": "Leather and Allied Product Manufacturing",
+          "description": "Establishments in the Leather and Allied Product Manufacturing subsector transform hides into leather by tanning or curing and fabricating the leather into products for final consumption.  This subsector also includes the manufacture of similar products from other materials, including products (except apparel) made from \"leather substitutes,\" such as rubber, plastics, or textiles.  Rubber footwear, textile luggage, and plastics purses or wallets are examples of \"leather substitute\" products included in this subsector.  The products made from leather substitutes are included in this subsector because they are made in similar ways leather products are made (e.g., luggage).  They are made in the same establishments, so it is not practical to separate them.\n\nThe inclusion of leather and hide tanning and finishing in this subsector is partly because it is a relatively small industry that has few close neighbors as a production process, partly because leather is an input to some of the other products classified in this subsector, and partly for historical reasons.",
+          "children": {
+            "3161": {
+              "id": "3161",
+              "name": "Leather and Hide Tanning and Finishing",
+              "description": "",
+              "children": {
+                "31611": {
+                  "id": "31611",
+                  "name": "Leather and Hide Tanning and Finishing",
+                  "description": "See industry description for 316110."
+                },
+                "316110": {
+                  "id": "316110",
+                  "name": "Leather and Hide Tanning and Finishing",
+                  "description": "This industry comprises establishments primarily engaged in one or more of the following: (1) tanning, currying, and finishing hides and skins; (2) having others process hides and skins on a contract basis; and (3) dyeing or dressing furs."
+                }
+              }
+            },
+            "3162": {
+              "id": "3162",
+              "name": "Footwear Manufacturing",
+              "description": "",
+              "children": {
+                "31621": {
+                  "id": "31621",
+                  "name": "Footwear Manufacturing",
+                  "description": "See industry description for 316210."
+                },
+                "316210": {
+                  "id": "316210",
+                  "name": "Footwear Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing footwear (except orthopedic extension footwear).\n\nIllustrative Examples:\n\nAthletic shoes manufacturing\nBallet slippers manufacturing\nCleated athletic shoes manufacturing\nShoes, children's and infants' (except orthopedic extension), manufacturing\nShoes, men's (except orthopedic extension), manufacturing\nShoes, women's (except orthopedic extension), manufacturing\n\n\nCross-References."
+                }
+              }
+            },
+            "3169": {
+              "id": "3169",
+              "name": "Other Leather and Allied Product Manufacturing",
+              "description": "",
+              "children": {
+                "31699": {
+                  "id": "31699",
+                  "name": "Other Leather and Allied Product Manufacturing",
+                  "description": "See industry description for 316990."
+                },
+                "316990": {
+                  "id": "316990",
+                  "name": "Other Leather and Allied Product Manufacturing",
+                  "description": "This industry comprises establishments primarily engaged in manufacturing leather products (except footwear and apparel) from purchased leather or leather substitutes (e.g., fabric, plastics).\n\nIllustrative Examples:\n\nBillfolds, all materials, manufacturing\nBoot and shoe cut stock and findings, leather, manufacturing\nDog furnishings (e.g., collars, harnesses, leashes, muzzles), manufacturing \nLuggage, all materials, manufacturing\nShoe soles, leather, manufacturing\nPurses, women's, all materials (except metal), manufacturing\nToilet kits and cases (except metal) manufacturing\nWatch bands (except metal) manufacturing\nWelders' jackets, leggings, and sleeves, leather, manufacturing\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "42": {
       "id": "42",
       "name": "Wholesale Trade",
@@ -2303,6 +3071,1024 @@
                   "id": "425120",
                   "name": "Wholesale Trade Agents and Brokers",
                   "description": "This industry comprises wholesale trade agents and brokers acting on behalf of buyers or sellers in the wholesale distribution of goods, including those that use the Internet or other electronic means to bring together buyers and sellers.  Agents and brokers do not take title to the goods being sold but rather receive a commission or fee for their service.  Agents and brokers for all durable and nondurable goods are included in this industry.\n\nIllustrative Examples:\n\nIndependent sales representatives\nManufacturers' sales representatives\nGroup purchasing organizations (acting as agents for goods distribution)\n\n\nCross-References."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "44": {
+      "id": "44",
+      "name": "Retail Trade",
+      "description": "The Sector as a Whole\n\nThe Retail Trade sector comprises establishments primarily engaged in retailing merchandise, generally without transformation, and rendering services incidental to the sale of merchandise.\n\nThe retailing process is the final step in the distribution of merchandise; retailers are, therefore, organized to sell merchandise in small quantities to the general public.  Retail stores are fixed point-of-sale locations, located and designed to attract a high volume of walk-in customers.  In general, retail stores have extensive displays of merchandise and use mass-media advertising to attract customers.  Retailers often reach customers and market merchandise with methods other than, or in addition to, physical stores, such as Internet websites, the broadcasting of \"infomercials,\" the broadcasting and publishing of direct-response advertising, the publishing of paper and electronic catalogs, door-to-door solicitation, in-home demonstration, selling from portable stalls (street vendors, except food), and distribution through vending machines.  Establishments engaged in the direct sale and home delivery of products, such as home heating oil dealers and home delivery newspaper routes, are included here.\n\nRetail establishments typically sell merchandise to the general public for personal or household consumption, but some also serve business and institutional clients.  These include office supply retailers, computer and software retailers, building materials dealers, plumbing supply retailers, and electrical supply retailers.\n\nIn addition to retailing merchandise, some retailers are also engaged in the provision of after-sales services, such as repair and installation.  For example, new automobile dealers, electronics and appliance retailers, and musical instrument and supplies retailers often provide repair services.  As a general rule, establishments engaged in retailing merchandise and providing after-sales services are classified in this sector.\n\nRetail trade establishments are grouped into industries and industry groups typically based on one or more of the following criteria:\n\n(a) The merchandise line or lines carried; for example, specialty retailers are distinguished from general-line retailers.\n\n(b) The usual trade designation of the establishments.  This criterion applies in cases where a retailer is well recognized by the industry and the public, but difficult to define strictly in terms of merchandise lines carried; for example, pharmacies and department stores.\n\n(c) Human resource requirements in terms of expertise; for example, the staff of an automobile dealer requires knowledge in financing, registering, and licensing issues that are not necessary in other retail industries.\n\nThe buying of goods for resale is a characteristic of retail trade establishments that particularly distinguishes them from establishments in the agriculture, manufacturing, and construction industries.  For example, farms that sell their products at or from the point of production are not classified in retail, but rather in agriculture.  Similarly, establishments that both manufacture and sell their products to the general public are not classified in retail, but rather in manufacturing.  However, establishments that engage in processing activities incidental to retailing are classified in retail.  This includes optical goods retailers that grind lenses, and meat and seafood retailers that process carcasses into cuts.\n\nWholesalers also engage in the buying of goods for resale, but they are not usually organized to serve the general public.  They typically operate from a warehouse or office, and neither the design nor the location of these premises is intended to solicit a high volume of walk-in traffic.  Wholesalers supply institutional, industrial, wholesale, and retail clients; their operations are, therefore, generally organized to purchase, sell, and deliver merchandise in larger quantities.  However, dealers of durable nonconsumer goods, such as farm machinery and heavy-duty trucks, are included in wholesale trade even if they often sell these products in single units.",
+      "children": {
+        "441": {
+          "id": "441",
+          "name": "Motor Vehicle and Parts Dealers",
+          "description": "Industries in the Motor Vehicle and Parts Dealers subsector retail motor vehicles and parts.  Establishments in this subsector often operate from a showroom and/or an open lot where the vehicles are on display.  The display of vehicles and the related parts require little by way of display equipment.  The personnel generally include both the sales and sales support staff familiar with the requirements for registering and financing a vehicle as well as a staff of parts experts and mechanics trained to provide repair and maintenance services for the vehicles.  Specific industries included in this subsector identify the type of vehicle being retailed.\n\nSales of capital or durable nonconsumer goods, such as medium- and heavy-duty trucks, are always included in wholesale trade.",
+          "children": {
+            "4411": {
+              "id": "4411",
+              "name": "Automobile Dealers",
+              "description": "This industry group comprises establishments primarily engaged in retailing new and used automobiles and light trucks, such as sport utility vehicles, and passenger and cargo vans.",
+              "children": {
+                "44111": {
+                  "id": "44111",
+                  "name": "New Car Dealers",
+                  "description": "See industry description for 441110."
+                },
+                "441110": {
+                  "id": "441110",
+                  "name": "New Car Dealers",
+                  "description": "This industry comprises establishments primarily engaged in retailing new automobiles and light trucks, such as sport utility vehicles, and passenger and cargo vans, or retailing these new vehicles in combination with activities, such as repair services, retailing used cars, and selling replacement parts and accessories.\n\nIllustrative Examples:\n\nAutomobile dealers, new only, or new and used\nLight utility truck dealers, new only, or new and used\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "44112": {
+                  "id": "44112",
+                  "name": "Used Car Dealers",
+                  "description": "See industry description for 441120."
+                },
+                "441120": {
+                  "id": "441120",
+                  "name": "Used Car Dealers",
+                  "description": "This industry comprises establishments primarily engaged in retailing used automobiles and light trucks, such as sport utility vehicles, and passenger and cargo vans.\n\nIllustrative Examples:\n\nAntique auto dealers\nLight truck dealers, used only\nAutomobile dealers, used only\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4412": {
+              "id": "4412",
+              "name": "Other Motor Vehicle Dealers",
+              "description": "This industry group comprises establishments primarily engaged in retailing new and used vehicles (except automobiles, light trucks, such as sport utility vehicles, and passenger and cargo vans).",
+              "children": {
+                "44121": {
+                  "id": "44121",
+                  "name": "Recreational Vehicle Dealers",
+                  "description": "See industry description for 441210."
+                },
+                "441210": {
+                  "id": "441210",
+                  "name": "Recreational Vehicle Dealers",
+                  "description": "This industry comprises establishments primarily engaged in retailing new and/or used recreational vehicles commonly referred to as RVs or retailing these new vehicles in combination with activities, such as repair services and selling replacement parts and accessories.\n\nIllustrative Examples:\n\nMotor home dealers\nRecreational vehicle (RV) parts and accessories stores\nRecreational vehicle (RV) dealers\nTravel trailer dealers \n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "44122": {
+                  "id": "44122",
+                  "name": "Motorcycle, Boat, and Other Motor Vehicle Dealers",
+                  "description": "This industry comprises establishments primarily engaged in retailing new and used motorcycles, boats, and other vehicles (except automobiles, light trucks, and recreational vehicles), or retailing these new vehicles in combination with activities, such as repair services and selling replacement parts and accessories.\n\nIllustrative Examples:\n\nAircraft dealers\nMotorcycle dealers\nAll-terrain vehicle (ATV) dealers\nUtility trailer dealers\nBoat dealers, new and used\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "441222": {
+                  "id": "441222",
+                  "name": "Boat Dealers",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) retailing new and/or used boats or retailing new boats in combination with activities, such as repair services and selling replacement parts and accessories, and/or (2) retailing new and/or used outboard motors, boat trailers, marine supplies, parts, and accessories.\n\nIllustrative Examples:\n\nBoat dealers (e.g., power boats, rowboats, sailboats)\nOutboard motor dealers\nMarine supply dealers\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "441227": {
+                  "id": "441227",
+                  "name": "Motorcycle, ATV, and All Other Motor Vehicle Dealers",
+                  "description": "This U.S. industry comprises establishments primarily engaged in retailing new and/or used motorcycles, motor scooters, motorbikes, mopeds, off-road all-terrain vehicles (ATV), personal watercraft, utility trailers, and other motor vehicles (except automobiles, light trucks, recreational vehicles, and boats) or retailing these new vehicles in combination with activities, such as repair services and selling replacement parts and accessories.\n\nIllustrative Examples:\n\nAll-terrain vehicle (ATV) dealers\nMotorcycle dealers\nMoped dealers\nMotorcycle parts and accessories dealers\nPersonal watercraft dealers\nAircraft dealers\nSnowmobile dealers\nPowered golf cart dealers\nUtility trailer dealers\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4413": {
+              "id": "4413",
+              "name": "Automotive Parts, Accessories, and Tire Retailers",
+              "description": "This industry group comprises establishments primarily engaged in retailing new, used, and/or rebuilt automotive parts and accessories, including tires and tubes.  Included in this industry group are establishments primarily engaged in retailing automotive parts and accessories in combination with automotive repair services.",
+              "children": {
+                "44133": {
+                  "id": "44133",
+                  "name": "Automotive Parts and Accessories Retailers",
+                  "description": "See industry description for 441330."
+                },
+                "441330": {
+                  "id": "441330",
+                  "name": "Automotive Parts and Accessories Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing new, used, and/or rebuilt automotive parts and accessories, with or without repairing automobiles; and/or establishments primarily engaged in retailing and installing automotive accessories.\n\nIllustrative Examples:\n\nAutomotive parts and supply retailers\nTruck cap retailers\nAutomotive stereo retailers\nUsed automotive parts retailers\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "44134": {
+                  "id": "44134",
+                  "name": "Tire Dealers",
+                  "description": "See industry description for 441340."
+                },
+                "441340": {
+                  "id": "441340",
+                  "name": "Tire Dealers",
+                  "description": "This industry comprises establishments primarily engaged in retailing new and/or used tires and tubes or retailing new tires in combination with automotive repair services.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "444": {
+          "id": "444",
+          "name": "Building Material and Garden Equipment and Supplies Dealers",
+          "description": "Industries in the Building Material and Garden Equipment and Supplies Dealers subsector retail new building materials, hardware, paint, and garden and outdoor power equipment and supplies.  Establishments in this subsector with fixed point-of-sale locations, including home centers and retail lumber yards, may display merchandise either indoors or outdoors under covered areas.  The staff is usually knowledgeable in the use of the specific products being retailed in the construction, repair, and maintenance of the home and associated grounds.",
+          "children": {
+            "4441": {
+              "id": "4441",
+              "name": "Building Material and Supplies Dealers",
+              "description": "This industry group comprises establishments primarily engaged in retailing new building materials and supplies.",
+              "children": {
+                "44411": {
+                  "id": "44411",
+                  "name": "Home Centers",
+                  "description": "See industry description for 444110."
+                },
+                "444110": {
+                  "id": "444110",
+                  "name": "Home Centers",
+                  "description": "This industry comprises establishments generally known as home centers primarily engaged in retailing a general line of new home repair and improvement materials and supplies, such as lumber, plumbing goods, electrical goods, tools, housewares, hardware, and lawn and garden supplies, with no one merchandise line predominating.\n\nCross-References."
+                },
+                "44412": {
+                  "id": "44412",
+                  "name": "Paint and Wallpaper Retailers",
+                  "description": "See industry description for 444120."
+                },
+                "444120": {
+                  "id": "444120",
+                  "name": "Paint and Wallpaper Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing paint, wallpaper, and related supplies.\n\nCross-References."
+                },
+                "44414": {
+                  "id": "44414",
+                  "name": "Hardware Retailers",
+                  "description": "See industry description for 444140."
+                },
+                "444140": {
+                  "id": "444140",
+                  "name": "Hardware Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing a general line of new hardware items, such as tools and builders' hardware.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "44418": {
+                  "id": "44418",
+                  "name": "Other Building Material Dealers",
+                  "description": "See industry description for 444180."
+                },
+                "444180": {
+                  "id": "444180",
+                  "name": "Other Building Material Dealers",
+                  "description": "This industry comprises establishments (except home centers, paint and wallpaper retailers, and hardware retailers) primarily engaged in retailing specialized lines of new building materials, such as lumber, fencing, glass, doors, plumbing fixtures and supplies, electrical supplies, prefabricated buildings and kits, and kitchen and bath cabinets and countertops to be installed.\n\nIllustrative Examples:\n\nElectrical supply retailers\nKitchen cabinet (except custom) retailers\nFencing dealers\nLumber yards, retail\nFloor covering retailers, hardwood or ceramic tile only\nPlumbing supply retailers\nGarage door dealers\nPrefabricated building (except manufactured home) dealers\nGlass (except automotive) retailers\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4442": {
+              "id": "4442",
+              "name": "Lawn and Garden Equipment and Supplies Retailers",
+              "description": "This industry group comprises establishments primarily engaged in retailing new lawn and garden equipment and supplies.",
+              "children": {
+                "44423": {
+                  "id": "44423",
+                  "name": "Outdoor Power Equipment Retailers",
+                  "description": "See industry description for 444230."
+                },
+                "444230": {
+                  "id": "444230",
+                  "name": "Outdoor Power Equipment Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing new outdoor power equipment or retailing new outdoor power equipment in combination with activities, such as repair services and selling replacement parts.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "44424": {
+                  "id": "44424",
+                  "name": "Nursery, Garden Center, and Farm Supply Retailers",
+                  "description": "See industry description for 444240."
+                },
+                "444240": {
+                  "id": "444240",
+                  "name": "Nursery, Garden Center, and Farm Supply Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing nursery and garden products, such as trees, shrubs, plants, seeds, bulbs, and sod, that are predominantly grown elsewhere.  These establishments may sell a limited amount of a product they grow themselves.  Also included in this industry are establishments primarily engaged in retailing farm supplies, such as animal (except pet) feed, fertilizers, agricultural chemicals, and pesticides.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "445": {
+          "id": "445",
+          "name": "Food and Beverage Retailers",
+          "description": "Industries in the Food and Beverage Retailers subsector primarily retail general or specialized lines of food and beverage products.  Establishments in this subsector with fixed point-of-sale locations have special equipment (e.g., freezers, refrigerated display cases, refrigerators) for displaying food and beverage products and have staff trained in the processing of food products to guarantee the proper storage and sanitary conditions required by regulatory authority.  Vending machine operators are also included in this subsector.",
+          "children": {
+            "4451": {
+              "id": "4451",
+              "name": "Grocery and Convenience Retailers",
+              "description": "This industry group comprises establishments primarily engaged in retailing a general line of food products. This industry group also includes vending machine operators.",
+              "children": {
+                "44511": {
+                  "id": "44511",
+                  "name": "Supermarkets and Other Grocery Retailers (except Convenience Retailers)",
+                  "description": "See industry description for 445110."
+                },
+                "445110": {
+                  "id": "445110",
+                  "name": "Supermarkets and Other Grocery Retailers (except Convenience Retailers)",
+                  "description": "This industry comprises establishments generally known as supermarkets and other grocery retailers (except convenience retailers) primarily engaged in retailing a general line of food, such as canned and frozen foods; fresh fruits and vegetables; and fresh and prepared meats, fish, and poultry.  Included in this industry are delicatessen-type establishments primarily engaged in retailing a general line of food.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "44513": {
+                  "id": "44513",
+                  "name": "Convenience Retailers and Vending Machine Operators",
+                  "description": "This industry comprises establishments primarily engaged in retailing a limited line of groceries that generally includes milk, bread, soda, and snacks.  Included in this industry are convenience retailers, such as convenience stores or food marts (except those operating fuel pumps), and vending machine operators.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "445131": {
+                  "id": "445131",
+                  "name": "Convenience Retailers",
+                  "description": "This U.S. industry comprises establishments primarily engaged in retailing a limited line of groceries that generally includes milk, bread, soda, and snacks, such as convenience stores or food marts (except those operating fuel pumps).\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "445132": {
+                  "id": "445132",
+                  "name": "Vending Machine Operators",
+                  "description": "This U.S. industry comprises establishments primarily engaged in retailing merchandise through vending machines that they service.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4452": {
+              "id": "4452",
+              "name": "Specialty Food Retailers",
+              "description": "This industry group comprises establishments primarily engaged in retailing specialized lines of food not for immediate consumption.",
+              "children": {
+                "44523": {
+                  "id": "44523",
+                  "name": "Fruit and Vegetable Retailers",
+                  "description": "See industry description for 445230."
+                },
+                "445230": {
+                  "id": "445230",
+                  "name": "Fruit and Vegetable Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing fresh fruits and vegetables.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "44524": {
+                  "id": "44524",
+                  "name": "Meat Retailers",
+                  "description": "See industry description for 445240."
+                },
+                "445240": {
+                  "id": "445240",
+                  "name": "Meat Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing fresh, frozen, or cured meats and poultry not for immediate consumption.  Delicatessen-type establishments primarily engaged in retailing fresh meat are included in this industry.\n\nIllustrative Examples:\n\nBaked ham retailers\nMeat retailers\nButcher shops\nPoultry dealers\nFrozen meat retailers\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "44525": {
+                  "id": "44525",
+                  "name": "Fish and Seafood Retailers",
+                  "description": "See industry description for 445250."
+                },
+                "445250": {
+                  "id": "445250",
+                  "name": "Fish and Seafood Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing fresh, frozen, or cured fish and seafood products not for immediate consumption.\n\nCross-References."
+                },
+                "44529": {
+                  "id": "44529",
+                  "name": "Other Specialty Food Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing specialty foods (except fruits and vegetables, meat, fish, and seafood) not for immediate consumption and not made on the premises.\n\nIllustrative Examples:\n\nBaked goods (not made on premises) retailers \nDairy product retailers\nCoffee and tea (i.e., packaged) retailers\nGourmet food retailers\nConfectionery (i.e., packaged) retailers\nNut (i.e., packaged) retailers\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "445291": {
+                  "id": "445291",
+                  "name": "Baked Goods Retailers",
+                  "description": "This U.S. industry comprises establishments primarily engaged in retailing baked goods not for immediate consumption and not made on the premises.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "445292": {
+                  "id": "445292",
+                  "name": "Confectionery and Nut Retailers",
+                  "description": "This U.S. industry comprises establishments primarily engaged in retailing candy and other confections, nuts, and popcorn not for immediate consumption and not made on the premises.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "445298": {
+                  "id": "445298",
+                  "name": "All Other Specialty Food Retailers",
+                  "description": "This U.S. industry comprises establishments primarily engaged in retailing miscellaneous specialty foods (except fruit and vegetables, meat, fish, seafood, confections, nuts, popcorn, and baked goods) not for immediate consumption and not made on the premises.\n\nIllustrative Examples:\n\nCoffee and tea (i.e., packaged) retailers\nSoft drink (i.e., bottled) retailers\nDairy product retailers\nSpice retailers\nGourmet food retailers\nWater (i.e., bottled) retailers\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4453": {
+              "id": "4453",
+              "name": "Beer, Wine, and Liquor Retailers",
+              "description": "",
+              "children": {
+                "44532": {
+                  "id": "44532",
+                  "name": "Beer, Wine, and Liquor Retailers",
+                  "description": "See industry description for 445320."
+                },
+                "445320": {
+                  "id": "445320",
+                  "name": "Beer, Wine, and Liquor Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing packaged alcoholic beverages, such as ale, beer, wine, and liquor.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "449": {
+          "id": "449",
+          "name": "Furniture, Home Furnishings, Electronics, and Appliance Retailers",
+          "description": "Industries in the Furniture, Home Furnishings, Electronics, and Appliance Retailers subsector retail new furniture, home furnishings, electronics, and appliances.  Establishments in this subsector with fixed point-of-sale locations may operate from showrooms or other locations that have substantial areas for the presentation or demonstration of their products.  Establishments in this subsector may provide incidental services, including interior decorating, product assembly, installation, or repair services.",
+          "children": {
+            "4491": {
+              "id": "4491",
+              "name": "Furniture and Home Furnishings Retailers",
+              "description": "This industry group comprises establishments primarily engaged in retailing new furniture and home furnishings.  Establishments in this industry group with fixed point-of-sale locations may operate from showrooms and have substantial areas for the presentation of their products.  Establishments in this industry group may provide incidental services, including interior decorating, product assembly, installation, or repair services.",
+              "children": {
+                "44911": {
+                  "id": "44911",
+                  "name": "Furniture Retailers",
+                  "description": "See industry description for 449110."
+                },
+                "449110": {
+                  "id": "449110",
+                  "name": "Furniture Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing new furniture, such as household furniture (e.g., baby furniture, box springs, and mattresses) and outdoor furniture; office furniture (except sold in combination with office supplies and equipment); and/or furniture sold in combination with major appliances, home electronics, home furnishings, or floor coverings.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "44912": {
+                  "id": "44912",
+                  "name": "Home Furnishings Retailers",
+                  "description": "This industry comprises establishments primarily engaged in retailing new home furnishings (except furniture).\n\nIllustrative Examples:\n\nBath shops\nChinaware retailers\nFloor covering retailers (except hardwood or ceramic tile only)\nGlassware retailers\nKitchenware retailers\nWindow treatment retailers\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "449121": {
+                  "id": "449121",
+                  "name": "Floor Covering Retailers",
+                  "description": "This U.S. industry comprises establishments primarily engaged in retailing new floor coverings, such as rugs and carpets, laminate and vinyl floor coverings, linoleum flooring, and floor tile (except ceramic tile or hardwood floor coverings only); or retailing new floor coverings in combination with installation and repair services.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "449122": {
+                  "id": "449122",
+                  "name": "Window Treatment Retailers",
+                  "description": "This U.S. industry comprises establishments primarily engaged in retailing new window treatments, such as curtains, drapes, blinds, and shades.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "449129": {
+                  "id": "449129",
+                  "name": "All Other Home Furnishings Retailers",
+                  "description": "This U.S. industry comprises establishments primarily engaged in retailing new home furnishings (except furniture, floor coverings, and window treatments).\n\nIllustrative Examples:\n\nBath shops\nKitchenware retailers\nChinaware retailers\nLinen retailers\nElectric lamp retailers\nPicture frame retailers, custom\nGlassware retailers\nWood-burning stove retailers\nHousewares retailers\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4492": {
+              "id": "4492",
+              "name": "Electronics and Appliance Retailers",
+              "description": "",
+              "children": {
+                "44921": {
+                  "id": "44921",
+                  "name": "Electronics and Appliance Retailers",
+                  "description": "See industry description for 449210."
+                },
+                "449210": {
+                  "id": "449210",
+                  "name": "Electronics and Appliance Retailers",
+                  "description": "This industry comprises establishments primarily engaged in one of the following: (1) retailing an array of new household-type appliances and consumer-type electronic products, such as televisions, computers, electronic tablets, and cameras; (2) specializing in retailing a single line of new consumer-type electronic products; (3) retailing these new products in combination with repair and support services; (4) retailing new prepackaged or downloadable computer software (without publishing); and/or (5) retailing prerecorded audio and video media, such as downloadable digital music and video files (without production or publishing), CDs, and DVDs.\n\nIllustrative Examples:\n\nAppliance retailers, household-type\nConsumer-type electronics retailers (e.g., televisions, computers, cameras)\nCellular telephone accessories retailers\nStereo and sound system retailers (except automotive) \n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "48": {
+      "id": "48",
+      "name": "Transportation and Warehousing",
+      "description": "The Sector as a Whole\n\nThe Transportation and Warehousing sector includes industries providing transportation of passengers and cargo, warehousing and storage for goods, scenic and sightseeing transportation, and support activities related to modes of transportation.  Establishments in these industries use transportation equipment or transportation-related facilities as a productive asset.  The type of equipment depends on the mode of transportation.  The modes of transportation are air, rail, water, road, and pipeline.\n\nThe Transportation and Warehousing sector distinguishes three basic types of activities: subsectors for each mode of transportation, a subsector for warehousing and storage, and a subsector for establishments providing support activities for transportation.  In addition, there are subsectors for establishments that provide passenger transportation for scenic and sightseeing purposes, postal services, and courier services.\n\nA separate subsector for support activities is established in the sector because, first, support activities for transportation are inherently multimodal, such as freight transportation arrangement, or have multimodal aspects.  Secondly, there are production process similarities among the support activity industries.\n\nOne of the support activities identified in the Support Activities for Transportation subsector is the routine repair and maintenance of transportation equipment (e.g., aircraft at an airport, railroad rolling stock at a railroad terminal, or ships at a harbor or port facility).  Such establishments do not perform complete overhauling or rebuilding of transportation equipment (i.e., periodic restoration of transportation equipment to original design specifications) or transportation equipment conversion (i.e., major modification to systems).  An establishment that primarily performs factory (or shipyard) overhauls, rebuilding, or conversions of aircraft, railroad rolling stock, or ships is classified in Subsector 336, Transportation Equipment Manufacturing, according to the type of equipment.\n\nMany of the establishments in this sector often operate on networks, with physical facilities, labor forces, and equipment spread over an extensive geographic area.\n\nWarehousing establishments in this sector are distinguished from merchant wholesaling in that the warehouse establishments do not sell the goods.\n\nExcluded from this sector are establishments primarily engaged in providing travel agent, travel arrangement, and reservation services that support transportation establishments, hotels, other businesses, and government agencies.  These establishments are classified in Sector 56, Administrative and Support and Waste Management and Remediation Services.  Establishments primarily engaged in providing rental and leasing of transportation equipment without operator are classified in Subsector 532, Rental and Leasing Services.  Establishments primarily engaged in providing medical care with transportation are classified in Sector 62, Health Care and Social Assistance.",
+      "children": {
+        "481": {
+          "id": "481",
+          "name": "Air Transportation",
+          "description": "Industries in the Air Transportation subsector provide air transportation of passengers and/or cargo using aircraft, such as airplanes, helicopters, and spacecraft.  The subsector distinguishes scheduled from nonscheduled air transportation.  Scheduled air carriers fly regular routes on regular schedules and operate even if flights are only partially loaded.  Nonscheduled carriers often operate during nonpeak time slots at busy airports.  These establishments have more flexibility with respect to choice of airport, hours of operation, load factors, and similar operational characteristics.  Nonscheduled carriers provide chartered air transportation of passengers, cargo, or specialty flying services.  Specialty flying services establishments use general purpose aircraft to provide a variety of specialized flying services.\n\nScenic and sightseeing air transportation and air courier services are not included in this subsector but are included in Subsector 487, Scenic and Sightseeing Transportation, and in Subsector 492, Couriers and Messengers, respectively.  Although these activities may use aircraft, they are different from the activities included in air transportation.  Air sightseeing does not usually involve place-to-place transportation; the passenger's flight (e.g., balloon ride, aerial sightseeing) typically starts and ends at the same location.  Courier services (individual package or cargo delivery) include more than air transportation; road transportation is usually required to deliver the cargo to the intended recipient.",
+          "children": {
+            "4811": {
+              "id": "4811",
+              "name": "Scheduled Air Transportation",
+              "description": "",
+              "children": {
+                "48111": {
+                  "id": "48111",
+                  "name": "Scheduled Air Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing air transportation of passengers and/or cargo over regular routes and on regular schedules.  Establishments in this industry operate flights even if partially loaded.  Establishments primarily engaged in providing scheduled air transportation of mail on a contract basis are included in this industry.\n\nIllustrative Examples:\n\nAir commuter carriers, scheduled\nScheduled air passenger carriers\nScheduled air cargo carriers (except air couriers)\nScheduled helicopter passenger carriers \n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "481111": {
+                  "id": "481111",
+                  "name": "Scheduled Passenger Air Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing air transportation of passengers or passengers and freight over regular routes and on regular schedules.  Establishments in this industry operate flights even if partially loaded.  Scheduled air passenger carriers including commuter and helicopter carriers (except scenic and sightseeing) are included in this industry.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "481112": {
+                  "id": "481112",
+                  "name": "Scheduled Freight Air Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing air transportation of cargo without transporting passengers over regular routes and on regular schedules.  Establishments in this industry operate flights even if partially loaded.  Establishments primarily engaged in providing scheduled air transportation of mail on a contract basis are included in this industry.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4812": {
+              "id": "4812",
+              "name": "Nonscheduled Air Transportation",
+              "description": "",
+              "children": {
+                "48121": {
+                  "id": "48121",
+                  "name": "Nonscheduled Air Transportation",
+                  "description": "This industry comprises establishments primarily engaged in (1) providing air transportation of passengers and/or cargo with no regular routes and regular schedules or (2) providing specialty flying services with no regular routes and regular schedules using general purpose aircraft.  These establishments have more flexibility with respect to choice of airports, hours of operation, load factors, and similar operational characteristics.\n\nIllustrative Examples:\n\nAir taxi services\nNonscheduled air freight transportation services\nAircraft charter services\nNonscheduled air passenger transportation services\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "481211": {
+                  "id": "481211",
+                  "name": "Nonscheduled Chartered Passenger Air Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing air transportation of passengers or passengers and cargo with no regular routes and regular schedules.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "481212": {
+                  "id": "481212",
+                  "name": "Nonscheduled Chartered Freight Air Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing air transportation of cargo without transporting passengers with no regular routes and regular schedules.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "481219": {
+                  "id": "481219",
+                  "name": "Other Nonscheduled Air Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing air transportation with no regular routes and regular schedules (except nonscheduled chartered passenger and/or cargo air transportation).  These establishments provide a variety of specialty air transportation or flying services based on individual customer needs using general purpose aircraft.\n\nIllustrative Examples:\n\nAircraft charter services (i.e., general purpose aircraft used for a variety of specialty air and flying services)\nAviation clubs providing a variety of air transportation activities to the general public\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "482": {
+          "id": "482",
+          "name": "Rail Transportation",
+          "description": "Industries in the Rail Transportation subsector provide rail transportation of passengers and/or cargo using railroad rolling stock.  The railroads in this subsector primarily either operate on networks, with physical facilities, labor force, and equipment spread over an extensive geographic area, or operate over a short distance on a local rail line.\n\nScenic and sightseeing rail transportation and street railroads, commuter rail, and rapid transit are not included in this subsector but are included in Subsector 487, Scenic and Sightseeing Transportation, and Subsector 485, Transit and Ground Passenger Transportation, respectively.  Although these activities use railroad rolling stock, they are different from the activities included in rail transportation.  Sightseeing and scenic railroads do not usually involve place-to-place transportation; the passenger's trip typically starts and ends at the same location.  Commuter railroads operate in a manner more consistent with local and urban transit and are often part of integrated transit systems.",
+          "children": {
+            "4821": {
+              "id": "4821",
+              "name": "Rail Transportation",
+              "description": "",
+              "children": {
+                "48211": {
+                  "id": "48211",
+                  "name": "Rail Transportation",
+                  "description": "This industry comprises establishments primarily engaged in operating railroads (except street railroads, commuter rail, urban rapid transit, and scenic and sightseeing trains).  Line-haul railroads and short-line railroads are included in this industry.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "482111": {
+                  "id": "482111",
+                  "name": "Line-Haul Railroads",
+                  "description": "This U.S. industry comprises establishments known as line-haul railroads primarily engaged in operating railroads for the transport of passengers and/or cargo over a long distance within a rail network.  These establishments provide for the intercity movement of trains between the terminals and stations on main and branch lines of a line-haul rail network (except for local switching services).\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "482112": {
+                  "id": "482112",
+                  "name": "Short Line Railroads",
+                  "description": "This U.S. industry comprises establishments known as short-line railroads primarily engaged in operating railroads for the transport of cargo over a short distance on local rail lines not part of a rail network.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "483": {
+          "id": "483",
+          "name": "Water Transportation",
+          "description": "Industries in the Water Transportation subsector provide water transportation of passengers and cargo using watercraft, such as ships, barges, and boats.\n\nThe subsector is composed of two industry groups: (1) one for deep sea, coastal, and Great Lakes water transportation; and (2) one for inland water transportation.  This split typically reflects the difference in equipment used.\n\nScenic and sightseeing water transportation services are not included in this subsector but are included in Subsector 487, Scenic and Sightseeing Transportation.  Although these activities use watercraft, they are different from the activities included in water transportation.  Water sightseeing does not usually involve place-to-place transportation; the passenger's trip starts and ends at the same location.",
+          "children": {
+            "4831": {
+              "id": "4831",
+              "name": "Deep Sea, Coastal, and Great Lakes Water Transportation",
+              "description": "",
+              "children": {
+                "48311": {
+                  "id": "48311",
+                  "name": "Deep Sea, Coastal, and Great Lakes Water Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing deep sea, coastal, Great Lakes, and St. Lawrence Seaway water transportation.  Marine transportation establishments using the facilities of the St. Lawrence Seaway Authority Commission are considered to be using the Great Lakes Water Transportation System.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "483111": {
+                  "id": "483111",
+                  "name": "Deep Sea Freight Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing deep sea transportation of cargo to or from foreign ports.\n\nCross-References."
+                },
+                "483112": {
+                  "id": "483112",
+                  "name": "Deep Sea Passenger Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing deep sea transportation of passengers to or from foreign ports.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "483113": {
+                  "id": "483113",
+                  "name": "Coastal and Great Lakes Freight Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing water transportation of cargo in coastal waters, on the Great Lakes System, or deep seas between ports of the United States, Puerto Rico, and United States island possessions or protectorates.  Marine transportation establishments using the facilities of the St. Lawrence Seaway Authority Commission are considered to be using the Great Lakes Water Transportation System.  Establishments primarily engaged in providing coastal and/or Great Lakes barge transportation services are included in this industry.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "483114": {
+                  "id": "483114",
+                  "name": "Coastal and Great Lakes Passenger Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing water transportation of passengers in coastal waters, the Great Lakes System, or deep seas between ports of the United States, Puerto Rico, and United States island possessions and protectorates.  Marine transportation establishments using the facilities of the St. Lawrence Seaway Authority Commission are considered to be using the Great Lakes Water Transportation System.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4832": {
+              "id": "4832",
+              "name": "Inland Water Transportation",
+              "description": "",
+              "children": {
+                "48321": {
+                  "id": "48321",
+                  "name": "Inland Water Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing inland water transportation of passengers and/or cargo on lakes, rivers, or intracoastal waterways (except on the Great Lakes System).\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "483211": {
+                  "id": "483211",
+                  "name": "Inland Water Freight Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing inland water transportation of cargo on lakes, rivers, or intracoastal waterways (except on the Great Lakes System).\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "483212": {
+                  "id": "483212",
+                  "name": "Inland Water Passenger Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing inland water transportation of passengers on lakes, rivers, or intracoastal waterways (except on the Great Lakes System).\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "484": {
+          "id": "484",
+          "name": "Truck Transportation",
+          "description": "Industries in the Truck Transportation subsector provide over-the-road transportation of cargo using motor vehicles, such as trucks and tractor trailers.  The subsector is subdivided into general freight trucking and specialized freight trucking.  This distinction reflects differences in equipment used, type of load carried, scheduling, terminal, and other networking services.  General freight transportation establishments handle a wide variety of general commodities, generally palletized, and transported in a container or van trailer.  Specialized freight transportation is the transportation of cargo that, because of size, weight, shape, or other inherent characteristics, requires specialized equipment for transportation.\n\nEach of these industry groups is further subdivided based on distance traveled.  Local trucking establishments primarily carry goods within a single metropolitan area and its adjacent nonurban areas.  Long-distance trucking establishments carry goods between metropolitan areas.\n\nThe Specialized Freight Trucking industry group includes a separate industry for Used Household and Office Goods Moving. The household and office goods movers are separated because of the substantial network of establishments that has developed to deal with local and long-distance moving and the associated storage.  In this area, the same establishment provides both local and long-distance services, while other specialized freight establishments generally limit their services to either local or long-distance hauling.",
+          "children": {
+            "4841": {
+              "id": "4841",
+              "name": "General Freight Trucking",
+              "description": "This industry group comprises establishments primarily engaged in providing general freight trucking.  General freight trucking establishments handle a wide variety of commodities, generally palletized, and transported in a container or van trailer.  The establishments of this industry group provide a combination of the following network activities: local pick-up, local sorting and terminal operations, line-haul, destination sorting and terminal operations, and local delivery.",
+              "children": {
+                "48411": {
+                  "id": "48411",
+                  "name": "General Freight Trucking, Local",
+                  "description": "See industry description for 484110."
+                },
+                "484110": {
+                  "id": "484110",
+                  "name": "General Freight Trucking, Local",
+                  "description": "This industry comprises establishments primarily engaged in providing local general freight trucking.  General freight trucking establishments handle a wide variety of commodities, generally palletized and transported in a container or van trailer.  Local general freight trucking establishments usually provide trucking within a metropolitan area which may cross state lines.  Generally the trips are same-day return.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "48412": {
+                  "id": "48412",
+                  "name": "General Freight Trucking, Long-Distance",
+                  "description": "This industry comprises establishments primarily engaged in providing long-distance general freight trucking.  General freight trucking establishments handle a wide variety of commodities, generally palletized and transported in a container or van trailer.  Long-distance general freight trucking establishments usually provide trucking between metropolitan areas which may cross North American country borders.  Included in this industry are establishments operating as truckload (TL) or less than truckload (LTL) carriers.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "484121": {
+                  "id": "484121",
+                  "name": "General Freight Trucking, Long-Distance, Truckload",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing long-distance general freight truckload (TL) trucking.  These long-distance general freight truckload carrier establishments provide full truck movement of freight from origin to destination.  The shipment of freight on a truck is characterized as a full single load not combined with other shipments.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "484122": {
+                  "id": "484122",
+                  "name": "General Freight Trucking, Long-Distance, Less Than Truckload",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing long-distance, general freight, less than truckload (LTL) trucking.  LTL carriage is characterized as multiple shipments combined onto a single truck for multiple deliveries within a network.  These establishments are generally characterized by the following network activities: local pick-up, local sorting and terminal operations, line-haul, destination sorting and terminal operations, and local delivery.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4842": {
+              "id": "4842",
+              "name": "Specialized Freight Trucking",
+              "description": "This industry group comprises establishments primarily engaged in providing local or long-distance specialized freight trucking.  The establishments of this industry are primarily engaged in the transportation of freight which, because of size, weight, shape, or other inherent characteristics, requires specialized equipment, such as flatbeds, tankers, or refrigerated trailers.  This industry includes the transportation of used household, institutional, and commercial furniture and equipment.",
+              "children": {
+                "48421": {
+                  "id": "48421",
+                  "name": "Used Household and Office Goods Moving",
+                  "description": "See industry description for 484210."
+                },
+                "484210": {
+                  "id": "484210",
+                  "name": "Used Household and Office Goods Moving",
+                  "description": "This industry comprises establishments primarily engaged in providing local or long-distance trucking of used household, used institutional, or used commercial furniture and equipment.  Incidental packing and storage activities are often provided by these establishments."
+                },
+                "48422": {
+                  "id": "48422",
+                  "name": "Specialized Freight (except Used Goods) Trucking, Local",
+                  "description": "See industry description for 484220."
+                },
+                "484220": {
+                  "id": "484220",
+                  "name": "Specialized Freight (except Used Goods) Trucking, Local",
+                  "description": "This industry comprises establishments primarily engaged in providing local, specialized trucking.  Local trucking establishments provide trucking within a metropolitan area that may cross state lines.  Generally the trips are same-day return.\n\nIllustrative Examples:\n\nLocal agricultural products trucking\nLocal dump trucking (e.g., gravel, sand, top-soil)\nLocal boat hauling\nLocal livestock trucking\nLocal bulk liquids trucking\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "48423": {
+                  "id": "48423",
+                  "name": "Specialized Freight (except Used Goods) Trucking, Long-Distance",
+                  "description": "See industry description for 484230."
+                },
+                "484230": {
+                  "id": "484230",
+                  "name": "Specialized Freight (except Used Goods) Trucking, Long-Distance",
+                  "description": "This industry comprises establishments primarily engaged in providing long-distance specialized trucking.  These establishments provide trucking between metropolitan areas that may cross North American country borders.\n\nIllustrative Examples:\n\nLong-distance automobile carrier trucking\nLong-distance refrigerated product trucking\nLong-distance bulk liquid trucking\nLong-distance trucking of waste\nLong-distance hazardous material trucking\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "485": {
+          "id": "485",
+          "name": "Transit and Ground Passenger Transportation",
+          "description": "Industries in the Transit and Ground Passenger Transportation subsector include a variety of passenger transportation activities, such as urban transit systems; chartered bus, school bus, and interurban bus transportation; and taxis.  These activities are distinguished based primarily on such production process factors as vehicle types, routes, and schedules.\n\nIn this subsector, the principal splits identify scheduled transportation as separate from nonscheduled transportation.  The scheduled transportation industry groups are Urban Transit Systems, Interurban and Rural Bus Transportation, and School and Employee Bus Transportation.  The nonscheduled industry groups are the Charter Bus Industry and Taxi and Limousine Service.  The Other Transit and Ground Passenger Transportation industry group includes both scheduled and nonscheduled transportation.\n\nScenic and sightseeing ground transportation services are not included in this subsector but are included in Subsector 487, Scenic and Sightseeing Transportation.  Sightseeing does not usually involve place-to-place transportation; the passenger's trip starts and ends at the same location.",
+          "children": {
+            "4851": {
+              "id": "4851",
+              "name": "Urban Transit Systems",
+              "description": "",
+              "children": {
+                "48511": {
+                  "id": "48511",
+                  "name": "Urban Transit Systems",
+                  "description": "This industry comprises establishments primarily engaged in operating local and suburban passenger transit systems over regular routes and on regular schedules within a metropolitan area and its adjacent nonurban areas.  Such transportation systems involve the use of one or more modes of transport including light rail, commuter rail, subways, and streetcars, as well as buses and other motor vehicles.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "485111": {
+                  "id": "485111",
+                  "name": "Mixed Mode Transit Systems",
+                  "description": "This U.S. industry comprises establishments primarily engaged in operating local and suburban ground passenger transit systems using more than one mode of transport over regular routes and on regular schedules within a metropolitan area and its adjacent nonurban areas.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "485112": {
+                  "id": "485112",
+                  "name": "Commuter Rail Systems",
+                  "description": "This U.S. industry comprises establishments primarily engaged in operating local and suburban commuter rail systems over regular routes and on a regular schedule within a metropolitan area and its adjacent nonurban areas.  Commuter rail is usually characterized by reduced fares, multiple ride and commutation tickets, and mostly used by passengers during the morning and evening peak periods.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "485113": {
+                  "id": "485113",
+                  "name": "Bus and Other Motor Vehicle Transit Systems",
+                  "description": "This U.S. industry comprises establishments primarily engaged in operating local and suburban passenger transportation systems using buses or other motor vehicles over regular routes and on regular schedules within a metropolitan area and its adjacent nonurban areas.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "485119": {
+                  "id": "485119",
+                  "name": "Other Urban Transit Systems",
+                  "description": "This U.S. industry comprises establishments primarily engaged in operating local and suburban ground passenger transit systems (except mixed mode transit systems, commuter rail systems, and buses and other motor vehicles) over regular routes and on regular schedules within a metropolitan area and its adjacent nonurban areas.\n\nIllustrative Examples:\n\nCommuter cable car systems (i.e., stand-alone)\nLight rail systems (i.e., stand-alone)\nCommuter tramway systems (i.e., stand-alone)\nMonorail transit systems (i.e., stand-alone)\nCommuter trolley systems (i.e., stand-alone)\nSubway systems (i.e., stand-alone)\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4852": {
+              "id": "4852",
+              "name": "Interurban and Rural Bus Transportation",
+              "description": "",
+              "children": {
+                "48521": {
+                  "id": "48521",
+                  "name": "Interurban and Rural Bus Transportation",
+                  "description": "See industry description for 485210."
+                },
+                "485210": {
+                  "id": "485210",
+                  "name": "Interurban and Rural Bus Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing bus passenger transportation over regular routes and on regular schedules, principally outside a single metropolitan area and its adjacent nonurban areas.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4853": {
+              "id": "4853",
+              "name": "Taxi and Limousine Service",
+              "description": "This industry group comprises establishments primarily engaged in providing passenger transportation by automobile or van or providing an array of specialty and luxury passenger transportation services via limousine or luxury sedan generally on a reserved basis.  These establishments do not operate over regular routes and on regular schedules.",
+              "children": {
+                "48531": {
+                  "id": "48531",
+                  "name": "Taxi and Ridesharing Services",
+                  "description": "See industry description for 485310."
+                },
+                "485310": {
+                  "id": "485310",
+                  "name": "Taxi and Ridesharing Services",
+                  "description": "This industry comprises establishments primarily engaged in providing passenger transportation by automobile or van, not operated over regular routes and on regular schedules.  Establishments of taxicab owner/operators, taxicab fleet operators, taxicab organizations, ridesharing services (including arrangement services), and ride hailing services (including arrangement services) are included in this industry.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "48532": {
+                  "id": "48532",
+                  "name": "Limousine Service",
+                  "description": "See industry description for 485320."
+                },
+                "485320": {
+                  "id": "485320",
+                  "name": "Limousine Service",
+                  "description": "This industry comprises establishments primarily engaged in providing an array of specialty and luxury passenger transportation services via limousine or luxury sedan generally on a reserved basis.  These establishments do not operate over regular routes and on regular schedules.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4854": {
+              "id": "4854",
+              "name": "School and Employee Bus Transportation",
+              "description": "",
+              "children": {
+                "48541": {
+                  "id": "48541",
+                  "name": "School and Employee Bus Transportation",
+                  "description": "See industry description for 485410."
+                },
+                "485410": {
+                  "id": "485410",
+                  "name": "School and Employee Bus Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing buses and other motor vehicles to transport pupils to and from school or employees to and from work.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4855": {
+              "id": "4855",
+              "name": "Charter Bus Industry",
+              "description": "",
+              "children": {
+                "48551": {
+                  "id": "48551",
+                  "name": "Charter Bus Industry",
+                  "description": "See industry description for 485510."
+                },
+                "485510": {
+                  "id": "485510",
+                  "name": "Charter Bus Industry",
+                  "description": "This industry comprises establishments primarily engaged in providing buses for charter.  These establishments provide bus services to meet customers' road transportation needs and generally do not operate over fixed routes and on regular schedules.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4859": {
+              "id": "4859",
+              "name": "Other Transit and Ground Passenger Transportation",
+              "description": "",
+              "children": {
+                "48599": {
+                  "id": "48599",
+                  "name": "Other Transit and Ground Passenger Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing other transit and ground passenger transportation (except urban transit systems, interurban and rural bus transportation, taxi and ridesharing services, school and employee bus transportation, charter bus services, and limousine services (except shuttle services)).  Shuttle services (except school and employee bus) and special needs transportation services are included in this industry.  Shuttle services establishments generally travel within a metropolitan area and its adjacent nonurban areas on regular routes, on regular schedules and provide services between hotels, airports, or other destination points.  Establishments in the Special Needs Transportation industry provide passenger transportation for the disabled or elderly.  These establishments may use specially equipped vehicles to provide passenger transportation.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "485991": {
+                  "id": "485991",
+                  "name": "Special Needs Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing special needs transportation (except to and from school or work) for the disabled or elderly.  These establishments may use specially equipped vehicles to provide passenger transportation.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "485999": {
+                  "id": "485999",
+                  "name": "All Other Transit and Ground Passenger Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing ground passenger transportation (except urban transit systems; interurban and rural bus transportation, taxi and/or limousine services (except shuttle services), school and employee bus transportation, charter bus services, and special needs transportation).  Establishments primarily engaged in operating shuttle services and car pools or vanpools (except ridesharing and ridesharing arrangement services) are included in this industry.  Shuttle services establishments generally provide travel on regular routes and on regular schedules between hotels, airports, or other destination points.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "486": {
+          "id": "486",
+          "name": "Pipeline Transportation",
+          "description": "Industries in the Pipeline Transportation subsector use transmission pipelines to transport products, such as crude oil, natural gas, refined petroleum products, and slurry.  Industries are identified based on the products transported (i.e., pipeline transportation of crude oil, natural gas, refined petroleum products, and other products).\n\nThe Pipeline Transportation of Natural Gas industry includes the storage of natural gas because the storage is usually done by the pipeline establishment and because a pipeline is inherently a network in which all the nodes are interdependent.",
+          "children": {
+            "4861": {
+              "id": "4861",
+              "name": "Pipeline Transportation of Crude Oil",
+              "description": "",
+              "children": {
+                "48611": {
+                  "id": "48611",
+                  "name": "Pipeline Transportation of Crude Oil",
+                  "description": "See industry description for 486110."
+                },
+                "486110": {
+                  "id": "486110",
+                  "name": "Pipeline Transportation of Crude Oil",
+                  "description": "This industry comprises establishments primarily engaged in the pipeline transportation of crude oil.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4862": {
+              "id": "4862",
+              "name": "Pipeline Transportation of Natural Gas",
+              "description": "",
+              "children": {
+                "48621": {
+                  "id": "48621",
+                  "name": "Pipeline Transportation of Natural Gas",
+                  "description": "See industry description for 486210."
+                },
+                "486210": {
+                  "id": "486210",
+                  "name": "Pipeline Transportation of Natural Gas",
+                  "description": "This industry comprises establishments primarily engaged in the pipeline transportation of natural gas from processing plants to local distribution systems. This industry includes the storage of natural gas because the storage is usually done by the pipeline establishment and because a pipeline is inherently a network in which all the nodes are interdependent.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4869": {
+              "id": "4869",
+              "name": "Other Pipeline Transportation",
+              "description": "This industry group comprises establishments primarily engaged in the pipeline transportation of products (except crude oil and natural gas).",
+              "children": {
+                "48691": {
+                  "id": "48691",
+                  "name": "Pipeline Transportation of Refined Petroleum Products",
+                  "description": "See industry description for 486910."
+                },
+                "486910": {
+                  "id": "486910",
+                  "name": "Pipeline Transportation of Refined Petroleum Products",
+                  "description": "This industry comprises establishments primarily engaged in the pipeline transportation of refined petroleum products."
+                },
+                "48699": {
+                  "id": "48699",
+                  "name": "All Other Pipeline Transportation",
+                  "description": "See industry description for 486990."
+                },
+                "486990": {
+                  "id": "486990",
+                  "name": "All Other Pipeline Transportation",
+                  "description": "This industry comprises establishments primarily engaged in the pipeline transportation of products (except crude oil, natural gas, and refined petroleum products).\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "487": {
+          "id": "487",
+          "name": "Scenic and Sightseeing Transportation",
+          "description": "Industries in the Scenic and Sightseeing Transportation subsector utilize transportation equipment to provide recreation and entertainment.  These activities have a production process distinct from passenger transportation carried out for the purpose of other types of for-hire transportation.  This process does not emphasize efficient transportation; in fact, such activities often use obsolete vehicles, such as steam trains, to provide some extra ambience.  The activity is local in nature, usually involving a same-day return to the point of departure.\n\nThe Scenic and Sightseeing Transportation subsector is separated into three industries based on the mode: land, water, and other.\n\nActivities that are recreational in nature and involve participation by the customer, such as white water rafting, are generally excluded from this subsector, unless they impose an impact on part of the transportation system.  Charter boat fishing, for example, is included in the Scenic and Sightseeing Transportation, Water industry.",
+          "children": {
+            "4871": {
+              "id": "4871",
+              "name": "Scenic and Sightseeing Transportation, Land",
+              "description": "",
+              "children": {
+                "48711": {
+                  "id": "48711",
+                  "name": "Scenic and Sightseeing Transportation, Land",
+                  "description": "See industry description for 487110."
+                },
+                "487110": {
+                  "id": "487110",
+                  "name": "Scenic and Sightseeing Transportation, Land",
+                  "description": "This industry comprises establishments primarily engaged in providing scenic and sightseeing transportation on land, such as sightseeing buses and trolleys, steam train excursions, and horse-drawn sightseeing rides.  The services provided are usually local and involve same-day return to place of origin.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4872": {
+              "id": "4872",
+              "name": "Scenic and Sightseeing Transportation, Water",
+              "description": "",
+              "children": {
+                "48721": {
+                  "id": "48721",
+                  "name": "Scenic and Sightseeing Transportation, Water",
+                  "description": "See industry description for 487210."
+                },
+                "487210": {
+                  "id": "487210",
+                  "name": "Scenic and Sightseeing Transportation, Water",
+                  "description": "This industry comprises establishments primarily engaged in providing scenic and sightseeing transportation on water.  The services provided are usually local and involve same-day return to place of origin.\n\nIllustrative Examples:\n\nAirboat (i.e., swamp buggy) operation\nExcursion boat operation\nCharter fishing boat services\nHarbor sightseeing tours\nDinner cruises\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4879": {
+              "id": "4879",
+              "name": "Scenic and Sightseeing Transportation, Other",
+              "description": "",
+              "children": {
+                "48799": {
+                  "id": "48799",
+                  "name": "Scenic and Sightseeing Transportation, Other",
+                  "description": "See industry description for 487990."
+                },
+                "487990": {
+                  "id": "487990",
+                  "name": "Scenic and Sightseeing Transportation, Other",
+                  "description": "This industry comprises establishments primarily engaged in providing scenic and sightseeing transportation (except on land and water).  The services provided are usually local and involve same-day return to place of departure.\n\nIllustrative Examples:\n\nAerial cable cars, scenic and sightseeing operation\nHelicopter rides, scenic and sightseeing operation\nGlider excursions\nAerial tramways, scenic and sightseeing operation\nHot air balloon rides, scenic and sightseeing operation\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            }
+          }
+        },
+        "488": {
+          "id": "488",
+          "name": "Support Activities for Transportation",
+          "description": "Industries in the Support Activities for Transportation subsector provide services which support transportation.  These services may be provided to transportation carrier establishments or to the general public.  This subsector includes a wide array of establishments, including air traffic control services, marine cargo handling, and motor vehicle towing.\n\nThe Support Activities for Transportation subsector includes services to transportation, separated by type of mode serviced.  The Support Activities for Rail Transportation industry includes services to the rail industry (e.g., railroad switching and terminal establishments).  Ship repair and maintenance services not done in a shipyard are included in the Other Support Activities for Water Transportation industry.  An example would be floating drydock services in a harbor.\n\nExcluded from this subsector are establishments primarily engaged in providing factory conversion and overhaul of transportation equipment, which are classified in Subsector 336, Transportation Equipment Manufacturing.  Establishments primarily engaged in providing rental and leasing of transportation equipment without operator are classified in Subsector 532, Rental and Leasing Services. Also, establishments primarily engaged in providing travel arrangement and reservation services are classified in Industry Group 5615, Travel Arrangement and Reservation Services.",
+          "children": {
+            "4881": {
+              "id": "4881",
+              "name": "Support Activities for Air Transportation",
+              "description": "This industry group comprises establishments primarily engaged in providing services to the air transportation industry.  These services include airport operation, servicing, repairing (except factory conversion and overhaul of aircraft), maintaining and storing aircraft, and ferrying aircraft.",
+              "children": {
+                "48811": {
+                  "id": "48811",
+                  "name": "Airport Operations",
+                  "description": "This industry comprises establishments primarily engaged in (1) operating international, national, or civil airports or public flying fields or (2) supporting airport operations (except special food services contractors), such as rental of hangar space, air traffic control (except military) services, baggage handling services, and cargo handling services.\n\nCross-References."
+                },
+                "488111": {
+                  "id": "488111",
+                  "name": "Air Traffic Control",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing air traffic control (except military) services to regulate the flow of air traffic.\n\nCross-References."
+                },
+                "488119": {
+                  "id": "488119",
+                  "name": "Other Airport Operations",
+                  "description": "This U.S. industry comprises establishments primarily engaged in (1) operating international, national, or civil airports, or public flying fields or (2) supporting airport operations, such as rental of hangar space, and providing baggage handling and/or cargo handling services.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "48819": {
+                  "id": "48819",
+                  "name": "Other Support Activities for Air Transportation",
+                  "description": "See industry description for 488190."
+                },
+                "488190": {
+                  "id": "488190",
+                  "name": "Other Support Activities for Air Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing specialized services for air transportation (except air traffic control and other airport operations).\n\nIllustrative Examples:\n\nAircraft maintenance and repair services (except factory conversions, overhauls, rebuilding)\nAircraft passenger screening security services\nAircraft testing services\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4882": {
+              "id": "4882",
+              "name": "Support Activities for Rail Transportation",
+              "description": "",
+              "children": {
+                "48821": {
+                  "id": "48821",
+                  "name": "Support Activities for Rail Transportation",
+                  "description": "See industry description for 488210."
+                },
+                "488210": {
+                  "id": "488210",
+                  "name": "Support Activities for Rail Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing specialized services for railroad transportation, including servicing, routine repairing (except factory conversion, overhaul, or rebuilding of rolling stock), and maintaining rail cars; loading and unloading rail cars; and operating independent terminals.\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4883": {
+              "id": "4883",
+              "name": "Support Activities for Water Transportation",
+              "description": "This industry group comprises establishments primarily engaged in one of the following: (1) operating ports, harbors (including docking and pier facilities), or canals; (2) providing stevedoring and other marine cargo handling services (except warehousing); (3) providing navigational services to shipping; or (4) providing other services to water transportation.",
+              "children": {
+                "48831": {
+                  "id": "48831",
+                  "name": "Port and Harbor Operations",
+                  "description": "See industry description for 488310."
+                },
+                "488310": {
+                  "id": "488310",
+                  "name": "Port and Harbor Operations",
+                  "description": "This industry comprises establishments primarily engaged in operating ports, harbors (including docking and pier facilities), or canals.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "48832": {
+                  "id": "48832",
+                  "name": "Marine Cargo Handling",
+                  "description": "See industry description for 488320."
+                },
+                "488320": {
+                  "id": "488320",
+                  "name": "Marine Cargo Handling",
+                  "description": "This industry comprises establishments primarily engaged in providing stevedoring and other marine cargo handling services (except warehousing).\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "48833": {
+                  "id": "48833",
+                  "name": "Navigational Services to Shipping",
+                  "description": "See industry description for 488330."
+                },
+                "488330": {
+                  "id": "488330",
+                  "name": "Navigational Services to Shipping",
+                  "description": "This industry comprises establishments primarily engaged in providing navigational services to shipping.  Marine salvage establishments are included in this industry.\n\nIllustrative Examples:\n\nDocking and undocking marine vessel services\nPiloting services, water transportation\nMarine vessel traffic reporting services\nTugboat services, harbor operation\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "48839": {
+                  "id": "48839",
+                  "name": "Other Support Activities for Water Transportation",
+                  "description": "See industry description for 488390."
+                },
+                "488390": {
+                  "id": "488390",
+                  "name": "Other Support Activities for Water Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing services to water transportation (except port and harbor operations; marine cargo handling services; and navigational services to shipping).\n\nIllustrative Examples:\n\nFloating drydocks (i.e., routine repair and maintenance of ships)\nShip scaling services\nMarine cargo checkers and surveyors\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4884": {
+              "id": "4884",
+              "name": "Support Activities for Road Transportation",
+              "description": "This industry group comprises establishments primarily engaged in (1) towing light or heavy motor vehicles, both local and long-distance, or (2) providing other services to road network users.",
+              "children": {
+                "48841": {
+                  "id": "48841",
+                  "name": "Motor Vehicle Towing",
+                  "description": "See industry description for 488410."
+                },
+                "488410": {
+                  "id": "488410",
+                  "name": "Motor Vehicle Towing",
+                  "description": "This industry comprises establishments primarily engaged in towing light or heavy motor vehicles, both local and long-distance.  These establishments may provide incidental services, such as storage and emergency road repair services.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "48849": {
+                  "id": "48849",
+                  "name": "Other Support Activities for Road Transportation",
+                  "description": "See industry description for 488490."
+                },
+                "488490": {
+                  "id": "488490",
+                  "name": "Other Support Activities for Road Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing services (except motor vehicle towing) to road network users.\n\nIllustrative Examples:\n\nBridge, tunnel, and highway operations\nPilot car services (i.e., wide load warning services)\nTruck or weighing station operations\nDriving services, independent (e.g., automobile, truck delivery)\n\n\nCross-References. Establishments primarily engaged in--"
+                }
+              }
+            },
+            "4885": {
+              "id": "4885",
+              "name": "Freight Transportation Arrangement",
+              "description": "",
+              "children": {
+                "48851": {
+                  "id": "48851",
+                  "name": "Freight Transportation Arrangement",
+                  "description": "See industry description for 488510."
+                },
+                "488510": {
+                  "id": "488510",
+                  "name": "Freight Transportation Arrangement",
+                  "description": "This industry comprises establishments primarily engaged in arranging transportation of freight between shippers and carriers.  These establishments are usually known as freight forwarders, marine shipping agents, or customs brokers and offer a combination of services spanning transportation modes but do not directly provide shipping services.\n\nCross-References."
+                }
+              }
+            },
+            "4889": {
+              "id": "4889",
+              "name": "Other Support Activities for Transportation",
+              "description": "",
+              "children": {
+                "48899": {
+                  "id": "48899",
+                  "name": "Other Support Activities for Transportation",
+                  "description": "This industry comprises establishments primarily engaged in providing support activities to transportation (except for air transportation; rail transportation; water transportation; road transportation; and freight transportation arrangement).\n\nIllustrative Examples:\n\nArrangement of vanpools or car pools (except ridesharing arrangement services)\nIndependent pipeline terminal facilities \nStockyards (i.e., not for fattening or selling livestock)\n\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "488991": {
+                  "id": "488991",
+                  "name": "Packing and Crating",
+                  "description": "This U.S. industry comprises establishments primarily engaged in packing, crating, and otherwise preparing goods for transportation.\n\nCross-References. Establishments primarily engaged in--"
+                },
+                "488999": {
+                  "id": "488999",
+                  "name": "All Other Support Activities for Transportation",
+                  "description": "This U.S. industry comprises establishments primarily engaged in providing support activities to transportation (except for air transportation; rail transportation; water transportation; road transportation; freight transportation arrangement; and packing and crating).\n\nIllustrative Examples:\n\nArrangement of vanpools or car pools (except ridesharing arrangement services)\nIndependent pipeline terminal facilities\nStockyards (i.e., not for fattening or selling livestock)\n\n\nCross-References. Establishments primarily engaged in--"
                 }
               }
             }

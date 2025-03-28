@@ -143,6 +143,7 @@ def load_taxonomy_from_excel(file_path: str) -> Taxonomy:
                 logger.error(f"Failed to read as pipe-delimited text: {str(csv_error)}")
                 raise ValueError(f"Could not parse taxonomy file '{file_path}'. Tried Excel and Pipe-Delimited CSV.") from excel_error
 
+
         # --- Column Identification ---
         # Define potential names for required columns (case-insensitive)
         code_col_options = ['naics code', '2022 naics us code', 'code']
