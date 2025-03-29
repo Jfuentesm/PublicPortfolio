@@ -1,12 +1,14 @@
-import './assets/main.css' 
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import App from './App.vue'
-import './assets/styles.css';      
+import App from './App.vue';
+import './assets/styles.css'; // Import custom styles AFTER potential framework styles
 
-const app = createApp(App)
+// Optional: If using Bootstrap JS components via import (instead of CDN in index.html)
+// import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
-app.use(createPinia())
+const app = createApp(App);
 
-app.mount('#app')
+app.use(createPinia());
+
+app.mount('#app');

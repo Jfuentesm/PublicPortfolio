@@ -30,14 +30,19 @@ export const useJobStore = defineStore('job', () => {
             jobDetails.value = null; // Clear details when job ID changes
             error.value = null; // Clear errors
             isLoading.value = false; // Reset loading state
-             // Update URL
-             if (jobId && window.history.pushState) {
-                const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + `?job_id=${jobId}`;
-                window.history.pushState({path:newUrl},'',newUrl);
-            } else if (!jobId && window.history.pushState) {
-                 // Clear job_id from URL if it's set to null
-                const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                window.history.pushState({path:newUrl},'',newUrl);
+
+            // Update URL to reflect the current job ID or clear it
+            try {
+                 const url = new URL(window.location.href);
+                 if (jobId) {
+                     url.searchParams.set('job_id', jobId);
+                 } else {
+                     url.searchParams.delete('job_id');
+                 }
+                 // Use replaceState to avoid polluting history
+                 window.history.replaceState({}, '', url.toString());
+            } catch (e) {
+                 console.error("Failed to update URL:", e);
             }
         }
     }
@@ -45,11 +50,11 @@ export const useJobStore = defineStore('job', () => {
     function updateJobDetails(details: JobDetails): void {
         // Only update if the details are for the currently tracked job
         if (details && details.job_id === currentJobId.value) {
-            console.log(`JobStore: Updating jobDetails for ${currentJobId.value}`);
-            jobDetails.value = details;
+            // console.log(`JobStore: Updating jobDetails for ${currentJobId.value}`);
+            jobDetails.value = { ...details }; // Create new object for reactivity
             error.value = null; // Clear error on successful update
         } else if (details) {
-            console.warn(`JobStore: Received details for job ${details.job_id}, but currently tracking ${currentJobId.value}. Ignoring update.`);
+            // console.warn(`JobStore: Received details for job ${details.job_id}, but currently tracking ${currentJobId.value}. Ignoring update.`);
         }
     }
 
@@ -63,7 +68,7 @@ export const useJobStore = defineStore('job', () => {
 
     function clearJob(): void {
         console.log('JobStore: Clearing job state.');
-        setCurrentJobId(null); // This also clears details, error, loading
+        setCurrentJobId(null); // This also clears details, error, loading and URL param
     }
 
     return {

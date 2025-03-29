@@ -4,13 +4,14 @@ import apiService from '@/services/api'; // Adjust path as needed
 
 interface User {
     username: string;
+    // Add other relevant user fields if needed (e.g., email, id)
 }
 
 export const useAuthStore = defineStore('auth', () => {
     // --- State ---
     const token = ref<string | null>(localStorage.getItem('authToken'));
     const storedUser = localStorage.getItem('authUser');
-    const user = ref<User | null>(storedUser ? JSON.parse(storedUser) : null);
+    const user = ref<User | null>(storedUser ? JSON.parse(storedUser) : null); // Initialize from localStorage
     const loading = ref(false);
     const error = ref<string | null>(null);
 
@@ -26,17 +27,14 @@ export const useAuthStore = defineStore('auth', () => {
             console.log('AuthStore: Attempting login...');
             const response = await apiService.login(usernameInput, passwordInput);
             token.value = response.access_token;
-            user.value = { username: response.username };
+            user.value = { username: response.username }; // Store username
 
-            // --- FIX: Handle null token for localStorage ---
+            // Persist to localStorage
             if (token.value) {
                 localStorage.setItem('authToken', token.value);
             } else {
-                localStorage.removeItem('authToken'); // Remove if token is null/undefined
+                localStorage.removeItem('authToken'); // Should not happen on success, but safe
             }
-            // --- END FIX ---
-
-            // Store user object safely
             if (user.value) {
                 localStorage.setItem('authUser', JSON.stringify(user.value));
             } else {
@@ -49,9 +47,9 @@ export const useAuthStore = defineStore('auth', () => {
             token.value = null;
             user.value = null;
             localStorage.removeItem('authToken'); // Ensure removal on error
-            localStorage.removeItem('authUser'); // Ensure removal on error
+            localStorage.removeItem('authUser');
             error.value = err.message || 'Login failed. Please check credentials.';
-            throw err;
+            throw err; // Re-throw for the component to handle
         } finally {
             loading.value = false;
         }
@@ -62,10 +60,9 @@ export const useAuthStore = defineStore('auth', () => {
         token.value = null;
         user.value = null;
         error.value = null;
-        // --- FIX: Explicitly remove items ---
         localStorage.removeItem('authToken');
         localStorage.removeItem('authUser');
-        // --- END FIX ---
+        // Optionally redirect or clear other stores if needed
         console.log('AuthStore: Logout complete.');
     }
 
@@ -76,21 +73,30 @@ export const useAuthStore = defineStore('auth', () => {
 
         if (storedToken && storedUserJson) {
             try {
-                token.value = storedToken;
-                user.value = JSON.parse(storedUserJson);
-                console.log('AuthStore: Found valid token and user in localStorage.');
+                const parsedUser = JSON.parse(storedUserJson);
+                // Basic validation if needed (e.g., check if username exists)
+                if (parsedUser && parsedUser.username) {
+                    token.value = storedToken;
+                    user.value = parsedUser;
+                    console.log('AuthStore: Session restored from localStorage.');
+                } else {
+                    console.warn('AuthStore: Invalid user data in localStorage. Logging out.');
+                    logout();
+                }
             } catch (e) {
                 console.error('AuthStore: Error parsing stored user data. Logging out.');
                 logout();
             }
         } else {
             console.log('AuthStore: No token or user found in localStorage.');
+            // Ensure state matches localStorage absence
             if (token.value || user.value) {
-                logout(); // Ensure state is cleared if localStorage is missing items
+                logout();
             }
         }
     }
 
+    // Action to get the current token (useful for API service interceptor)
     function getToken(): string | null {
         return token.value;
     }

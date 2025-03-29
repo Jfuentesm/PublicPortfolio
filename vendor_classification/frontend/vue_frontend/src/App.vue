@@ -1,32 +1,39 @@
 <template>
-  <div>
+  <div id="vue-app-wrapper">
     <Navbar :is-logged-in="authStore.isAuthenticated" :username="authStore.username" @logout="handleLogout" />
 
-    <div class="container mt-nav-fix">
+    <!-- Use container-fluid for full width sections like Hero, standard container for content -->
+    <main role="main" class="flex-shrink-0">
+      <!-- Show Landing/Login page if not authenticated -->
       <LandingPage v-if="!authStore.isAuthenticated" @login-successful="handleLoginSuccess" />
-      <AppContent v-else />
-    </div>
+
+      <!-- Show main application content (Upload, Status) if authenticated -->
+      <!-- Wrap AppContent in a standard container for centered content -->
+      <div class="container" v-else>
+          <AppContent />
+      </div>
+    </main>
 
     <Footer />
   </div>
 </template>
 
 <script setup lang="ts">
+// ... (script content remains the same as previous version) ...
 import { onMounted } from 'vue';
 import Navbar from './components/Navbar.vue';
 import LandingPage from './components/LandingPage.vue';
 import AppContent from './components/AppContent.vue';
 import Footer from './components/Footer.vue';
 import { useAuthStore } from './stores/auth';
-import { useJobStore } from './stores/job'; // Import job store
+import { useJobStore } from './stores/job';
 
 const authStore = useAuthStore();
-const jobStore = useJobStore(); // Use job store
+const jobStore = useJobStore();
 
 const handleLogout = () => {
   authStore.logout();
-  jobStore.clearJob(); // Clear job state on logout
-  // Optionally clear URL query params
+  jobStore.clearJob();
   if (window.history.pushState) {
       const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
       window.history.pushState({path:newUrl},'',newUrl);
@@ -34,34 +41,37 @@ const handleLogout = () => {
 };
 
 const handleLoginSuccess = () => {
-  // Auth store should update isAuthenticated itself after successful login
   console.log('Login successful, App.vue notified.');
+  const urlParams = new URLSearchParams(window.location.search);
+  const jobIdFromUrl = urlParams.get('job_id');
+   if (jobIdFromUrl) {
+      console.log(`App.vue: Found Job ID in URL after login: ${jobIdFromUrl}. Setting in store.`);
+      jobStore.setCurrentJobId(jobIdFromUrl);
+   }
 };
 
-// Check auth status on component mount (e.g., if token exists in localStorage)
-// Also check for job_id in URL on initial load if authenticated
 onMounted(() => {
-  authStore.checkAuthStatus(); // Action in store to check localStorage
+  authStore.checkAuthStatus();
   if (authStore.isAuthenticated) {
     const urlParams = new URLSearchParams(window.location.search);
     const jobIdFromUrl = urlParams.get('job_id');
     if (jobIdFromUrl && !jobStore.currentJobId) {
-      console.log(`App.vue: Found Job ID in URL: ${jobIdFromUrl}. Setting in store.`);
-      jobStore.setCurrentJobId(jobIdFromUrl); // Set job ID in store
+      console.log(`App.vue: Found Job ID in URL on mount: ${jobIdFromUrl}. Setting in store.`);
+      jobStore.setCurrentJobId(jobIdFromUrl);
     }
   }
 });
 </script>
 
 <style>
-/* Import global styles if not done in main.ts */
-/* @import './assets/css/styles.css'; */
-
-body {
-    padding-top: 56px; /* Adjust for fixed navbar height */
+#vue-app-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
-
-.mt-nav-fix {
-    margin-top: 2rem; /* Additional margin below navbar */
+/* main role="main" is used for semantic structure */
+main.flex-shrink-0 {
+  flex: 1 0 auto; /* Allows main content to grow and push footer */
+  padding-bottom: 3rem; /* Add some padding at the bottom */
 }
 </style>
