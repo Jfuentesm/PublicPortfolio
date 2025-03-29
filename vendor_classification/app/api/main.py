@@ -1,18 +1,19 @@
 # app/api/main.py
-import socket # Ensure socket is imported
-import sqlalchemy # Ensure sqlalchemy is imported
-import httpx # Ensure httpx is imported
+import socket
+import sqlalchemy
+import httpx
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+# --- MODIFIED IMPORTS ---
+from fastapi.responses import JSONResponse # Keep JSONResponse for error handling
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+# --- END MODIFIED IMPORTS ---
 from typing import Dict, Any, Optional
 import uuid
 import os
 from datetime import datetime, timedelta
-import logging # <-- Added basic logging import for startup/health
+import logging # Keep for startup/health
 
 from models.job import Job, JobStatus, ProcessingStage
 from models.user import User
@@ -25,7 +26,7 @@ from api.auth import get_current_user, authenticate_user, create_access_token
 from core.database import get_db, SessionLocal
 from core.initialize_db import initialize_database
 from services.file_service import save_upload_file
-from tasks.celery_app import celery_app # Use celery_app directly
+from tasks.celery_app import celery_app
 from utils.taxonomy_loader import load_taxonomy
 
 from fastapi.security import OAuth2PasswordRequestForm
@@ -33,10 +34,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 # Configure logging using the setup function, then get the specific logger
 setup_logging_done = False # Flag to prevent re-setup during reloads
 try:
-    # Basic configuration for startup messages before full setup
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     startup_logger = logging.getLogger("vendor_classification.startup")
-    # Full setup will happen in startup_event
 except Exception as e:
     print(f"Initial basic logging config failed: {e}")
     startup_logger = logging.getLogger("vendor_classification.startup") # Try getting it anyway
@@ -61,44 +60,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for frontend
-frontend_dir = "/frontend"
-static_dir = "/frontend/static"
-logger.info(f"Looking for frontend directory at: {frontend_dir}")
-logger.info(f"Looking for static directory at: {static_dir}")
-if os.path.exists(frontend_dir) and os.path.exists(static_dir):
-    logger.info(f"Frontend and Static directories found.")
-    try:
-        app.mount("/static", StaticFiles(directory=static_dir), name="static")
-        logger.info(f"Mounted static files from {static_dir}")
-        try:
-            static_files = os.listdir(static_dir)
-            logger.info(f"Contents of {static_dir}: {static_files}")
-        except Exception as list_err:
-            logger.error(f"Could not list contents of {static_dir}: {list_err}")
-    except RuntimeError as e:
-         logger.warning(f"Could not mount static files (possibly already mounted or path issue): {e}")
-    except Exception as e:
-        logger.error(f"Failed to mount static files from {static_dir}", exc_info=True)
-else:
-    logger.error(f"Frontend or Static directory NOT FOUND. Frontend: {os.path.exists(frontend_dir)}, Static: {os.path.exists(static_dir)}")
+# --- VUE.JS FRONTEND SERVING SETUP ---
+# Define the path to the built Vue app's static files within the container
+# Adjust this path based on where your Dockerfile copies the 'dist' folder
+VUE_BUILD_DIR = "/app/frontend/dist" # Example path
+VUE_INDEX_FILE = os.path.join(VUE_BUILD_DIR, "index.html")
+
+logger.info(f"Attempting to serve Vue frontend from: {VUE_BUILD_DIR}")
+if not os.path.exists(VUE_BUILD_DIR):
+    logger.error(f"Vue build directory NOT FOUND at {VUE_BUILD_DIR}. Frontend will not be served.")
     logger.error(f"Current working directory: {os.getcwd()}")
-    if os.path.exists('/frontend'): logger.error(f"Contents of /frontend: {os.listdir('/frontend')}")
+    # Optionally list contents of parent dir if it helps debugging
+    parent_dir = os.path.dirname(VUE_BUILD_DIR)
+    if os.path.exists(parent_dir):
+        try: logger.error(f"Contents of {parent_dir}: {os.listdir(parent_dir)}")
+        except Exception as list_err: logger.error(f"Could not list {parent_dir}: {list_err}")
+elif not os.path.exists(VUE_INDEX_FILE):
+    logger.error(f"Vue index.html NOT FOUND at {VUE_INDEX_FILE}. Frontend serving might fail.")
+    try: logger.error(f"Contents of {VUE_BUILD_DIR}: {os.listdir(VUE_BUILD_DIR)}")
+    except Exception as list_err: logger.error(f"Could not list {VUE_BUILD_DIR}: {list_err}")
+else:
+    logger.info(f"Vue build directory and index.html found. Static files will be mounted.")
+    # Mount the entire Vue build directory at the root path.
+    # `html=True` ensures that non-API routes serve index.html for client-side routing.
+    # IMPORTANT: Mount this *after* all your API routes are defined.
+    # We will mount it at the end of the file.
 
-
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    """Serve the frontend application."""
-    index_path = os.path.join(frontend_dir, "index.html")
-    logger.info(f"Attempting to serve index.html from {index_path}")
-    if os.path.exists(index_path):
-        logger.info("Serving index.html")
-        return FileResponse(index_path)
-    else:
-        logger.error(f"Index file not found at {index_path}", extra={"path": index_path})
-        content = f"<html><body><h1>Error: Frontend file not found</h1><p>Could not find {index_path}</p><p>Static dir found: {os.path.exists(static_dir)}</p></body></html>"
-        return HTMLResponse(content=content, status_code=404)
-
+# --- API ROUTES ---
+# Define all your API routes (/api/v1/..., /token, /health) BEFORE mounting static files.
 
 @app.get("/health")
 async def health_check():
@@ -134,8 +123,9 @@ async def health_check():
             db.close()
             logger.debug("Health Check: Database session closed.")
 
-    frontend_status = "found" if os.path.exists(os.path.join(frontend_dir, "index.html")) else "missing"
-    static_status = "found" if os.path.exists(static_dir) else "missing"
+    # --- MODIFIED: Check for Vue build directory ---
+    vue_frontend_status = "found" if os.path.exists(VUE_INDEX_FILE) else "missing"
+    # --- END MODIFIED ---
 
     celery_broker_status = "unknown"
     celery_connection = None
@@ -181,14 +171,23 @@ async def health_check():
         "ip": local_ip,
         "database": db_status,
         "celery_broker": celery_broker_status,
-        "frontend_index": frontend_status,
-        "frontend_static": static_status,
+        # --- MODIFIED: Report Vue frontend status ---
+        "vue_frontend_index": vue_frontend_status,
+        # --- END MODIFIED ---
         "external_api_openrouter": openrouter_status,
         "external_api_tavily": tavily_status,
         "timestamp": datetime.now().isoformat()
     }
 
-# Custom Exception Handler for Validation Errors
+# --- REMOVED: Old root route ---
+# @app.get("/", response_class=HTMLResponse)
+# async def root():
+#     """Serve the frontend application."""
+#     # This is now handled by the StaticFiles mount below
+#     pass
+# --- END REMOVED ---
+
+# --- Exception Handlers (Keep as they are) ---
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     correlation_id = get_correlation_id() or str(uuid.uuid4())
@@ -205,7 +204,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         headers={"X-Correlation-ID": correlation_id}
     )
 
-# General Exception Handler
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     correlation_id = get_correlation_id() or str(uuid.uuid4())
@@ -213,12 +211,20 @@ async def general_exception_handler(request: Request, exc: Exception):
         "correlation_id": correlation_id, "request_headers": dict(request.headers),
         "path": request.url.path, "method": request.method,
     })
+    # Check if the request looks like it was intended for the frontend SPA
+    # If the path doesn't start with /api, /token, /health, etc., and Vue files exist,
+    # maybe it should have been handled by the SPA. But StaticFiles(html=True) handles this better.
+    # Instead of trying to serve index.html here, rely on the StaticFiles mount.
+    # Just return a standard 500 error for backend exceptions.
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "An internal server error occurred.", "correlation_id": correlation_id},
         headers={"X-Correlation-ID": correlation_id}
     )
 
+
+# --- Your existing API endpoints (/api/v1/..., /token) ---
+# Keep all these endpoints exactly as they were. Example:
 
 @app.post("/api/v1/upload", response_model=Dict[str, Any])
 async def upload_file(
@@ -227,7 +233,7 @@ async def upload_file(
     current_user: User = Depends(get_current_user),
     db = Depends(get_db)
 ):
-    """Upload vendor Excel file for processing."""
+    # ... (endpoint implementation remains the same) ...
     job_id = str(uuid.uuid4())
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
@@ -305,7 +311,7 @@ async def upload_file(
 
 @app.get("/api/v1/jobs/{job_id}", response_model=Dict[str, Any])
 async def get_job_status(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    """Check job status."""
+    # ... (endpoint implementation remains the same) ...
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     logger.info(f"Job status requested", extra={"username": current_user.username if current_user else "unknown"})
@@ -335,7 +341,7 @@ async def get_job_status(job_id: str, current_user: User = Depends(get_current_u
 
 @app.get("/api/v1/jobs/{job_id}/download")
 async def download_results(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    """Download job results."""
+    # ... (endpoint implementation remains the same) ...
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     logger.info(f"Results download requested", extra={"username": current_user.username if current_user else "unknown"})
@@ -352,12 +358,14 @@ async def download_results(job_id: str, current_user: User = Depends(get_current
     base_name = "results";
     if job.input_file_name: base_name, _ = os.path.splitext(job.input_file_name)
     download_filename = f"{base_name}_results.xlsx"
+    # Use FileResponse directly for downloads
+    from fastapi.responses import FileResponse
     return FileResponse( output_path, filename=download_filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=\"{download_filename}\""} )
 
 
 @app.post("/api/v1/jobs/{job_id}/notify", response_model=Dict[str, Any])
 async def request_notification(job_id: str, email_payload: Dict[str, str], current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    """Request email notification when job completes."""
+    # ... (endpoint implementation remains the same) ...
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     email = email_payload.get("email")
@@ -377,7 +385,7 @@ async def request_notification(job_id: str, email_payload: Dict[str, str], curre
 
 @app.get("/api/v1/jobs/{job_id}/stats", response_model=Dict[str, Any])
 async def get_job_stats(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    """Get job processing statistics."""
+    # ... (endpoint implementation remains the same) ...
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     logger.info(f"Job stats requested", extra={"username": current_user.username if current_user else "unknown"})
@@ -397,7 +405,7 @@ async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db = Depends(get_db)
 ):
-    """Get an access token for authentication."""
+    # ... (endpoint implementation remains the same) ...
     correlation_id = str(uuid.uuid4())
     set_correlation_id(correlation_id)
     client_host = request.client.host if request.client else "Unknown"
@@ -419,10 +427,7 @@ async def login_for_access_token(
             data={"sub": user.username}, expires_delta=access_token_expires
         )
 
-        # --- ADDED CONFIRMATION LOG ---
-        # This log confirms that create_access_token completed without error
         logger.info(f"Login successful, token generated", extra={ "username": user.username, "ip": client_host, "token_expires_in_minutes": settings.ACCESS_TOKEN_EXPIRE_MINUTES})
-        # --- END ADDED CONFIRMATION LOG ---
 
         return { "access_token": access_token, "token_type": "bearer", "username": user.username }
 
@@ -431,14 +436,13 @@ async def login_for_access_token(
              logger.error(f"HTTP exception during login", exc_info=True)
         raise
     except Exception as e:
-        # The KeyError from logging used to happen here before the fix
         logger.error(f"Unexpected login error", exc_info=True, extra={"error": str(e), "username": form_data.username})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during the login process."
         )
 
-
+# --- Startup Event (Keep as is) ---
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup."""
@@ -484,3 +488,21 @@ async def startup_event():
         logger.info("Taxonomy pre-loading completed.")
     except Exception as e:
         logger.error("Failed to pre-load taxonomy during startup.", exc_info=True)
+
+
+# --- MOUNT STATIC FILES (Vue App) ---
+# This should be the LAST app configuration step
+if os.path.exists(VUE_BUILD_DIR) and os.path.exists(VUE_INDEX_FILE):
+    logger.info(f"Mounting Vue app from directory: {VUE_BUILD_DIR}")
+    app.mount("/", StaticFiles(directory=VUE_BUILD_DIR, html=True), name="app")
+else:
+    logger.error(f"Cannot mount Vue app: Directory {VUE_BUILD_DIR} or index file {VUE_INDEX_FILE} not found.")
+    # Add a fallback route to show an error if the frontend isn't mounted
+    @app.get("/")
+    async def missing_frontend():
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": f"Frontend not found. Expected build files in {VUE_BUILD_DIR}"}
+        )
+
+# --- END VUE.JS FRONTEND SERVING SETUP ---

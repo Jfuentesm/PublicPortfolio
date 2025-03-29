@@ -1,0 +1,32 @@
+// frontend/vue_frontend/tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler", // Recommended for modern bundlers like Vite
+    "strict": true,
+    "jsx": "preserve",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"], // Added DOM.Iterable
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".", // Define base URL for path resolution
+    "paths": {      // Define the '@' alias
+      "@/*": ["src/*"]
+    },
+    "types": ["vite/client"] // Ensure Vite client types are included
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "env.d.ts", // Include environment types
+    "vite.config.ts" // Include Vite config for better editor support
+  ],
+  "exclude": ["node_modules", "dist"], // Exclude build output and dependencies
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
