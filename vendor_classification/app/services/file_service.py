@@ -4,7 +4,7 @@ import os
 import pandas as pd
 from fastapi import UploadFile
 import shutil
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set # Added Set
 import uuid
 import logging # Make sure logging is imported
 from datetime import datetime
@@ -17,15 +17,13 @@ logger = get_logger("vendor_classification.file_service")
 
 # --- Define expected column names (case-insensitive matching) ---
 VENDOR_NAME_COL = 'vendor_name'
-# --- REMOVED: OPTIONAL_DESC_COL ---
 OPTIONAL_EXAMPLE_COL = 'optional_example_good_serviced_purchased'
-# --- ADDED: New optional column names ---
 OPTIONAL_ADDRESS_COL = 'vendor_address'
 OPTIONAL_WEBSITE_COL = 'vendor_website'
 OPTIONAL_INTERNAL_CAT_COL = 'internal_category'
 OPTIONAL_PARENT_CO_COL = 'parent_company'
 OPTIONAL_SPEND_CAT_COL = 'spend_category'
-# --- END ADDED ---
+# --- End Define expected column names ---
 
 @log_function_call(logger, include_args=False) # Keep args=False for UploadFile
 def save_upload_file(file: UploadFile, job_id: str) -> str:
@@ -51,10 +49,8 @@ def save_upload_file(file: UploadFile, job_id: str) -> str:
         logger.error(f"Failed to create job directory", exc_info=True, extra={"directory": job_dir})
         raise IOError(f"Could not create directory for job {job_id}: {e}")
 
-    # Use original filename, ensure it's safe (basic check)
-    # More robust sanitization might be needed depending on environment
     safe_filename = os.path.basename(file.filename or f"upload_{job_id}.tmp")
-    if not safe_filename: # Handle empty filename after basename
+    if not safe_filename:
          safe_filename = f"upload_{job_id}.tmp"
 
     file_path = os.path.join(job_dir, safe_filename)
@@ -63,17 +59,14 @@ def save_upload_file(file: UploadFile, job_id: str) -> str:
     with LogTimer(logger, "File saving"):
         try:
             with open(file_path, "wb") as buffer:
-                # Copy file object efficiently
                 shutil.copyfileobj(file.file, buffer)
         except Exception as e:
             logger.error("Failed to save uploaded file content", exc_info=True, extra={"file_path": file_path})
-            # Clean up potentially partially written file
             if os.path.exists(file_path):
                  try: os.remove(file_path)
                  except OSError: logger.warning("Could not remove partially written file on error.", extra={"file_path": file_path})
             raise IOError(f"Could not save uploaded file content: {e}")
         finally:
-            # Ensure the file object provided by FastAPI is closed
             if hasattr(file, 'close') and callable(file.close):
                 file.close()
 
@@ -83,7 +76,7 @@ def save_upload_file(file: UploadFile, job_id: str) -> str:
                    extra={"path": file_path, "size_bytes": file_size})
     except OSError as e:
         logger.warning(f"Could not get size of saved file", exc_info=False, extra={"file_path": file_path, "error": str(e)})
-        file_size = -1 # Indicate unknown size
+        file_size = -1
 
     return file_path
 
@@ -113,28 +106,23 @@ def read_vendor_file(file_path: str) -> List[Dict[str, Any]]:
 
     with LogTimer(logger, "Excel file reading", include_in_stats=True):
         try:
-            # Read the Excel file, assuming header is in the first row (index 0)
             df = pd.read_excel(file_path, header=0)
             detected_columns = list(df.columns)
             logger.debug(f"Successfully read Excel file. Columns detected: {detected_columns}")
         except Exception as e:
             logger.error(f"Error reading Excel file with pandas", exc_info=True,
                         extra={"file_path": file_path})
-            # Raise a clearer error message
             raise ValueError(f"Could not parse the Excel file. Please ensure it is a valid .xlsx or .xls file. Error details: {str(e)}")
 
     # --- Find columns case-insensitively ---
     column_map: Dict[str, Optional[str]] = {
         'vendor_name': None,
-        # --- REMOVED: description ---
         'example': None,
-        # --- ADDED: Keys for new optional columns ---
         'address': None,
         'website': None,
         'internal_cat': None,
         'parent_co': None,
         'spend_cat': None
-        # --- END ADDED ---
     }
     normalized_detected_columns = {str(col).strip().lower(): str(col) for col in detected_columns if isinstance(col, str)}
 
@@ -147,45 +135,21 @@ def read_vendor_file(file_path: str) -> List[Dict[str, Any]]:
                     extra={"available_columns": detected_columns})
         raise ValueError(f"Input Excel file must contain a column named '{VENDOR_NAME_COL}' (case-insensitive). Found columns: {', '.join(map(str, detected_columns))}")
 
-    # --- REMOVED: Description column lookup ---
-
-    if OPTIONAL_EXAMPLE_COL in normalized_detected_columns:
-        column_map['example'] = normalized_detected_columns[OPTIONAL_EXAMPLE_COL]
-        logger.info(f"Found optional column '{OPTIONAL_EXAMPLE_COL}' as: '{column_map['example']}'")
-    else:
-         logger.info(f"Optional column '{OPTIONAL_EXAMPLE_COL}' not found.")
-
-    # --- ADDED: Find new optional columns ---
-    if OPTIONAL_ADDRESS_COL in normalized_detected_columns:
-        column_map['address'] = normalized_detected_columns[OPTIONAL_ADDRESS_COL]
-        logger.info(f"Found optional column '{OPTIONAL_ADDRESS_COL}' as: '{column_map['address']}'")
-    else:
-        logger.info(f"Optional column '{OPTIONAL_ADDRESS_COL}' not found.")
-
-    if OPTIONAL_WEBSITE_COL in normalized_detected_columns:
-        column_map['website'] = normalized_detected_columns[OPTIONAL_WEBSITE_COL]
-        logger.info(f"Found optional column '{OPTIONAL_WEBSITE_COL}' as: '{column_map['website']}'")
-    else:
-        logger.info(f"Optional column '{OPTIONAL_WEBSITE_COL}' not found.")
-
-    if OPTIONAL_INTERNAL_CAT_COL in normalized_detected_columns:
-        column_map['internal_cat'] = normalized_detected_columns[OPTIONAL_INTERNAL_CAT_COL]
-        logger.info(f"Found optional column '{OPTIONAL_INTERNAL_CAT_COL}' as: '{column_map['internal_cat']}'")
-    else:
-        logger.info(f"Optional column '{OPTIONAL_INTERNAL_CAT_COL}' not found.")
-
-    if OPTIONAL_PARENT_CO_COL in normalized_detected_columns:
-        column_map['parent_co'] = normalized_detected_columns[OPTIONAL_PARENT_CO_COL]
-        logger.info(f"Found optional column '{OPTIONAL_PARENT_CO_COL}' as: '{column_map['parent_co']}'")
-    else:
-        logger.info(f"Optional column '{OPTIONAL_PARENT_CO_COL}' not found.")
-
-    if OPTIONAL_SPEND_CAT_COL in normalized_detected_columns:
-        column_map['spend_cat'] = normalized_detected_columns[OPTIONAL_SPEND_CAT_COL]
-        logger.info(f"Found optional column '{OPTIONAL_SPEND_CAT_COL}' as: '{column_map['spend_cat']}'")
-    else:
-        logger.info(f"Optional column '{OPTIONAL_SPEND_CAT_COL}' not found.")
-    # --- END ADDED ---
+    # Find optional columns
+    optional_cols = {
+        'example': OPTIONAL_EXAMPLE_COL,
+        'address': OPTIONAL_ADDRESS_COL,
+        'website': OPTIONAL_WEBSITE_COL,
+        'internal_cat': OPTIONAL_INTERNAL_CAT_COL,
+        'parent_co': OPTIONAL_PARENT_CO_COL,
+        'spend_cat': OPTIONAL_SPEND_CAT_COL
+    }
+    for key, col_name in optional_cols.items():
+        if col_name in normalized_detected_columns:
+            column_map[key] = normalized_detected_columns[col_name]
+            logger.info(f"Found optional column '{col_name}' as: '{column_map[key]}'")
+        else:
+            logger.info(f"Optional column '{col_name}' not found.")
     # --- End Find columns ---
 
     # --- Extract data into list of dictionaries ---
@@ -198,53 +162,27 @@ def read_vendor_file(file_path: str) -> List[Dict[str, Any]]:
             vendor_name_raw = row.get(column_map['vendor_name'])
             vendor_name = str(vendor_name_raw).strip() if pd.notna(vendor_name_raw) and str(vendor_name_raw).strip() else None
 
-            # Skip row if vendor name is missing or empty after stripping
             if not vendor_name or vendor_name.lower() in ['nan', 'none', 'null']:
                 skipped_count += 1
                 continue
 
             vendor_entry: Dict[str, Any] = {'vendor_name': vendor_name}
 
-            # --- REMOVED: Description extraction ---
-
-            if column_map['example']:
-                example_raw = row.get(column_map['example'])
-                example = str(example_raw).strip() if pd.notna(example_raw) and str(example_raw).strip() else None
-                if example:
-                    vendor_entry['example'] = example
-
-            # --- ADDED: Add new optional fields ---
-            if column_map['address']:
-                address_raw = row.get(column_map['address'])
-                address = str(address_raw).strip() if pd.notna(address_raw) and str(address_raw).strip() else None
-                if address:
-                    vendor_entry['vendor_address'] = address
-
-            if column_map['website']:
-                website_raw = row.get(column_map['website'])
-                website = str(website_raw).strip() if pd.notna(website_raw) and str(website_raw).strip() else None
-                if website:
-                    # Basic URL validation could be added here if needed
-                    vendor_entry['vendor_website'] = website
-
-            if column_map['internal_cat']:
-                internal_cat_raw = row.get(column_map['internal_cat'])
-                internal_cat = str(internal_cat_raw).strip() if pd.notna(internal_cat_raw) and str(internal_cat_raw).strip() else None
-                if internal_cat:
-                    vendor_entry['internal_category'] = internal_cat
-
-            if column_map['parent_co']:
-                parent_co_raw = row.get(column_map['parent_co'])
-                parent_co = str(parent_co_raw).strip() if pd.notna(parent_co_raw) and str(parent_co_raw).strip() else None
-                if parent_co:
-                    vendor_entry['parent_company'] = parent_co
-
-            if column_map['spend_cat']:
-                spend_cat_raw = row.get(column_map['spend_cat'])
-                spend_cat = str(spend_cat_raw).strip() if pd.notna(spend_cat_raw) and str(spend_cat_raw).strip() else None
-                if spend_cat:
-                    vendor_entry['spend_category'] = spend_cat
-            # --- END ADDED ---
+            # Add optional fields if found
+            for key, mapped_col in column_map.items():
+                if key != 'vendor_name' and mapped_col: # Check if optional column was found
+                    raw_value = row.get(mapped_col)
+                    value = str(raw_value).strip() if pd.notna(raw_value) and str(raw_value).strip() else None
+                    if value:
+                        # Map internal key to output key (e.g., 'example' -> 'example')
+                        output_key = key
+                        if key == 'example': output_key = 'example' # Keep existing key
+                        elif key == 'address': output_key = 'vendor_address'
+                        elif key == 'website': output_key = 'vendor_website'
+                        elif key == 'internal_cat': output_key = 'internal_category'
+                        elif key == 'parent_co': output_key = 'parent_company'
+                        elif key == 'spend_cat': output_key = 'spend_category'
+                        vendor_entry[output_key] = value
 
             vendors_data.append(vendor_entry)
             processed_count += 1
@@ -252,8 +190,6 @@ def read_vendor_file(file_path: str) -> List[Dict[str, Any]]:
         logger.info(f"Extracted data for {processed_count} vendors. Skipped {skipped_count} rows due to missing/invalid vendor name.")
         if not vendors_data:
              logger.warning(f"No valid vendor data found in the file after processing rows.")
-             # Depending on requirements, could raise an error here or return empty list
-             # raise ValueError(f"No valid vendor names found in column '{column_map['vendor_name']}'.")
 
     except KeyError as e:
         logger.error(f"Internal Error: KeyError accessing column '{e}' after it was seemingly mapped.",
@@ -290,18 +226,15 @@ def normalize_vendor_data(vendors_data: List[Dict[str, Any]]) -> List[Dict[str, 
         for entry in vendors_data:
             original_name = entry.get('vendor_name')
             if isinstance(original_name, str):
-                # Strip whitespace first, then title case
                 normalized_name = original_name.strip().title()
-                if normalized_name: # Check if non-empty after stripping/casing
-                    # Create a new dict or modify in place - creating new is safer
-                    normalized_entry = entry.copy() # --- MODIFIED: Copy entire entry ---
-                    normalized_entry['vendor_name'] = normalized_name # --- MODIFIED: Update only name ---
+                if normalized_name:
+                    normalized_entry = entry.copy()
+                    normalized_entry['vendor_name'] = normalized_name
                     normalized_vendors_data.append(normalized_entry)
                 else:
                     empty_removed_count += 1
                     logger.warning("Skipping vendor entry due to empty name after normalization", extra={"original_name": original_name})
             else:
-                # Handle non-string or missing names
                 logger.warning("Skipping vendor entry due to missing or non-string name during normalization", extra={"entry": entry})
                 empty_removed_count += 1
 
@@ -325,10 +258,26 @@ def generate_output_file(
     """
     Generate output Excel file with classification results, mapping back to
     original vendor data including optional fields read from the input.
+    Prioritizes the deepest successful classification level achieved.
 
     Args:
         original_vendor_data: Original list of vendor dictionaries from the input file (normalized names, plus optional fields).
-        classification_results: Classification results keyed by unique, normalized vendor names.
+        classification_results: Classification results keyed by unique, normalized vendor names. Expected structure:
+            {
+                "Vendor Name": {
+                    "level1": { ... classification details ... },
+                    "level2": { ... },
+                    "level3": { ... },
+                    "level4": { ... },
+                    "search_results": { # Contains raw search data and potentially L1 classification attempt
+                        "sources": [...],
+                        "summary": "...",
+                        "classification_l1": { ... } # Result from process_search_results
+                    },
+                    "search_attempted": True, # Flag added by task if search was run
+                    "classified_via_search": True # Flag added by task if L1-L4 result came from search path
+                }
+            }
         job_id: Job ID
 
     Returns:
@@ -341,102 +290,110 @@ def generate_output_file(
                extra={"job_id": job_id})
 
     output_data = []
-    # Temporary mapping from normalized name back to results for efficiency
-    # Ensure keys in classification_results are also normalized consistently
-    normalized_to_result = {str(vendor).strip().title(): res for vendor, res in classification_results.items() if isinstance(vendor, str)}
 
     with LogTimer(logger, "Mapping results to original vendors"):
         for original_entry in original_vendor_data:
             original_vendor_name = original_entry.get('vendor_name', '') # Get normalized name
-            # --- ADDED: Get original optional fields from the input entry ---
-            # --- REMOVED: original_description ---
-            original_example = original_entry.get('example')
+            result = classification_results.get(original_vendor_name, {}) # Get results using normalized key
+
+            # Initialize output row fields
+            final_level1_id = ""
+            final_level1_name = ""
+            final_level2_id = ""
+            final_level2_name = ""
+            final_level3_id = ""
+            final_level3_name = ""
+            final_level4_id = ""
+            final_level4_name = ""
+            final_confidence = 0.0
+            classification_not_possible_flag = True # Assume impossible unless proven otherwise
+            final_notes = ""
+            reason = "Classification not possible" # Default reason if no success
+            classification_source = "Initial" # Assume initial pass unless overridden
+
+            # Determine the highest successful classification level
+            highest_successful_level = 0
+            for level in range(4, 0, -1): # Check from L4 down to L1
+                level_key = f"level{level}"
+                level_res = result.get(level_key)
+                if level_res and isinstance(level_res, dict) and not level_res.get("classification_not_possible", True):
+                    highest_successful_level = level
+                    break # Found the highest successful level
+
+            # Populate results based on the highest successful level
+            if highest_successful_level > 0:
+                classification_not_possible_flag = False
+                reason = None # Classification was possible
+                final_confidence = result[f"level{highest_successful_level}"].get("confidence", 0.0)
+                final_notes = result[f"level{highest_successful_level}"].get("notes", "")
+
+                # Populate all levels up to the highest successful one
+                for level in range(1, highest_successful_level + 1):
+                    level_res = result.get(f"level{level}", {})
+                    if level == 1:
+                        final_level1_id = level_res.get("category_id", "")
+                        final_level1_name = level_res.get("category_name", "")
+                    elif level == 2:
+                        final_level2_id = level_res.get("category_id", "")
+                        final_level2_name = level_res.get("category_name", "")
+                    elif level == 3:
+                        final_level3_id = level_res.get("category_id", "")
+                        final_level3_name = level_res.get("category_name", "")
+                    elif level == 4:
+                        final_level4_id = level_res.get("category_id", "")
+                        final_level4_name = level_res.get("category_name", "")
+
+                # Check if this successful classification came from the search path
+                if result.get("classified_via_search"):
+                    classification_source = "Search"
+                    final_notes = f"Classified via search: {final_notes}"
+
+            else: # No level was successfully classified
+                classification_not_possible_flag = True
+                final_confidence = 0.0
+                # Find the reason for failure
+                failure_reason_found = False
+                for level in range(4, 0, -1): # Check highest level first for failure reason
+                     level_res = result.get(f"level{level}")
+                     if level_res and isinstance(level_res, dict) and level_res.get("classification_not_possible", False):
+                          reason = level_res.get("classification_not_possible_reason", f"Classification failed at Level {level}")
+                          final_notes = level_res.get("notes", "") # Use notes from the failed level if available
+                          failure_reason_found = True
+                          break
+                if not failure_reason_found: # If no level explicitly failed, check search results reason if search was attempted
+                     if result.get("search_attempted"):
+                          search_l1_result = result.get("search_results", {}).get("classification_l1", {})
+                          if search_l1_result and search_l1_result.get("classification_not_possible", False):
+                               reason = search_l1_result.get("classification_not_possible_reason", "Search did not yield classification")
+                               final_notes = search_l1_result.get("notes", "")
+                          elif result.get("search_results", {}).get("error"):
+                               reason = f"Search error: {result['search_results']['error']}"
+                     # else 'Classification not possible' remains default
+
+            # Get original optional fields
             original_address = original_entry.get('vendor_address')
             original_website = original_entry.get('vendor_website')
             original_internal_cat = original_entry.get('internal_category')
             original_parent_co = original_entry.get('parent_company')
             original_spend_cat = original_entry.get('spend_category')
-            # --- END ADDED ---
+            original_example = original_entry.get('example')
 
-            # The key to lookup results *is* the normalized name
-            normalized_key = original_vendor_name
-
-            result = normalized_to_result.get(normalized_key, {}) # Get results using normalized key
-
-            # --- Safely access nested results using .get() ---
-            level1 = result.get("level1", {})
-            level2 = result.get("level2", {})
-            level3 = result.get("level3", {})
-            level4 = result.get("level4", {})
-            search_results_data = result.get("search_results", {})
-            search_classification = search_results_data.get("classification", {})
-
-            # Determine final classification status and reason
-            final_classification_possible_l4 = level4.get("category_id") and level4.get("category_id") not in ["N/A", "ERROR"]
-            classification_not_possible_flag = True # Assume impossible unless proven otherwise
-            reason = "Not fully classified" # Default reason
-            final_notes = ""
-            final_confidence = 0.0
-            final_level1_id = level1.get("category_id", "")
-            final_level1_name = level1.get("category_name", "")
-            final_level2_id = level2.get("category_id", "")
-            final_level2_name = level2.get("category_name", "")
-            final_level3_id = level3.get("category_id", "")
-            final_level3_name = level3.get("category_name", "")
-            final_level4_id = level4.get("category_id", "")
-            final_level4_name = level4.get("category_name", "")
-
-
-            if final_classification_possible_l4:
-                classification_not_possible_flag = False
-                reason = None
-                final_notes = level4.get("notes", "")
-                final_confidence = level4.get("confidence", 0.0)
-                # Keep L1-L4 as they are
-            elif search_classification and not search_classification.get("classification_not_possible", True):
-                 # If search provided a valid L1 classification, use that as the 'best' result
-                 classification_not_possible_flag = False # Mark as classified (at least L1)
-                 reason = None
-                 final_notes = f"Classified via search: {search_classification.get('notes', '')}"
-                 final_confidence = search_classification.get("confidence", 0.0) # Use L1 confidence from search
-                 # Overwrite L1, clear L2-L4
-                 final_level1_id = search_classification.get("category_id", "")
-                 final_level1_name = search_classification.get("category_name", "")
-                 final_level2_id = ""
-                 final_level2_name = ""
-                 final_level3_id = ""
-                 final_level3_name = ""
-                 final_level4_id = ""
-                 final_level4_name = ""
-            else:
-                # Find the first level where classification failed, if any
-                failure_reason_found = False
-                for lvl in range(1, 5):
-                     lvl_res = result.get(f"level{lvl}", {})
-                     if lvl_res.get("classification_not_possible", False):
-                          reason = lvl_res.get("classification_not_possible_reason", f"Classification failed at Level {lvl}")
-                          final_notes = lvl_res.get("notes", "") # Use notes from the failed level if available
-                          failure_reason_found = True
-                          break
-                if not failure_reason_found: # If no level explicitly failed, check search results reason
-                     if search_classification and search_classification.get("classification_not_possible", False):
-                           reason = search_classification.get("classification_not_possible_reason", "Search did not yield classification")
-                           final_notes = search_classification.get("notes", "")
-                     elif search_results_data.get("error"):
-                           reason = f"Search error: {search_results_data.get('error')}"
-                     # else 'Not fully classified' remains
+            # Extract search sources URL
+            search_sources_urls = ""
+            search_data = result.get("search_results", {})
+            if search_data and isinstance(search_data.get("sources"), list):
+                 search_sources_urls = ", ".join(
+                     source.get("url", "") for source in search_data["sources"] if isinstance(source, dict) and source.get("url")
+                 )
 
             row = {
-                "vendor_name": original_vendor_name, # Use the normalized name from the input data
-                # --- ADDED: Include original optional fields in output row ---
+                "vendor_name": original_vendor_name,
                 "vendor_address": original_address or "",
                 "vendor_website": original_website or "",
                 "internal_category": original_internal_cat or "",
                 "parent_company": original_parent_co or "",
                 "spend_category": original_spend_cat or "",
-                # --- END ADDED ---
-                # --- REMOVED: Optional_vendor_description ---
-                "Optional_example_good_serviced_purchased": original_example or "", # Keep existing optional fields
+                "Optional_example_good_serviced_purchased": original_example or "",
                 "level1_category_id": final_level1_id,
                 "level1_category_name": final_level1_name,
                 "level2_category_id": final_level2_id,
@@ -448,47 +405,47 @@ def generate_output_file(
                 "final_confidence": final_confidence,
                 "classification_not_possible": classification_not_possible_flag,
                 "classification_notes_or_reason": reason or final_notes or "", # Provide reason if failed, else notes
-                # Safely extract URLs from sources list (which should contain dicts)
-                "sources": ", ".join(
-                    source.get("url", "") for source in search_results_data.get("sources", []) if isinstance(source, dict) and source.get("url")
-                ) if isinstance(search_results_data.get("sources"), list) else ""
+                "classification_source": classification_source, # Indicate if search was used
+                "sources": search_sources_urls
             }
             output_data.append(row)
-            # --- End Safe Access ---
 
     if not output_data:
         logger.warning("No data rows generated for the output file.")
-        # Handle appropriately - maybe raise error or return indicator?
-        # For now, create an empty file.
-        # return "empty_output_generated.xlsx" # Or similar indicator
-
-    with LogTimer(logger, "Creating DataFrame for output"):
-        # --- MODIFIED: Define column order explicitly including new fields, excluding description ---
-        output_columns = [
-            "vendor_name",
-            "vendor_address",
-            "vendor_website",
-            "internal_category",
-            "parent_company",
-            "spend_category",
-            # --- REMOVED: Optional_vendor_description ---
-            "Optional_example_good_serviced_purchased",
-            "level1_category_id",
-            "level1_category_name",
-            "level2_category_id",
-            "level2_category_name",
-            "level3_category_id",
-            "level3_category_name",
-            "level4_category_id",
-            "level4_category_name",
-            "final_confidence",
-            "classification_not_possible",
-            "classification_notes_or_reason",
-            "sources"
-        ]
-        df = pd.DataFrame(output_data, columns=output_columns)
-        # --- End Define column order ---
-
+        # Create an empty file or handle as needed
+        df = pd.DataFrame(columns=[ # Define columns even for empty file
+            "vendor_name", "vendor_address", "vendor_website", "internal_category",
+            "parent_company", "spend_category", "Optional_example_good_serviced_purchased",
+            "level1_category_id", "level1_category_name", "level2_category_id", "level2_category_name",
+            "level3_category_id", "level3_category_name", "level4_category_id", "level4_category_name",
+            "final_confidence", "classification_not_possible", "classification_notes_or_reason",
+            "classification_source", "sources"
+        ])
+    else:
+        with LogTimer(logger, "Creating DataFrame for output"):
+            output_columns = [
+                "vendor_name",
+                "vendor_address",
+                "vendor_website",
+                "internal_category",
+                "parent_company",
+                "spend_category",
+                "Optional_example_good_serviced_purchased",
+                "level1_category_id",
+                "level1_category_name",
+                "level2_category_id",
+                "level2_category_name",
+                "level3_category_id",
+                "level3_category_name",
+                "level4_category_id",
+                "level4_category_name",
+                "final_confidence",
+                "classification_not_possible",
+                "classification_notes_or_reason",
+                "classification_source", # Added column
+                "sources"
+            ]
+            df = pd.DataFrame(output_data, columns=output_columns)
 
     output_dir = os.path.join(settings.OUTPUT_DATA_DIR, job_id)
     try:
@@ -498,14 +455,12 @@ def generate_output_file(
         logger.error(f"Failed to create output directory", exc_info=True, extra={"directory": output_dir})
         raise IOError(f"Could not create output directory for job {job_id}: {e}")
 
-    # Generate a unique-ish but potentially more readable filename
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file_name = f"classification_results_{job_id[:8]}_{timestamp_str}.xlsx"
     output_path = os.path.join(output_dir, output_file_name)
 
     with LogTimer(logger, "Writing Excel file"):
         try:
-            # Use XlsxWriter for potentially better handling of large files/formatting
             df.to_excel(output_path, index=False, engine='xlsxwriter')
         except Exception as e:
             logger.error("Failed to write output Excel file", exc_info=True, extra={"output_path": output_path})
@@ -518,4 +473,4 @@ def generate_output_file(
     except OSError as e:
          logger.warning(f"Could not get size of generated output file", exc_info=False, extra={"output_path": output_path, "error": str(e)})
 
-    return output_file_name # Return only the filename, not the full path
+    return output_file_name # Return only the filename

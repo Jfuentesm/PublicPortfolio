@@ -93,7 +93,7 @@ def get_files_recursively(directory):
                 '.zip', '.gz', '.tar', '.rar',
                 '.exe', '.dll', '.so', '.o', '.a', '.lib',
                 '.pyc', '.pyd', '.pyo',
-                '.swp', '.swo' # Vim swap files
+                '.swp', '.swo', '.json' # Vim swap files
                 ]
             if item.suffix.lower() in excluded_suffixes:
                 continue

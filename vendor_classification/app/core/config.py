@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     OPENROUTER_MODEL: str = "deepseek/deepseek-chat-v3-0324:free"  # Default model to use
     
     # Tavily Search API - HARDCODED API KEY FOR TESTING
-    TAVILY_API_KEY: str = "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"
+    TAVILY_API_KEY: str = "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" #"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"
     
     # Processing Configuration
     BATCH_SIZE: int = 5
