@@ -27,6 +27,12 @@
     "env.d.ts", // Include environment types
     "vite.config.ts" // Include Vite config for better editor support
   ],
-  "exclude": ["node_modules", "dist"], // Exclude build output and dependencies
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/components/HelloWorld.vue", // Exclude unused template file
+    "src/components/TheWelcome.vue", // Exclude unused template file
+    "src/components/WelcomeItem.vue" // Exclude unused template file
+  ], // Exclude build output and dependencies
   "references": [{ "path": "./tsconfig.node.json" }]
 }

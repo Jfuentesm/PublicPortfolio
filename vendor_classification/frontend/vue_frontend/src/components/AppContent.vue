@@ -1,35 +1,44 @@
 <template>
-  <div>
-    <div class="row">
-      <!-- Adjust column layout as needed -->
-      <div class="col-lg-6 col-md-8 offset-lg-3 offset-md-2">
-          <!-- Upload Form -->
-          <UploadForm @upload-successful="handleUploadSuccess" />
+  <div class="space-y-8 md:space-y-12"> <!-- Adds vertical space between children -->
+      <!-- Upload Form Section -->
+      <section aria-labelledby="upload-heading">
+          <div class="max-w-2xl mx-auto">
+              <h2 id="upload-heading" class="sr-only">Upload Vendor File</h2> <!-- Screen reader heading -->
+              <UploadForm @upload-successful="handleUploadSuccess" />
+          </div>
+      </section>
+
+       <!-- Job Status Section -->
+      <section aria-labelledby="status-heading" v-if="jobStore.currentJobId">
+          <div class="max-w-4xl mx-auto">
+              <h2 id="status-heading" class="sr-only">Job Status and Results</h2> <!-- Screen reader heading -->
+              <JobStatus :key="jobStore.currentJobId" />
+              <!-- key forces re-render if job ID changes -->
+          </div>
+      </section>
+
+      <!-- Placeholder if no job active and logged in -->
+      <div v-else class="text-center py-16 text-gray-500 bg-white rounded-lg shadow border border-gray-200">
+          <p class="text-lg mb-2">No active job.</p>
+          <p>Upload a file above to start the classification process.</p>
       </div>
-    </div>
-     <div class="row mt-4">
-       <div class="col-lg-8 col-md-10 offset-lg-2 offset-md-1">
-           <!-- Job Status (conditionally rendered based on jobStore) -->
-          <JobStatus v-if="jobStore.currentJobId" :key="jobStore.currentJobId" />
-          <!-- key forces re-render if job ID changes -->
-       </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import UploadForm from './UploadForm.vue';
 import JobStatus from './JobStatus.vue';
-import { useJobStore } from '@/stores/job'; // Adjust path
+import { useJobStore } from '@/stores/job';
 
 const jobStore = useJobStore();
 
 const handleUploadSuccess = (jobId: string) => {
   console.log(`AppContent: Received upload-successful event for job ${jobId}`);
-  jobStore.setCurrentJobId(jobId); // Update the store, JobStatus will react
+  // The job store watcher will handle UI updates
+  jobStore.setCurrentJobId(jobId);
 };
 </script>
 
 <style scoped>
-/* Add spacing or specific layout styles for the logged-in view */
+/* No scoped styles needed */
 </style>

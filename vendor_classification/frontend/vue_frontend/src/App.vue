@@ -1,17 +1,17 @@
 <template>
-  <div id="vue-app-wrapper">
+  <!-- Basic wrapper, background set in styles.css/body -->
+  <div class="flex flex-col min-h-screen">
     <Navbar :is-logged-in="authStore.isAuthenticated" :username="authStore.username" @logout="handleLogout" />
 
-    <!-- Use container-fluid for full width sections like Hero, standard container for content -->
-    <main role="main" class="flex-shrink-0">
-      <!-- Show Landing/Login page if not authenticated -->
+    <!-- main content area that grows -->
+    <main role="main" class="flex-grow w-full mx-auto">
+      <!-- LandingPage takes full width for its sections -->
       <LandingPage v-if="!authStore.isAuthenticated" @login-successful="handleLoginSuccess" />
 
-      <!-- Show main application content (Upload, Status) if authenticated -->
-      <!-- Wrap AppContent in a standard container for centered content -->
-      <div class="container" v-else>
+      <!-- AppContent is wrapped in a standard container for logged-in state -->
+       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" v-else>
           <AppContent />
-      </div>
+       </div>
     </main>
 
     <Footer />
@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-// ... (script content remains the same as previous version) ...
+// ... script content remains the same ...
 import { onMounted } from 'vue';
 import Navbar from './components/Navbar.vue';
 import LandingPage from './components/LandingPage.vue';
@@ -62,16 +62,3 @@ onMounted(() => {
   }
 });
 </script>
-
-<style>
-#vue-app-wrapper {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-/* main role="main" is used for semantic structure */
-main.flex-shrink-0 {
-  flex: 1 0 auto; /* Allows main content to grow and push footer */
-  padding-bottom: 3rem; /* Add some padding at the bottom */
-}
-</style>
