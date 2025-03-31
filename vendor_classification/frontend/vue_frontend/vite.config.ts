@@ -1,3 +1,5 @@
+// frontend/vue_frontend/vite.config.ts
+// No changes needed based on errors, assuming tsconfig.node.json is set up correctly
 import { fileURLToPath, URL } from 'node:url'
 
 import { defineConfig } from 'vite'

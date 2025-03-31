@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse # Keep JSONResponse for error handlin
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 # --- END MODIFIED IMPORTS ---
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List # <-- ADDED List
 import uuid
 import os
 from datetime import datetime, timedelta
@@ -30,6 +30,15 @@ from tasks.celery_app import celery_app
 from utils.taxonomy_loader import load_taxonomy
 
 from fastapi.security import OAuth2PasswordRequestForm
+
+# --- ADDED: Import the new jobs router ---
+from api import jobs as jobs_router
+# --- END ADDED ---
+
+# --- Schema Imports (Optional but good practice) ---
+from schemas.job import JobResponse # Import the response schema
+# --- End Schema Imports ---
+
 
 # Configure logging using the setup function, then get the specific logger
 setup_logging_done = False # Flag to prevent re-setup during reloads
@@ -308,15 +317,21 @@ async def upload_file(
              if error_db_unexpected: error_db_unexpected.close(); logger.debug("Upload Unexpected Error: Error handling DB session closed.")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred during upload.")
 
-
-@app.get("/api/v1/jobs/{job_id}", response_model=Dict[str, Any])
+# --- UPDATED: Changed response_model to JobResponse ---
+@app.get("/api/v1/jobs/{job_id}", response_model=JobResponse)
 async def get_job_status(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    # ... (endpoint implementation remains the same) ...
+    # ... (endpoint implementation remains the same, but ensure it returns fields matching JobResponse) ...
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     logger.info(f"Job status requested", extra={"username": current_user.username if current_user else "unknown"})
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
+
+    # Check ownership (or admin status) - important for security
+    if job.created_by != current_user.username: # and not current_user.is_superuser:
+        logger.warning("User attempted to access job they do not own", extra={"job_owner": job.created_by})
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this job")
+
 
     estimated_completion_iso = None
     if job.status == JobStatus.PROCESSING.value and job.progress > 0 and job.progress < 1.0 and job.created_at:
@@ -336,7 +351,16 @@ async def get_job_status(job_id: str, current_user: User = Depends(get_current_u
     elif job.status == JobStatus.COMPLETED.value and job.completed_at: estimated_completion_iso = job.completed_at.isoformat()
 
     logger.info(f"Job status retrieved", extra={ "status": job.status, "progress": job.progress, "stage": job.current_stage})
-    return { "job_id": job.id, "status": job.status, "progress": job.progress, "current_stage": job.current_stage, "created_at": job.created_at.isoformat() if job.created_at else None, "updated_at": job.updated_at.isoformat() if job.updated_at else None, "estimated_completion": estimated_completion_iso, "error_message": job.error_message }
+
+    # Construct the response using the JobResponse schema
+    # Pydantic v2 handles this automatically with from_attributes=True
+    # For Pydantic v1, you might need JobResponse.from_orm(job)
+    response_data = JobResponse.model_validate(job) # Pydantic v2
+    # Add estimated_completion separately if not part of the base model
+    # response_data.estimated_completion = estimated_completion_iso # Example if needed
+
+    # Return the validated schema object
+    return response_data
 
 
 @app.get("/api/v1/jobs/{job_id}/download")
@@ -347,6 +371,12 @@ async def download_results(job_id: str, current_user: User = Depends(get_current
     logger.info(f"Results download requested", extra={"username": current_user.username if current_user else "unknown"})
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
+
+    # Check ownership
+    if job.created_by != current_user.username: # and not current_user.is_superuser:
+        logger.warning("User attempted to download results for job they do not own", extra={"job_owner": job.created_by})
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to download results for this job")
+
     if job.status == JobStatus.FAILED.value: raise HTTPException(status_code=400, detail=f"Job failed: {job.error_message}")
     if job.status != JobStatus.COMPLETED.value: raise HTTPException(status_code=400, detail="Job processing has not completed yet")
     if not job.output_file_name: raise HTTPException(status_code=404, detail="Output file name not recorded for this job.")
@@ -365,7 +395,7 @@ async def download_results(job_id: str, current_user: User = Depends(get_current
 
 @app.post("/api/v1/jobs/{job_id}/notify", response_model=Dict[str, Any])
 async def request_notification(job_id: str, email_payload: Dict[str, str], current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    # ... (endpoint implementation remains the same) ...
+    # ... (endpoint implementation remains the same, add ownership check) ...
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     email = email_payload.get("email")
@@ -373,6 +403,12 @@ async def request_notification(job_id: str, email_payload: Dict[str, str], curre
     logger.info(f"Notification requested", extra={"username": current_user.username if current_user else "unknown", "email": email})
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
+
+    # Check ownership
+    if job.created_by != current_user.username: # and not current_user.is_superuser:
+        logger.warning("User attempted to set notification for job they do not own", extra={"job_owner": job.created_by})
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to set notification for this job")
+
     if "@" not in email or "." not in email.split('@')[-1]: raise HTTPException(status_code=400, detail="Invalid email address format provided.")
     job.notification_email = email
     try:
@@ -385,12 +421,18 @@ async def request_notification(job_id: str, email_payload: Dict[str, str], curre
 
 @app.get("/api/v1/jobs/{job_id}/stats", response_model=Dict[str, Any])
 async def get_job_stats(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    # ... (endpoint implementation remains the same) ...
+    # ... (endpoint implementation remains the same, add ownership check) ...
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     logger.info(f"Job stats requested", extra={"username": current_user.username if current_user else "unknown"})
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
+
+    # Check ownership
+    if job.created_by != current_user.username: # and not current_user.is_superuser:
+        logger.warning("User attempted to get stats for job they do not own", extra={"job_owner": job.created_by})
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access stats for this job")
+
     if not isinstance(job.stats, dict):
          logger.warning(f"Job stats data is not a dictionary or is missing", extra={"stats_type": type(job.stats)})
          return { "vendors_processed": 0, "unique_vendors": 0, "api_calls": 0, "tokens_used": 0, "tavily_searches": 0, "processing_time": 0, "invalid_category_errors": 0, "successfully_classified_l4": 0, "search_successful_classifications": 0 }
@@ -441,6 +483,16 @@ async def login_for_access_token(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during the login process."
         )
+
+# --- ADDED: Include the jobs router ---
+app.include_router(
+    jobs_router.router,
+    prefix=settings.API_V1_STR + "/jobs",
+    tags=["jobs"],
+    dependencies=[Depends(get_current_user)] # Apply auth dependency to all job history routes
+)
+# --- END ADDED ---
+
 
 # --- Startup Event (Keep as is) ---
 @app.on_event("startup")

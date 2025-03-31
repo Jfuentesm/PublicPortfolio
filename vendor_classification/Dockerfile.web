@@ -1,103 +1,119 @@
 # --- Stage 1: Build Frontend ---
-  FROM node:18-alpine AS builder
+# Using standard Debian-based image
+FROM node:18 AS builder
 
-  WORKDIR /frontend
-  
-  # Log contents of the context's frontend directories before attempting COPY
-  RUN echo ">>> [Builder Stage 1] Listing context contents:"
-  RUN echo ">>> [Builder Stage 1] Context Root:" && ls -la ../ || echo "Cannot list context root"
-  RUN echo ">>> [Builder Stage 1] Context 'frontend/':" && ls -la ../frontend/ || echo ">>> [Builder Stage 1] INFO: ../frontend/ not found or empty"
-  RUN echo ">>> [Builder Stage 1] Context 'frontend/vue_frontend/':" && ls -la ../frontend/vue_frontend/ || echo ">>> [Builder Stage 1] INFO: ../frontend/vue_frontend/ not found or empty"
-  
-  # Copy package manifests
-  COPY frontend/vue_frontend/package.json frontend/vue_frontend/package-lock.json* ./
-  # If using yarn:
-  # COPY frontend/vue_frontend/package.json frontend/vue_frontend/yarn.lock ./
-  
-  # Install dependencies
-  RUN echo ">>> [Builder Stage 1] Running npm install..." && \
-      npm install || { echo ">>> [Builder Stage 1] ERROR: npm install failed!"; exit 1; }
-  RUN echo ">>> [Builder Stage 1] npm install completed."
-  
-  # Copy the rest of the frontend source code
-  COPY frontend/vue_frontend/ ./
-  
-  # --- ADDED LOGGING ---
-  # Verify the structure inside the container *before* running the build
-  RUN echo ">>> [Builder Stage 1] Listing WORKDIR (/frontend) contents BEFORE build:" && ls -la
-  RUN echo ">>> [Builder Stage 1] Checking for src/main.ts:" && ls -l src/main.ts || echo ">>> [Builder Stage 1] WARNING: src/main.ts not found!"
-  RUN echo ">>> [Builder Stage 1] Checking for vite.config.ts:" && ls -l vite.config.ts || echo ">>> [Builder Stage 1] WARNING: vite.config.ts not found!"
-  # --- END ADDED LOGGING ---
-  
-  # Build the Vue application
-  # Ensure 'build' script is defined in your frontend/vue_frontend/package.json
-  RUN echo ">>> [Builder Stage 1] Running npm run build..." && \
-      npm run build || { echo ">>> [Builder Stage 1] ERROR: npm run build failed!"; exit 1; }
-  RUN echo ">>> [Builder Stage 1] npm run build completed."
-  
-  # --- ADDED LOGGING ---
-  # Verify the output of the build - THIS IS CRITICAL
-  RUN echo ">>> [Builder Stage 1] Listing contents of /frontend/dist AFTER build:" && \
-      ls -lA dist/ || { echo ">>> [Builder Stage 1] ERROR: /frontend/dist directory NOT FOUND or empty after build!"; exit 1; }
-  RUN echo ">>> [Builder Stage 1] Checking for index.html in dist:" && \
-      ls -l dist/index.html || { echo ">>> [Builder Stage 1] ERROR: dist/index.html NOT FOUND after build!"; exit 1; }
-  # --- END ADDED LOGGING ---
-  
-  
-  # --- Stage 2: Final Python Application ---
-  FROM python:3.11-slim
-  
-  WORKDIR /app
-  
-  # Install system dependencies (same as before)
-  RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential \
-      net-tools \
-      curl \
-      procps \
-      && rm -rf /var/lib/apt/lists/*
-  
-  # Create directories for data
-  RUN mkdir -p /data/input /data/output /data/taxonomy /data/logs
-  
-  # Install Python dependencies
-  COPY requirements.txt .
-  # Consider adding --verbose to pip install for more detail if needed
-  RUN pip install --no-cache-dir numpy==1.24.4
-  RUN pip install --no-cache-dir -r requirements.txt
-  
-  # Copy application code (backend only)
-  COPY ./app /app
-  
-  # Copy Built Frontend from Builder Stage
-  RUN echo ">>> [Final Stage 2] Copying built frontend from builder stage (/frontend/dist) to /app/frontend/dist..."
-  COPY --from=builder /frontend/dist /app/frontend/dist
-  # --- ADDED LOGGING ---
-  # Verify the copy - THIS IS CRITICAL
-  RUN echo ">>> [Final Stage 2] Listing contents of /app/frontend/dist AFTER COPY:" && \
-      ls -lA /app/frontend/dist || { echo ">>> [Final Stage 2] ERROR: /app/frontend/dist directory NOT FOUND or empty after copy!"; exit 1; }
-  RUN echo ">>> [Final Stage 2] Checking for index.html in /app/frontend/dist:" && \
-      ls -l /app/frontend/dist/index.html || { echo ">>> [Final Stage 2] ERROR: /app/frontend/dist/index.html NOT FOUND after copy!"; exit 1; }
-  # --- END ADDED LOGGING ---
-  
-  # Set environment variables
-  ENV PYTHONPATH=/app
-  ENV PYTHONUNBUFFERED=1
-  
-  # Expose port
-  EXPOSE 8000
-  
-  # Diagnostic output (remains useful)
-  RUN echo ">>> [Final Stage 2] Python version:" && python --version
-  RUN echo ">>> [Final Stage 2] Checking Python app directory contents (/app):" && ls -la /app || echo "App directory not found"
-  
-  # Add a healthcheck
-  HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-  
-  # Run the application
-  CMD ["sh", "-c", "echo '>>> [CMD Start] Starting web server...' && \
-                    echo '>>> [CMD Start] Final check of /app/frontend/dist:' && \
-                    ls -lA /app/frontend/dist && \
-                    echo '>>> [CMD Start] Running Uvicorn...' && \
-                    uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug"]
+WORKDIR /frontend
+
+# Log contents of the context's frontend directories before attempting COPY
+RUN echo ">>> [Builder Stage 1] Listing context contents:"
+RUN echo ">>> [Builder Stage 1] Context Root:" && ls -la ../ || echo "Cannot list context root"
+RUN echo ">>> [Builder Stage 1] Context 'frontend/':" && ls -la ../frontend/ || echo ">>> [Builder Stage 1] INFO: ../frontend/ not found or empty"
+RUN echo ">>> [Builder Stage 1] Context 'frontend/vue_frontend/':" && ls -la ../frontend/vue_frontend/ || echo ">>> [Builder Stage 1] INFO: ../frontend/vue_frontend/ not found or empty"
+
+# Copy package manifests first
+COPY frontend/vue_frontend/package.json frontend/vue_frontend/package-lock.json* ./
+
+# Clean cache and update npm
+RUN echo ">>> [Builder Stage 1] Cleaning npm cache..." && \
+    npm cache clean --force || echo ">>> [Builder Stage 1] WARNING: npm cache clean failed, continuing..."
+# RUN echo ">>> [Builder Stage 1] Updating npm..." && \
+#     npm install -g npm@latest || echo ">>> [Builder Stage 1] WARNING: Failed to update npm, continuing with default version..."
+# RUN echo ">>> [Builder Stage 1] Current npm version:" && npm --version
+
+# Install dependencies using the manifests copied earlier
+# Keep --no-optional here, but we'll add the specific one later
+RUN echo ">>> [Builder Stage 1] Running npm install --no-optional..." && \
+    npm install --no-optional || { echo ">>> [Builder Stage 1] ERROR: npm install failed!"; exit 1; }
+RUN echo ">>> [Builder Stage 1] npm install completed."
+
+# Copy the rest of the frontend source code
+COPY frontend/vue_frontend/ ./
+
+# --- MODIFIED: Explicitly install the required optional Rollup binary ---
+# Determine the target architecture (this assumes linux/arm64 based on the error)
+# If building on a different host, Docker buildx might need platform flags
+RUN echo ">>> [Builder Stage 1] Explicitly installing @rollup/rollup-linux-arm64-gnu..." && \
+    npm install --no-save @rollup/rollup-linux-arm64-gnu || \
+    { echo ">>> [Builder Stage 1] WARNING: Failed to explicitly install optional dependency, build might still fail."; }
+# --- END MODIFIED ---
+
+
+# --- ADDED LOGGING ---
+# Verify the structure inside the container *before* running the build
+RUN echo ">>> [Builder Stage 1] Listing WORKDIR (/frontend) contents BEFORE build:" && ls -la node_modules/@rollup || echo "Cannot list node_modules/@rollup"
+RUN echo ">>> [Builder Stage 1] Checking for src/main.ts:" && ls -l src/main.ts || echo ">>> [Builder Stage 1] WARNING: src/main.ts not found!"
+RUN echo ">>> [Builder Stage 1] Checking for vite.config.ts:" && ls -l vite.config.ts || echo ">>> [Builder Stage 1] WARNING: vite.config.ts not found!"
+# --- END ADDED LOGGING ---
+
+# Build the Vue application
+# Ensure 'build' script is defined in your frontend/vue_frontend/package.json
+RUN echo ">>> [Builder Stage 1] Running npm run build..." && \
+    npm run build || { echo ">>> [Builder Stage 1] ERROR: npm run build failed!"; exit 1; }
+RUN echo ">>> [Builder Stage 1] npm run build completed."
+
+# --- ADDED LOGGING ---
+# Verify the output of the build - THIS IS CRITICAL
+RUN echo ">>> [Builder Stage 1] Listing contents of /frontend/dist AFTER build:" && \
+    ls -lA dist/ || { echo ">>> [Builder Stage 1] ERROR: /frontend/dist directory NOT FOUND or empty after build!"; exit 1; }
+RUN echo ">>> [Builder Stage 1] Checking for index.html in dist:" && \
+    ls -l dist/index.html || { echo ">>> [Builder Stage 1] ERROR: dist/index.html NOT FOUND after build!"; exit 1; }
+# --- END ADDED LOGGING ---
+
+
+# --- Stage 2: Final Python Application ---
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies (same as before)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    net-tools \
+    curl \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create directories for data
+RUN mkdir -p /data/input /data/output /data/taxonomy /data/logs
+
+# Install Python dependencies
+COPY requirements.txt .
+# Consider adding --verbose to pip install for more detail if needed
+RUN pip install --no-cache-dir numpy==1.24.4
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code (backend only)
+COPY ./app /app
+
+# Copy Built Frontend from Builder Stage
+RUN echo ">>> [Final Stage 2] Copying built frontend from builder stage (/frontend/dist) to /app/frontend/dist..."
+COPY --from=builder /frontend/dist /app/frontend/dist
+# --- ADDED LOGGING ---
+# Verify the copy - THIS IS CRITICAL
+RUN echo ">>> [Final Stage 2] Listing contents of /app/frontend/dist AFTER COPY:" && \
+    ls -lA /app/frontend/dist || { echo ">>> [Final Stage 2] ERROR: /app/frontend/dist directory NOT FOUND or empty after copy!"; exit 1; }
+RUN echo ">>> [Final Stage 2] Checking for index.html in /app/frontend/dist:" && \
+    ls -l /app/frontend/dist/index.html || { echo ">>> [Final Stage 2] ERROR: /app/frontend/dist/index.html NOT FOUND after copy!"; exit 1; }
+# --- END ADDED LOGGING ---
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Expose port
+EXPOSE 8000
+
+# Diagnostic output (remains useful)
+RUN echo ">>> [Final Stage 2] Python version:" && python --version
+RUN echo ">>> [Final Stage 2] Checking Python app directory contents (/app):" && ls -la /app || echo "App directory not found"
+
+# Add a healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# Run the application
+CMD ["sh", "-c", "echo '>>> [CMD Start] Starting web server...' && \
+                  echo '>>> [CMD Start] Final check of /app/frontend/dist:' && \
+                  ls -lA /app/frontend/dist && \
+                  echo '>>> [CMD Start] Running Uvicorn...' && \
+                  uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug"]

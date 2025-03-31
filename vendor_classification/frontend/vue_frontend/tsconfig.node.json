@@ -1,15 +1,13 @@
 // frontend/vue_frontend/tsconfig.node.json
 {
   "compilerOptions": {
-    "composite": true,
-    "skipLibCheck": true,
+    "composite": true, // Required for project references
     "module": "ESNext",
-    "moduleResolution": "Bundler", // Match tsconfig.json
+    "moduleResolution": "Bundler", // Or NodeNext
     "allowSyntheticDefaultImports": true,
-    "strict": true // Enable strict checks for config files too
+    "esModuleInterop": true,
+    "strict": true,
+    "types": ["node"] // Crucial for finding 'node:url' etc.
   },
-  "include": [
-    "vite.config.ts" // Specify which Node-specific files this config applies to
-    // Add other Node-specific TS files here if any (e.g., scripts)
-  ]
+  "include": ["vite.config.ts", "postcss.config.js", "tailwind.config.js"] // Include config files
 }

@@ -34,7 +34,8 @@
               </p>
               <p class="flex justify-between">
                   <strong class="text-gray-600 font-medium">Invalid Category Errors:</strong>
-                  <span :class="stats.invalid_category_errors > 0 ? 'text-red-600 font-semibold' : 'text-gray-800 font-semibold'">
+                  <!-- Safely check for null before comparing -->
+                  <span :class="(stats.invalid_category_errors ?? 0) > 0 ? 'text-red-600 font-semibold' : 'text-gray-800 font-semibold'">
                       {{ stats.invalid_category_errors?.toLocaleString() ?? 'N/A' }}
                   </span>
               </p>
@@ -63,50 +64,99 @@
     </div>
   </template>
 
-  <script setup lang="ts">
-  // Script remains the same
-  import { ref, onMounted, watch, computed } from 'vue';
-  import apiService from '@/services/api';
+<script setup lang="ts">
+import { ref, onMounted, watch, computed } from 'vue';
+import apiService from '@/services/api';
 
-  interface JobStatsData {
-      vendors_processed: number | null; unique_vendors: number | null; api_calls: number | null;
-      tokens_used: number | null; tavily_searches: number | null; processing_time: number | null;
-      successfully_classified_l4: number | null; search_successful_classifications: number | null;
-      invalid_category_errors: number | null;
+// Define the structure for the stats data received from the API
+interface JobStatsData {
+    vendors_processed: number | null;
+    unique_vendors: number | null;
+    api_calls: number | null; // LLM API calls
+    tokens_used: number | null; // LLM tokens
+    tavily_searches: number | null; // Search API calls
+    processing_time: number | null; // In seconds
+    successfully_classified_l4: number | null; // Vendors reaching L4
+    search_successful_classifications: number | null; // Vendors classified via search (L4)
+    invalid_category_errors: number | null; // Count of invalid category IDs from LLM
+}
+
+// Define the component props
+interface Props {
+    jobId: string | null | undefined; // Allow jobId to be potentially null or undefined
+}
+const props = defineProps<Props>();
+
+// Reactive state variables
+const stats = ref<JobStatsData | null>(null);
+const isLoading = ref(false);
+const error = ref<string | null>(null);
+
+// Computed property to format processing time nicely
+const formattedTime = computed(() => {
+    if (stats.value?.processing_time == null) return 'N/A'; // Check for null or undefined
+    const seconds = stats.value.processing_time;
+    if (seconds < 0) return 'N/A'; // Handle potential negative values if they occur
+    if (seconds < 1) return `${(seconds * 1000).toFixed(0)} ms`;
+    if (seconds < 60) return `${seconds.toFixed(1)} seconds`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = (seconds % 60).toFixed(0);
+    return `${minutes} min ${remainingSeconds} sec`;
+});
+
+/**
+ * Fetches job statistics from the API for the given job ID.
+ * @param {string | null | undefined} id - The job ID to fetch stats for.
+ */
+const fetchStats = async (id: string | null | undefined) => {
+  // Only proceed if id is a non-empty string
+  if (!id) {
+      console.log("JobStats: fetchStats called with no ID, skipping."); // Logging
+      stats.value = null; // Clear previous stats if ID is null/undefined
+      error.value = null;
+      isLoading.value = false;
+      return;
   }
-  interface Props { jobId: string; }
-  const props = defineProps<Props>();
-  const stats = ref<JobStatsData | null>(null);
-  const isLoading = ref(false);
-  const error = ref<string | null>(null);
 
-  const formattedTime = computed(() => {
-      if (stats.value?.processing_time == null) return 'N/A';
-      const seconds = stats.value.processing_time;
-      if (seconds < 1) return `${(seconds * 1000).toFixed(0)} ms`;
-      if (seconds < 60) return `${seconds.toFixed(1)} seconds`;
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = (seconds % 60).toFixed(0);
-      return `${minutes} min ${remainingSeconds} sec`;
-  });
+  isLoading.value = true;
+  error.value = null;
+  // Don't clear stats immediately, only on successful fetch or error
+  // stats.value = null;
 
-  const fetchStats = async (id: string) => {
-    if (!id) return;
-    isLoading.value = true; error.value = null; stats.value = null;
-    try { stats.value = await apiService.getJobStats(id); }
-    catch (err: any) { error.value = err.message || 'Failed.'; }
-    finally { isLoading.value = false; }
-  };
+  try {
+      console.log(`JobStats: Fetching stats for job ID: ${id}`); // Logging
+      stats.value = await apiService.getJobStats(id);
+      console.log(`JobStats: Received stats:`, JSON.parse(JSON.stringify(stats.value))); // Log a deep copy
+  } catch (err: any) {
+      console.error(`JobStats: Error fetching stats for ${id}:`, err); // Logging
+      error.value = err.message || 'Failed to load statistics.';
+      stats.value = null; // Clear stats on error
+  } finally {
+      isLoading.value = false;
+  }
+};
 
-  onMounted(() => fetchStats(props.jobId));
-  watch(() => props.jobId, (newJobId) => {
-      if (newJobId) fetchStats(newJobId);
-      else { stats.value = null; error.value = null; isLoading.value = false; }
-  });
-  </script>
+// Fetch stats when the component mounts
+onMounted(() => {
+    console.log(`JobStats: Mounted with initial jobId: ${props.jobId}`); // Logging
+    fetchStats(props.jobId);
+});
 
-  <style scoped>
+// Watch for changes in the jobId prop and refetch stats
+watch(() => props.jobId,
+  // --- CORRECTED: Added type annotation for newJobId ---
+  (newJobId: string | null | undefined) => {
+  // --- END CORRECTION ---
+    console.log(`JobStats: Watched jobId changed to: ${newJobId}`); // Logging
+    fetchStats(newJobId); // fetchStats handles null/undefined check internally
+  },
+  { immediate: false } // Don't run immediately, onMounted handles initial fetch
+);
+</script>
+
+<style scoped>
   .shadow-inner {
       box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
   }
-  </style>
+  /* Add any other specific styles if needed */
+</style>
