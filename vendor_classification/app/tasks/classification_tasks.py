@@ -164,7 +164,10 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
         job.status = JobStatus.PROCESSING.value
         job.current_stage = ProcessingStage.INGESTION.value
         job.progress = 0.05 # Start progress slightly lower
+        # --- ADDED COMMIT ---
+        logger.info(f"[_process_vendor_file_async] Committing initial status update: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
+        # --- END ADDED ---
         logger.info(f"Job status updated",
                    extra={"status": job.status, "stage": job.current_stage, "progress": job.progress})
 
@@ -176,7 +179,10 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
 
         job.current_stage = ProcessingStage.NORMALIZATION.value
         job.progress = 0.1
+        # --- ADDED COMMIT ---
+        logger.info(f"[_process_vendor_file_async] Committing status update: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
+        # --- END ADDED ---
         logger.info(f"Job status updated",
                    extra={"stage": job.current_stage, "progress": job.progress})
 
@@ -213,7 +219,10 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
         # --- UPDATE STAGE AND PROGRESS ---
         job.current_stage = ProcessingStage.RESULT_GENERATION.value
         job.progress = 0.98 # Progress after all classification/search
+        # --- ADDED COMMIT ---
+        logger.info(f"[_process_vendor_file_async] Committing status update: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
+        # --- END ADDED ---
         logger.info(f"Job status updated",
                    extra={"stage": job.current_stage, "progress": job.progress})
         # --- END UPDATE ---
@@ -240,7 +249,10 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
 
         job.complete(output_file_name, stats)
         job.progress = 1.0 # Ensure progress is 1.0 on completion
+        # --- ADDED COMMIT ---
+        logger.info(f"[_process_vendor_file_async] Committing final job completion status.")
         db.commit()
+        # --- END ADDED ---
         logger.info(f"Job completed successfully",
                    extra={
                        "processing_duration": processing_duration,
@@ -258,7 +270,7 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
                     extra={"error": str(file_err)})
         if job:
             job.fail(f"File processing error: {str(file_err)}")
-            db.commit()
+            db.commit() # Commit the failure status
         else:
             logger.error("Job object was None during file error handling.")
     except Exception as async_err:
@@ -267,10 +279,10 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
         if job:
             if job.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
                 job.fail(f"Unexpected error: {str(async_err)}")
-                db.commit()
+                db.commit() # Commit the failure status
             else:
                 logger.warning(f"Unexpected error occurred but job status was already {job.status}. Error: {async_err}")
-                db.rollback()
+                db.rollback() # Rollback any pending changes if job was already terminal
         else:
             logger.error("Job object was None during unexpected error handling.")
     finally:
@@ -312,7 +324,10 @@ async def process_vendors(
         job.current_stage = getattr(ProcessingStage, f"CLASSIFICATION_L{level}").value
         # Adjust progress calculation: Spread 0.1 to 0.8 across 4 levels
         job.progress = min(0.8, 0.1 + ((level - 1) * 0.175))
+        # --- ADDED COMMIT ---
+        logger.info(f"[process_vendors] Committing status update before Level {level}: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
+        # --- END ADDED ---
         logger.info(f"===== Starting Initial Level {level} Classification =====",
                    extra={ "vendors_to_process": len(current_vendors_for_this_level), "progress": job.progress })
 
@@ -385,7 +400,10 @@ async def process_vendors(
                 # Spread progress for this level within its 0.175 range
                 job.progress = min(0.8, 0.1 + ((level - 1) * 0.175) + (0.175 * level_progress_fraction))
                 try:
+                    # --- ADDED COMMIT ---
+                    logger.info(f"[process_vendors] Committing progress update after batch {batch_counter_for_level}/{total_batches_for_level} (Level {level}): {job.progress:.3f}")
                     db.commit()
+                    # --- END ADDED ---
                 except Exception as db_err:
                      logger.error("Failed to commit progress update during batch processing", exc_info=True)
                      db.rollback()
@@ -428,7 +446,10 @@ async def process_vendors(
     if unknown_vendors_data_to_search:
         job.current_stage = ProcessingStage.SEARCH.value
         job.progress = 0.8 # Progress after initial classification attempts
+        # --- ADDED COMMIT ---
+        logger.info(f"[process_vendors] Committing status update before Search stage: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
+        # --- END ADDED ---
         logger.info(f"===== Starting Search and Recursive Classification for {stats['classification_not_possible_initial']} Unclassified Vendors =====")
 
         stats["search_attempts"] = len(unknown_vendors_data_to_search)
@@ -466,6 +487,9 @@ async def process_vendors(
                  logger.warning(f"Vendor '{vendor_name}' from search task not found in main results dict. Initializing.")
                  results[vendor_name] = {}
 
+            # Mark that search was attempted for this vendor
+            results[vendor_name]["search_attempted"] = True # Add flag
+
             if isinstance(result_or_exc, Exception):
                 logger.error(f"Error during search_and_classify_recursively for vendor {vendor_name}", exc_info=result_or_exc)
                 results[vendor_name]["search_results"] = {"error": f"Search/Recursive task error: {str(result_or_exc)}"}
@@ -486,6 +510,8 @@ async def process_vendors(
                 if l1_classification and not l1_classification.get("classification_not_possible", True):
                     successful_l1_searches += 1
                     logger.info(f"Vendor '{vendor_name}' classified via search (Level 1: {l1_classification.get('category_id')}).")
+                    results[vendor_name]["classified_via_search"] = True # Add flag
+
                     # Overwrite L1 only if initial L1 failed or didn't exist
                     if not results[vendor_name].get("level1") or results[vendor_name]["level1"].get("classification_not_possible", True):
                          results[vendor_name]["level1"] = l1_classification
@@ -530,7 +556,10 @@ async def process_vendors(
             search_progress_fraction = processed_search_count / len(unknown_vendors_data_to_search) if unknown_vendors_data_to_search else 1
             job.progress = min(0.98, 0.8 + (0.18 * search_progress_fraction))
             try:
+                # --- ADDED COMMIT ---
+                logger.info(f"[process_vendors] Committing progress update after search task {processed_search_count}/{len(unknown_vendors_data_to_search)}: {job.progress:.3f}")
                 db.commit()
+                # --- END ADDED ---
             except Exception as db_err:
                  logger.error("Failed to commit progress update during search processing", exc_info=True)
                  db.rollback()
@@ -548,9 +577,13 @@ async def process_vendors(
     else:
         logger.info("No unknown vendors required search.")
         job.progress = 0.98 # Set progress high if search wasn't needed
+        # --- ADDED COMMIT ---
+        logger.info(f"[process_vendors] Committing status update as search was skipped: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
+        # --- END ADDED ---
 
-
+# --- process_batch, search_and_classify_recursively, create_batches, group_by_parent_category remain the same as provided previously ---
+# (No changes needed in those functions based on the problem description)
 @log_function_call(logger, include_args=False) # Keep args=False
 async def process_batch(
     batch_data: List[Dict[str, Any]], # Pass list of dicts including optional fields
