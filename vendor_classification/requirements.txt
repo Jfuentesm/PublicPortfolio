@@ -1,8 +1,7 @@
 # Web Framework
 fastapi==0.103.1
 uvicorn==0.23.2
-pydantic==2.3.0
-pydantic-settings==2.0.3
+pydantic==2.8.1  # <-- UPGRADED from 2.3.0 to match pydantic-settings requirement
 python-multipart==0.0.6
 email-validator==2.0.0
 
@@ -38,3 +37,4 @@ pytest-asyncio==0.21.1
 python-dotenv==1.0.0
 tenacity==8.2.3
 loguru==0.7.0
+pydantic-settings==2.8.1 # Keep this newer version

@@ -6,35 +6,46 @@ services:
     ports:
       - "${WEB_PORT:-8001}:8000"
     volumes:
-      - ./app:/app
-      - ./frontend:/frontend
-      - ./data:/data
+      # - ./app:/app          # <-- REMOVE OR COMMENT OUT THIS LINE
+      - ./data:/data        # Keep this for persistent data
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/vendor_classification
       - REDIS_URL=redis://redis:6379/0
-      # API keys are hardcoded in config.py - no need to pass them as environment variables
+      # API keys are hardcoded in config.py
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy # Wait for DB to be healthy (requires HEALTHCHECK in db service)
+      redis:
+        condition: service_started # Wait for Redis to start
     networks:
       - app-network
+    # Add healthcheck for web service itself
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   worker:
     build:
       context: .
       dockerfile: Dockerfile.worker
     volumes:
-      - ./app:/app
+      # - ./app:/app # Consider removing this too if worker code doesn't need hot-reload
       - ./data:/data
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/vendor_classification
       - REDIS_URL=redis://redis:6379/0
-      # API keys are hardcoded in config.py - no need to pass them as environment variables
+      # API keys are hardcoded in config.py
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy # Wait for DB
+      redis:
+        condition: service_started # Wait for Redis
     networks:
       - app-network
+    # Consider adding a simple healthcheck if possible (e.g., celery status)
 
   db:
     image: postgres:14
@@ -45,9 +56,15 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=vendor_classification
     ports:
-      - "5433:5432"  # Changed to use port 5433 on the host
+      - "5433:5432"
     networks:
       - app-network
+    # Add healthcheck for the database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vendor_classification"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7
@@ -55,6 +72,12 @@ services:
       - "6379:6379"
     networks:
       - app-network
+    # Add healthcheck for Redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   app-network:

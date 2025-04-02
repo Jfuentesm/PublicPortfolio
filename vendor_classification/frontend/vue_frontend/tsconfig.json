@@ -1,0 +1,35 @@
+// frontend/vue_frontend/tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ESNext", // Target modern JavaScript
+    "useDefineForClassFields": true,
+    "module": "ESNext", // Use modern ES modules
+    "moduleResolution": "Bundler", // Recommended for Vite/modern setups (or NodeNext)
+    "strict": true, // Enable strict type checking (good practice)
+    "jsx": "preserve", // Preserve JSX for Vue
+    "importHelpers": true,
+    "isolatedModules": true, // Ensure files can be transpiled independently
+    "esModuleInterop": true, // Allows default imports from commonjs modules
+    "allowSyntheticDefaultImports": true, // Works with esModuleInterop
+    "sourceMap": true, // Generate source maps for debugging
+    "resolveJsonModule": true, // Allow importing JSON files
+    "baseUrl": ".", // Base directory for non-relative imports
+    "paths": {
+      "@/*": ["src/*"] // Alias for src directory
+    },
+    "lib": ["ESNext", "DOM", "DOM.Iterable"], // Include necessary JS/DOM libraries
+    "skipLibCheck": true, // Skip type checking of declaration files (speeds up build)
+    "noEmit": true, // vue-tsc handles emit, not tsc
+    "noUnusedLocals": true, // Warn on unused local variables
+    "noUnusedParameters": true, // Warn on unused parameters
+    "noFallthroughCasesInSwitch": true, // Check switch statements
+    // --- UPDATED/ADDED ---
+    "types": ["vite/client", "node"], // Add vite client types AND node types
+    "allowJs": true, // Allow JavaScript files to be compiled (useful if mixing JS/TS)
+    "checkJs": false // Don't type-check JS files by default
+    // --- END UPDATED/ADDED ---
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue", "vite.config.ts"],
+  "references": [{ "path": "./tsconfig.node.json" }], // Separate config for build-related files like vite.config.ts
+  "exclude": ["node_modules", "dist"] // Exclude node_modules and build output
+}

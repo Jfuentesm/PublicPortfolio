@@ -42,10 +42,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 "request_id": request_id,
                 "query_params": dict(request.query_params),
                 "path_params": request.path_params,
-                "headers": {
-                    k.lower(): v for k, v in request.headers.items()
-                    if k.lower() not in ("authorization", "cookie")
-                }
+                # --- MODIFIED: Log all headers, including Authorization ---
+                "headers": { k.lower(): v for k, v in request.headers.items() }
+                # --- END MODIFIED ---
             }
         )
         

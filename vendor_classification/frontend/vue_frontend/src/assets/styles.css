@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional: Add any global base styles here if needed */
+body {
+  @apply font-sans antialiased bg-light text-gray-800; /* Example base styles using tailwind */
+   padding-top: 4rem; /* Adjust for fixed navbar height */
+}

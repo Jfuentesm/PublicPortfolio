@@ -35,16 +35,16 @@ class Settings(BaseSettings):
     OUTPUT_DATA_DIR: str = "/data/output"
     TAXONOMY_DATA_DIR: str = "/data/taxonomy"
     
-    # Azure OpenAI - HARDCODED API KEYS FOR TESTING
-    AZURE_OPENAI_API_KEY: str = "KiYhgtCno1DsY8vkKqbN6m3zNCrs6ZaC"
-    AZURE_OPENAI_ENDPOINT: str = "https://DeepSeek-V3-muifm.eastus2.models.ai.azure.com/chat/completions"
-    AZURE_OPENAI_DEPLOYMENT: str = "DeepSeek-V3-muifm"
+    # OpenRouter - HARDCODED API KEY FOR TESTING
+    OPENROUTER_API_KEY: str = "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" # "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" 
+    OPENROUTER_API_BASE: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL: str = "deepseek/deepseek-chat-v3-0324:free"  # Default model to use
     
     # Tavily Search API - HARDCODED API KEY FOR TESTING
-    TAVILY_API_KEY: str = "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"
+    TAVILY_API_KEY: str = "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" #"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"
     
     # Processing Configuration
-    BATCH_SIZE: int = 10
+    BATCH_SIZE: int = 5
     MAX_RETRIES: int = 3
     RETRY_DELAY: int = 1  # seconds
     
@@ -55,10 +55,10 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         logger.info(f"Settings initialized with DATABASE_URL: {self.DATABASE_URL}")
-        logger.info(f"AZURE_OPENAI_DEPLOYMENT: {self.AZURE_OPENAI_DEPLOYMENT}")
+        logger.info(f"OPENROUTER_MODEL: {self.OPENROUTER_MODEL}")
         # Log if keys are present but not their actual values for security
-        logger.info(f"AZURE_OPENAI_API_KEY present: {bool(self.AZURE_OPENAI_API_KEY)}")
-        logger.info(f"AZURE_OPENAI_ENDPOINT present: {bool(self.AZURE_OPENAI_ENDPOINT)}")
+        logger.info(f"OPENROUTER_API_KEY present: {bool(self.OPENROUTER_API_KEY)}")
+        logger.info(f"OPENROUTER_API_BASE present: {bool(self.OPENROUTER_API_BASE)}")
         logger.info(f"TAVILY_API_KEY present: {bool(self.TAVILY_API_KEY)}")
 
 settings = Settings()
