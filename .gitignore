@@ -171,3 +171,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+#manual
+*/node_modules/
+vendor_classification/frontend/vue_frontend/node_modules/
+.DS_Store
+
