@@ -1,3 +1,4 @@
+# <file path='app/services/llm_service.py'>
 # app/services/llm_service.py
 import httpx
 import json
@@ -9,29 +10,21 @@ import uuid # <<< Added import
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from core.config import settings
-# --- MODIFIED IMPORT ---
-from models.taxonomy import Taxonomy, TaxonomyCategory # <<< Simplified import
+# --- MODIFIED IMPORT: Include L5 ---
+from models.taxonomy import Taxonomy, TaxonomyCategory, TaxonomyLevel1, TaxonomyLevel2, TaxonomyLevel3, TaxonomyLevel4, TaxonomyLevel5
 # --- END MODIFIED IMPORT ---
 from core.logging_config import get_logger, LogTimer, log_function_call, set_log_context, get_correlation_id # <-- Added get_correlation_id
 from utils.log_utils import log_api_request, log_method # <<< Ensure log_method is imported if used
 
 # Configure logger
 logger = get_logger("vendor_classification.llm_service")
-# --- ADDED LLM TRACE LOGGER ---
 llm_trace_logger = logging.getLogger("llm_api_trace") # ENSURE NAME CONSISTENT
-# --- END ADDED LLM TRACE LOGGER ---
 
 
 # --- Helper function for JSON parsing (No changes needed here) ---
 def _extract_json_from_response(response_content: str) -> Optional[Dict[str, Any]]:
     """
     Attempts to extract a JSON object from a string, handling common LLM response issues.
-
-    Args:
-        response_content: The raw string response from the LLM.
-
-    Returns:
-        A dictionary if JSON is successfully parsed, None otherwise.
     """
     if not response_content:
         logger.warning("Attempted to parse empty response content.")
@@ -50,7 +43,6 @@ def _extract_json_from_response(response_content: str) -> Optional[Dict[str, Any
         end_index = content.rfind('}')
         if start_index != -1 and end_index != -1 and end_index > start_index:
             potential_json = content[start_index:end_index+1]
-            # Basic brace matching check
             if potential_json.count('{') == potential_json.count('}'):
                  content = potential_json
                  logger.debug("Extracted potential JSON content based on first '{' and last '}'.")
@@ -264,7 +256,7 @@ class LLMService:
         """
         Process search results to determine **Level 1** classification only.
         This function is intended for the *initial* classification attempt after search.
-        Recursive L2-L4 calls should use classify_batch with the search context.
+        Recursive L2-L5 calls should use classify_batch with the search context.
         """
         vendor_name = vendor_data.get('vendor_name', 'UnknownVendor')
         logger.info(f"Processing search results for initial L1 classification",
@@ -391,7 +383,7 @@ class LLMService:
         search_context: Optional[Dict[str, Any]] = None # ADDED: Optional search context
     ) -> str:
         """
-        Create an appropriate prompt for the current classification level,
+        Create an appropriate prompt for the current classification level (1-5),
         optionally including search context for post-search classification.
         """
         context_type = "Search Context" if search_context else "Initial Data"
@@ -422,7 +414,8 @@ class LLMService:
 
         # --- Build Search Context Section (NEW) ---
         search_context_xml = ""
-        if search_context and level > 1: # Only include search context for L2-L4 post-search
+        # Include search context only for L2-L5 post-search attempts
+        if search_context and level > 1:
             logger.debug(f"Including search context in prompt for Level {level}", extra={"batch_id": batch_id})
             search_context_xml += "<search_context>\n"
             summary = search_context.get("summary")
@@ -446,7 +439,7 @@ class LLMService:
             search_context_xml += "</search_context>\n"
         # --- END Build Search Context Section ---
 
-        # --- Get Category Options (Remains the same logic, but log context) ---
+        # --- Get Category Options (Updated for Level 5) ---
         categories: List[TaxonomyCategory] = []
         parent_category_name = "N/A"
         category_lookup_successful = True
@@ -455,42 +448,53 @@ class LLMService:
             if level == 1:
                 categories = taxonomy.get_level1_categories()
             elif parent_category_id:
+                parent_obj = None
                 if level == 2:
                     categories = taxonomy.get_level2_categories(parent_category_id)
                     parent_obj = taxonomy.categories.get(parent_category_id)
-                    if parent_obj: parent_category_name = parent_obj.name
                 elif level == 3:
                     categories = taxonomy.get_level3_categories(parent_category_id)
-                    l1_id = None; l2_id = None
-                    id_parts = parent_category_id.split('.')
-                    if len(id_parts) >= 2: l1_id, l2_id = id_parts[0], id_parts[1]
-                    elif len(id_parts) == 1:
-                         for l1_key, l1_node in taxonomy.categories.items():
-                              if parent_category_id in getattr(l1_node, 'children', {}): l1_id = l1_key; l2_id = parent_category_id; break
-                    if l1_id and l2_id:
-                        parent_obj = taxonomy.categories.get(l1_id, {}).children.get(l2_id)
-                        if parent_obj: parent_category_name = parent_obj.name
+                    l1_id, l2_id = parent_category_id.split('.') if '.' in parent_category_id else (None, parent_category_id)
+                    if not l1_id: # Find L1 if only L2 was given
+                        for l1_key, l1_node in taxonomy.categories.items():
+                            if l2_id in getattr(l1_node, 'children', {}): l1_id = l1_key; break
+                    if l1_id: parent_obj = taxonomy.categories.get(l1_id, {}).children.get(l2_id)
                 elif level == 4:
                     categories = taxonomy.get_level4_categories(parent_category_id)
-                    l1_id = None; l2_id = None; l3_id = None
-                    id_parts = parent_category_id.split('.')
-                    if len(id_parts) >= 3: l1_id, l2_id, l3_id = id_parts[0], id_parts[1], id_parts[2]
-                    elif len(id_parts) == 1:
-                         found_l3_parent = False
+                    l1_id, l2_id, l3_id = parent_category_id.split('.') if parent_category_id.count('.') == 2 else (None, None, parent_category_id)
+                    if not l1_id: # Find parents if only L3 was given
+                         found = False
                          for l1k, l1n in taxonomy.categories.items():
                              for l2k, l2n in getattr(l1n, 'children', {}).items():
-                                 if parent_category_id in getattr(l2n, 'children', {}): l1_id = l1k; l2_id = l2k; l3_id = parent_category_id; found_l3_parent = True; break
-                             if found_l3_parent: break
+                                 if l3_id in getattr(l2n, 'children', {}): l1_id = l1k; l2_id = l2k; found = True; break
+                             if found: break
+                    if l1_id and l2_id: parent_obj = taxonomy.categories.get(l1_id, {}).children.get(l2_id, {}).children.get(l3_id)
+                # --- ADDED LEVEL 5 CASE ---
+                elif level == 5:
+                    categories = taxonomy.get_level5_categories(parent_category_id)
+                    l1_id, l2_id, l3_id, l4_id = parent_category_id.split('.') if parent_category_id.count('.') == 3 else (None, None, None, parent_category_id)
+                    if not l1_id: # Find parents if only L4 was given
+                        found = False
+                        for l1k, l1n in taxonomy.categories.items():
+                            for l2k, l2n in getattr(l1n, 'children', {}).items():
+                                for l3k, l3n in getattr(l2n, 'children', {}).items():
+                                    if l4_id in getattr(l3n, 'children', {}): l1_id = l1k; l2_id = l2k; l3_id = l3k; found = True; break
+                                if found: break
+                            if found: break
                     if l1_id and l2_id and l3_id:
-                        parent_obj = taxonomy.categories.get(l1_id, {}).children.get(l2_id, {}).children.get(l3_id)
-                        if parent_obj: parent_category_name = parent_obj.name
-            else:
+                        parent_obj = taxonomy.categories.get(l1_id, {}).children.get(l2_id, {}).children.get(l3_id, {}).children.get(l4_id)
+                # --- END ADDED LEVEL 5 CASE ---
+
+                if parent_obj: parent_category_name = parent_obj.name
+
+            else: # level > 1 and no parent_category_id
                 logger.error(f"Parent category ID is required for level {level} prompt generation but was not provided.")
                 category_lookup_successful = False
 
             if not categories and level > 1 and parent_category_id:
                  logger.warning(f"No subcategories found for Level {level}, Parent '{parent_category_id}'.")
-                 category_lookup_successful = False
+                 # This might be valid if a parent has no children, don't mark as error unless L1 failed
+                 if level == 1: category_lookup_successful = False
             elif not categories and level == 1:
                  logger.error(f"No Level 1 categories found in taxonomy!")
                  category_lookup_successful = False
@@ -509,14 +513,17 @@ class LLMService:
                 category_options_xml += f"  <parent_id>{parent_category_id}</parent_id>\n"
                 category_options_xml += f"  <parent_name>{parent_category_name}</parent_name>\n"
             category_options_xml += "  <categories>\n"
-            for cat in categories:
-                category_options_xml += f"    <category id=\"{cat.id}\" name=\"{cat.name}\"/>\n"
+            if categories: # Check if categories list is not empty
+                for cat in categories:
+                    category_options_xml += f"    <category id=\"{cat.id}\" name=\"{cat.name}\"/>\n"
+            else:
+                 category_options_xml += f"    <message>No subcategories available for this level and parent.</message>\n"
             category_options_xml += "  </categories>\n"
         else:
             category_options_xml += f"  <error>Could not retrieve valid categories for Level {level}, Parent '{parent_category_id}'. Classification is not possible.</error>\n"
         category_options_xml += "</category_options>"
 
-        # --- Define Output Format Section (Remains the same) ---
+        # --- Define Output Format Section (Updated for Level 5) ---
         output_format_xml = f"""<output_format>
 Respond *only* with a valid JSON object matching this exact schema. Do not include any text before or after the JSON object.
 
@@ -542,18 +549,15 @@ json
 </output_format>"""
 
         # --- Assemble Final Prompt ---
-        # Base prompt structure
         prompt_base = f"""
 <role>You are a precise vendor classification expert using the NAICS taxonomy.</role>
 
 <task>Classify each vendor provided in `<vendor_data>` into **ONE** appropriate NAICS category from the `<category_options>` for Level {level}. {f"Consider that these vendors belong to the parent category '{parent_category_id}: {parent_category_name}'. " if level > 1 and parent_category_id else ""}</task>"""
 
-        # Add search context instruction if present
         if search_context_xml:
             prompt_base += f"""
 <search_context_instruction>You have been provided with additional context from a web search in `<search_context>`. Use this information, along with the original `<vendor_data>`, to make the most accurate classification decision for Level {level}.</search_context_instruction>"""
 
-        # Add standard instructions
         prompt_base += f"""
 <instructions>
 1.  Analyze each vendor's details in `<vendor_data>` {f"and the supplementary information in `<search_context>`" if search_context_xml else ""}.
@@ -575,7 +579,6 @@ json
 """
         prompt = prompt_base
 
-        # Handle the case where category lookup failed explicitly
         if not category_lookup_successful:
              prompt = f"""
 <role>You are a precise vendor classification expert using the NAICS taxonomy.</role>

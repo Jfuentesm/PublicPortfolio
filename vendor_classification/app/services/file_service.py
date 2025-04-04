@@ -256,7 +256,7 @@ def generate_output_file(
     job_id: str
 ) -> str:
     """
-    Generate output Excel file with classification results, mapping back to
+    Generate output Excel file with classification results (up to Level 5), mapping back to
     original vendor data including optional fields read from the input.
     Prioritizes the deepest successful classification level achieved.
 
@@ -269,13 +269,14 @@ def generate_output_file(
                     "level2": { ... },
                     "level3": { ... },
                     "level4": { ... },
+                    "level5": { ... }, # Added Level 5
                     "search_results": { # Contains raw search data and potentially L1 classification attempt
                         "sources": [...],
                         "summary": "...",
                         "classification_l1": { ... } # Result from process_search_results
                     },
                     "search_attempted": True, # Flag added by task if search was run
-                    "classified_via_search": True # Flag added by task if L1-L4 result came from search path
+                    "classified_via_search": True # Flag added by task if L1-L5 result came from search path
                 }
             }
         job_id: Job ID
@@ -305,15 +306,20 @@ def generate_output_file(
             final_level3_name = ""
             final_level4_id = ""
             final_level4_name = ""
+            # --- ADDED L5 ---
+            final_level5_id = ""
+            final_level5_name = ""
+            # --- END ADDED ---
             final_confidence = 0.0
             classification_not_possible_flag = True # Assume impossible unless proven otherwise
             final_notes = ""
             reason = "Classification not possible" # Default reason if no success
             classification_source = "Initial" # Assume initial pass unless overridden
 
-            # Determine the highest successful classification level
+            # Determine the highest successful classification level (up to 5)
             highest_successful_level = 0
-            for level in range(4, 0, -1): # Check from L4 down to L1
+            # --- MODIFIED: Check up to level 5 ---
+            for level in range(5, 0, -1):
                 level_key = f"level{level}"
                 level_res = result.get(level_key)
                 if level_res and isinstance(level_res, dict) and not level_res.get("classification_not_possible", True):
@@ -328,6 +334,7 @@ def generate_output_file(
                 final_notes = result[f"level{highest_successful_level}"].get("notes", "")
 
                 # Populate all levels up to the highest successful one
+                # --- MODIFIED: Populate up to level 5 ---
                 for level in range(1, highest_successful_level + 1):
                     level_res = result.get(f"level{level}", {})
                     if level == 1:
@@ -342,6 +349,10 @@ def generate_output_file(
                     elif level == 4:
                         final_level4_id = level_res.get("category_id", "")
                         final_level4_name = level_res.get("category_name", "")
+                    elif level == 5: # Added L5
+                        final_level5_id = level_res.get("category_id", "")
+                        final_level5_name = level_res.get("category_name", "")
+                # --- END MODIFIED ---
 
                 # Check if this successful classification came from the search path
                 if result.get("classified_via_search"):
@@ -353,7 +364,8 @@ def generate_output_file(
                 final_confidence = 0.0
                 # Find the reason for failure
                 failure_reason_found = False
-                for level in range(4, 0, -1): # Check highest level first for failure reason
+                # --- MODIFIED: Check up to level 5 ---
+                for level in range(5, 0, -1):
                      level_res = result.get(f"level{level}")
                      if level_res and isinstance(level_res, dict) and level_res.get("classification_not_possible", False):
                           reason = level_res.get("classification_not_possible_reason", f"Classification failed at Level {level}")
@@ -386,6 +398,7 @@ def generate_output_file(
                      source.get("url", "") for source in search_data["sources"] if isinstance(source, dict) and source.get("url")
                  )
 
+            # --- MODIFIED: Add L5 fields to row ---
             row = {
                 "vendor_name": original_vendor_name,
                 "vendor_address": original_address or "",
@@ -402,50 +415,49 @@ def generate_output_file(
                 "level3_category_name": final_level3_name,
                 "level4_category_id": final_level4_id,
                 "level4_category_name": final_level4_name,
+                "level5_category_id": final_level5_id, # Added
+                "level5_category_name": final_level5_name, # Added
                 "final_confidence": final_confidence,
                 "classification_not_possible": classification_not_possible_flag,
                 "classification_notes_or_reason": reason or final_notes or "", # Provide reason if failed, else notes
                 "classification_source": classification_source, # Indicate if search was used
                 "sources": search_sources_urls
             }
+            # --- END MODIFIED ---
             output_data.append(row)
 
+    # --- MODIFIED: Add L5 columns to DataFrame definition ---
+    output_columns = [
+        "vendor_name",
+        "vendor_address",
+        "vendor_website",
+        "internal_category",
+        "parent_company",
+        "spend_category",
+        "Optional_example_good_serviced_purchased",
+        "level1_category_id",
+        "level1_category_name",
+        "level2_category_id",
+        "level2_category_name",
+        "level3_category_id",
+        "level3_category_name",
+        "level4_category_id",
+        "level4_category_name",
+        "level5_category_id", # Added
+        "level5_category_name", # Added
+        "final_confidence",
+        "classification_not_possible",
+        "classification_notes_or_reason",
+        "classification_source",
+        "sources"
+    ]
     if not output_data:
         logger.warning("No data rows generated for the output file.")
-        # Create an empty file or handle as needed
-        df = pd.DataFrame(columns=[ # Define columns even for empty file
-            "vendor_name", "vendor_address", "vendor_website", "internal_category",
-            "parent_company", "spend_category", "Optional_example_good_serviced_purchased",
-            "level1_category_id", "level1_category_name", "level2_category_id", "level2_category_name",
-            "level3_category_id", "level3_category_name", "level4_category_id", "level4_category_name",
-            "final_confidence", "classification_not_possible", "classification_notes_or_reason",
-            "classification_source", "sources"
-        ])
+        df = pd.DataFrame(columns=output_columns) # Define columns even for empty file
     else:
         with LogTimer(logger, "Creating DataFrame for output"):
-            output_columns = [
-                "vendor_name",
-                "vendor_address",
-                "vendor_website",
-                "internal_category",
-                "parent_company",
-                "spend_category",
-                "Optional_example_good_serviced_purchased",
-                "level1_category_id",
-                "level1_category_name",
-                "level2_category_id",
-                "level2_category_name",
-                "level3_category_id",
-                "level3_category_name",
-                "level4_category_id",
-                "level4_category_name",
-                "final_confidence",
-                "classification_not_possible",
-                "classification_notes_or_reason",
-                "classification_source", # Added column
-                "sources"
-            ]
             df = pd.DataFrame(output_data, columns=output_columns)
+    # --- END MODIFIED ---
 
     output_dir = os.path.join(settings.OUTPUT_DATA_DIR, job_id)
     try:
