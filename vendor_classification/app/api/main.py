@@ -4,99 +4,96 @@ import sqlalchemy
 import httpx
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-# --- MODIFIED IMPORTS ---
-from fastapi.responses import JSONResponse # Keep JSONResponse for error handling
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
-# --- END MODIFIED IMPORTS ---
-from typing import Dict, Any, Optional, List # <-- ADDED List
+from typing import Dict, Any, Optional, List
 import uuid
 import os
 from datetime import datetime, timedelta
-import logging # Keep for startup/health
+import logging
 
+# --- Model Imports ---
 from models.job import Job, JobStatus, ProcessingStage
 from models.user import User
 
+# --- Core Imports ---
 from core.config import settings
 from core.logging_config import setup_logging, get_logger, set_correlation_id, set_user, set_job_id, log_function_call, get_correlation_id
 from middleware.logging_middleware import RequestLoggingMiddleware
-
-from api.auth import get_current_user, authenticate_user, create_access_token
 from core.database import get_db, SessionLocal
 from core.initialize_db import initialize_database
+
+# --- Service Imports ---
 from services.file_service import save_upload_file
+
+# --- Task Imports ---
 from tasks.celery_app import celery_app
+
+# --- Utility Imports ---
 from utils.taxonomy_loader import load_taxonomy
 
+# --- Auth Imports ---
 from fastapi.security import OAuth2PasswordRequestForm
+from api.auth import (
+    get_current_user,
+    authenticate_user,
+    create_access_token,
+    get_current_active_user # Keep this if needed elsewhere, though often get_current_user is enough
+)
 
-# --- ADDED: Import the new jobs router ---
+# --- Router Imports ---
 from api import jobs as jobs_router
-# --- END ADDED ---
+from api import users as users_router # Import the new users router
 
-# --- Schema Imports (Optional but good practice) ---
-from schemas.job import JobResponse # Import the response schema
-# --- End Schema Imports ---
+# --- Schema Imports ---
+from schemas.job import JobResponse
+from schemas.user import UserResponse as UserResponseSchema # Import UserResponse schema
 
 
-# Configure logging using the setup function, then get the specific logger
-setup_logging_done = False # Flag to prevent re-setup during reloads
+# --- Logging Setup ---
+setup_logging_done = False
 try:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     startup_logger = logging.getLogger("vendor_classification.startup")
 except Exception as e:
     print(f"Initial basic logging config failed: {e}")
-    startup_logger = logging.getLogger("vendor_classification.startup") # Try getting it anyway
+    startup_logger = logging.getLogger("vendor_classification.startup")
 
 logger = get_logger("vendor_classification.api") # Get the main API logger
 
+
+# --- FastAPI App Initialization ---
 app = FastAPI(
     title="NAICS Vendor Classification API",
     description="API for classifying vendors according to NAICS taxonomy",
     version="1.0.0",
 )
 
-# Add logging middleware
+# --- Middleware ---
 app.add_middleware(RequestLoggingMiddleware)
-
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development only, restrict in production
+    allow_origins=["*"],  # Restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- VUE.JS FRONTEND SERVING SETUP ---
-# Define the path to the built Vue app's static files within the container
-# Adjust this path based on where your Dockerfile copies the 'dist' folder
-VUE_BUILD_DIR = "/app/frontend/dist" # Example path
+# --- Vue.js Frontend Serving Setup ---
+VUE_BUILD_DIR = "/app/frontend/dist"
 VUE_INDEX_FILE = os.path.join(VUE_BUILD_DIR, "index.html")
-
 logger.info(f"Attempting to serve Vue frontend from: {VUE_BUILD_DIR}")
 if not os.path.exists(VUE_BUILD_DIR):
     logger.error(f"Vue build directory NOT FOUND at {VUE_BUILD_DIR}. Frontend will not be served.")
-    logger.error(f"Current working directory: {os.getcwd()}")
-    # Optionally list contents of parent dir if it helps debugging
-    parent_dir = os.path.dirname(VUE_BUILD_DIR)
-    if os.path.exists(parent_dir):
-        try: logger.error(f"Contents of {parent_dir}: {os.listdir(parent_dir)}")
-        except Exception as list_err: logger.error(f"Could not list {parent_dir}: {list_err}")
 elif not os.path.exists(VUE_INDEX_FILE):
     logger.error(f"Vue index.html NOT FOUND at {VUE_INDEX_FILE}. Frontend serving might fail.")
-    try: logger.error(f"Contents of {VUE_BUILD_DIR}: {os.listdir(VUE_BUILD_DIR)}")
-    except Exception as list_err: logger.error(f"Could not list {VUE_BUILD_DIR}: {list_err}")
 else:
     logger.info(f"Vue build directory and index.html found. Static files will be mounted.")
-    # Mount the entire Vue build directory at the root path.
-    # `html=True` ensures that non-API routes serve index.html for client-side routing.
-    # IMPORTANT: Mount this *after* all your API routes are defined.
-    # We will mount it at the end of the file.
+# Static files are mounted at the end of the file
+
 
 # --- API ROUTES ---
-# Define all your API routes (/api/v1/..., /token, /health) BEFORE mounting static files.
 
 @app.get("/health")
 async def health_check():
@@ -118,23 +115,17 @@ async def health_check():
     db_status = "unknown"
     db = None
     try:
-        logger.debug("Health Check: Attempting to create DB session using SessionLocal.")
         db = SessionLocal()
-        logger.debug(f"Health Check: SessionLocal instance created: {type(db)}")
         db.execute(sqlalchemy.text("SELECT 1"))
         db_status = "connected"
-        logger.info("Health Check: Database connection test successful.")
     except Exception as e:
         logger.error(f"Health Check: Database connection error", exc_info=True, extra={"error_details": str(e)})
         db_status = f"error: {str(e)[:100]}"
     finally:
         if db:
             db.close()
-            logger.debug("Health Check: Database session closed.")
 
-    # --- MODIFIED: Check for Vue build directory ---
     vue_frontend_status = "found" if os.path.exists(VUE_INDEX_FILE) else "missing"
-    # --- END MODIFIED ---
 
     celery_broker_status = "unknown"
     celery_connection = None
@@ -142,7 +133,6 @@ async def health_check():
         celery_connection = celery_app.connection(heartbeat=2.0)
         celery_connection.ensure_connection(max_retries=1, timeout=2)
         celery_broker_status = "connected"
-        logger.debug("Celery broker connection successful during health check.")
     except Exception as celery_e:
         logger.error(f"Celery broker connection error during health check: {str(celery_e)}", exc_info=False)
         celery_broker_status = f"error: {str(celery_e)[:100]}"
@@ -180,23 +170,14 @@ async def health_check():
         "ip": local_ip,
         "database": db_status,
         "celery_broker": celery_broker_status,
-        # --- MODIFIED: Report Vue frontend status ---
         "vue_frontend_index": vue_frontend_status,
-        # --- END MODIFIED ---
         "external_api_openrouter": openrouter_status,
         "external_api_tavily": tavily_status,
         "timestamp": datetime.now().isoformat()
     }
 
-# --- REMOVED: Old root route ---
-# @app.get("/", response_class=HTMLResponse)
-# async def root():
-#     """Serve the frontend application."""
-#     # This is now handled by the StaticFiles mount below
-#     pass
-# --- END REMOVED ---
 
-# --- Exception Handlers (Keep as they are) ---
+# --- Exception Handlers ---
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     correlation_id = get_correlation_id() or str(uuid.uuid4())
@@ -220,11 +201,6 @@ async def general_exception_handler(request: Request, exc: Exception):
         "correlation_id": correlation_id, "request_headers": dict(request.headers),
         "path": request.url.path, "method": request.method,
     })
-    # Check if the request looks like it was intended for the frontend SPA
-    # If the path doesn't start with /api, /token, /health, etc., and Vue files exist,
-    # maybe it should have been handled by the SPA. But StaticFiles(html=True) handles this better.
-    # Instead of trying to serve index.html here, rely on the StaticFiles mount.
-    # Just return a standard 500 error for backend exceptions.
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "An internal server error occurred.", "correlation_id": correlation_id},
@@ -232,17 +208,75 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-# --- Your existing API endpoints (/api/v1/..., /token) ---
-# Keep all these endpoints exactly as they were. Example:
+# --- Authentication Endpoint ---
+@app.post("/token", response_model=Dict[str, Any]) # Keep response model generic Dict or create specific AuthResponse schema
+async def login_for_access_token(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db = Depends(get_db)
+):
+    """Handles user login and returns JWT token and user details."""
+    correlation_id = str(uuid.uuid4())
+    set_correlation_id(correlation_id)
+    client_host = request.client.host if request.client else "Unknown"
+    logger.info(f"Login attempt", extra={"username": form_data.username, "ip": client_host})
+
+    try:
+        user = authenticate_user(db, form_data.username, form_data.password)
+        if not user:
+            logger.warning(f"Login failed: invalid credentials", extra={"username": form_data.username, "ip": client_host})
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Check if user is active *after* authentication
+        if not user.is_active:
+             logger.warning(f"Login failed: user '{user.username}' is inactive.", extra={"ip": client_host})
+             raise HTTPException(
+                 status_code=status.HTTP_400_BAD_REQUEST, # Use 400 for inactive user
+                 detail="Inactive user.",
+             )
+
+        set_user(user) # Set context for logging
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.username}, expires_delta=access_token_expires
+        )
+
+        logger.info(f"Login successful, token generated", extra={ "username": user.username, "ip": client_host, "token_expires_in_minutes": settings.ACCESS_TOKEN_EXPIRE_MINUTES})
+
+        # Return user details along with token using the UserResponseSchema
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": UserResponseSchema.model_validate(user) # Validate and structure user data
+        }
+
+    except HTTPException as http_exc:
+        # Avoid logging expected 401/400 errors as exceptions unless debugging needed
+        if http_exc.status_code not in [status.HTTP_401_UNAUTHORIZED, status.HTTP_400_BAD_REQUEST]:
+             logger.error(f"HTTP exception during login", exc_info=True)
+        raise # Re-raise the exception
+    except Exception as e:
+        logger.error(f"Unexpected login error", exc_info=True, extra={"error": str(e), "username": form_data.username})
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during the login process."
+        )
+
+
+# --- Job Related API Endpoints ---
 
 @app.post("/api/v1/upload", response_model=Dict[str, Any])
 async def upload_file(
     file: UploadFile = File(...),
     company_name: str = Form(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user), # Use get_current_user for basic auth check
     db = Depends(get_db)
 ):
-    # ... (endpoint implementation remains the same) ...
+    """Handles file upload and initiates the classification job."""
     job_id = str(uuid.uuid4())
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
@@ -254,7 +288,6 @@ async def upload_file(
 
     job = None
     try:
-        logger.info("Attempting to save uploaded file...")
         input_file_path = save_upload_file(file, job_id)
         logger.info(f"File saved successfully", extra={"filepath": input_file_path})
 
@@ -284,9 +317,7 @@ async def upload_file(
         logger.error(f"File saving error during upload", exc_info=True, extra={"error": str(io_err)})
         error_db = None
         try:
-            logger.warning("Upload IOError: Attempting to mark job as failed using new SessionLocal.")
             error_db = SessionLocal()
-            logger.debug("Upload IOError: SessionLocal instance created for error handling.")
             job_in_error = error_db.query(Job).filter(Job.id == job_id).first()
             if job_in_error and job_in_error.status != JobStatus.FAILED.value:
                  job_in_error.fail(f"Upload endpoint failed (file save): {str(io_err)}"); error_db.commit()
@@ -296,15 +327,13 @@ async def upload_file(
              logger.error("Upload IOError: Error updating job status during file save error handling", exc_info=True, extra={"db_error": str(db_err)})
              if error_db: error_db.rollback()
         finally:
-             if error_db: error_db.close(); logger.debug("Upload IOError: Error handling DB session closed.")
+             if error_db: error_db.close()
         raise HTTPException(status_code=500, detail=f"Could not save uploaded file: {str(io_err)}")
     except Exception as e:
         logger.error(f"Unexpected error processing upload", exc_info=True, extra={"error": str(e)})
         error_db_unexpected = None
         try:
-            logger.warning("Upload Unexpected Error: Attempting to mark job as failed using new SessionLocal.")
             error_db_unexpected = SessionLocal()
-            logger.debug("Upload Unexpected Error: SessionLocal instance created for error handling.")
             job_in_error = error_db_unexpected.query(Job).filter(Job.id == job_id).first()
             if job_in_error and job_in_error.status != JobStatus.FAILED.value:
                 job_in_error.fail(f"Upload endpoint failed (unexpected): {str(e)}"); error_db_unexpected.commit()
@@ -314,66 +343,40 @@ async def upload_file(
              logger.error("Upload Unexpected Error: Error updating job status during unexpected error handling", exc_info=True, extra={"db_error": str(db_err_unexpected)})
              if error_db_unexpected: error_db_unexpected.rollback()
         finally:
-             if error_db_unexpected: error_db_unexpected.close(); logger.debug("Upload Unexpected Error: Error handling DB session closed.")
+             if error_db_unexpected: error_db_unexpected.close()
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred during upload.")
 
-# --- UPDATED: Changed response_model to JobResponse ---
+
 @app.get("/api/v1/jobs/{job_id}", response_model=JobResponse)
 async def get_job_status(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    # ... (endpoint implementation remains the same, but ensure it returns fields matching JobResponse) ...
+    """Get status and details for a specific job."""
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     logger.info(f"Job status requested", extra={"username": current_user.username if current_user else "unknown"})
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
 
-    # Check ownership (or admin status) - important for security
-    if job.created_by != current_user.username: # and not current_user.is_superuser:
+    # Check ownership or admin status
+    if job.created_by != current_user.username and not current_user.is_superuser:
         logger.warning("User attempted to access job they do not own", extra={"job_owner": job.created_by})
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this job")
 
-
-    estimated_completion_iso = None
-    if job.status == JobStatus.PROCESSING.value and job.progress > 0 and job.progress < 1.0 and job.created_at:
-        try:
-            now_dt = datetime.now(job.created_at.tzinfo)
-            elapsed_time = (now_dt - job.created_at).total_seconds()
-            if elapsed_time > 5 and job.progress > 0.01:
-                total_estimated_time = elapsed_time / job.progress
-                remaining_time = total_estimated_time - elapsed_time
-                if remaining_time > 0:
-                    estimated_completion_dt = now_dt + timedelta(seconds=remaining_time)
-                    estimated_completion_iso = estimated_completion_dt.isoformat()
-                    logger.debug(f"Calculated ETA", extra={"elapsed": elapsed_time, "progress": job.progress, "remaining": remaining_time, "eta": estimated_completion_iso})
-                else: logger.debug("Estimated remaining time is non-positive, cannot calculate ETA.")
-            else: logger.debug("Not enough progress or time elapsed to calculate reliable ETA.")
-        except Exception as calc_err: logger.warning(f"Could not calculate estimated completion time: {calc_err}", exc_info=False)
-    elif job.status == JobStatus.COMPLETED.value and job.completed_at: estimated_completion_iso = job.completed_at.isoformat()
-
     logger.info(f"Job status retrieved", extra={ "status": job.status, "progress": job.progress, "stage": job.current_stage})
-
-    # Construct the response using the JobResponse schema
-    # Pydantic v2 handles this automatically with from_attributes=True
-    # For Pydantic v1, you might need JobResponse.from_orm(job)
     response_data = JobResponse.model_validate(job) # Pydantic v2
-    # Add estimated_completion separately if not part of the base model
-    # response_data.estimated_completion = estimated_completion_iso # Example if needed
-
-    # Return the validated schema object
     return response_data
 
 
 @app.get("/api/v1/jobs/{job_id}/download")
 async def download_results(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    # ... (endpoint implementation remains the same) ...
+    """Download the results file for a completed job."""
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     logger.info(f"Results download requested", extra={"username": current_user.username if current_user else "unknown"})
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
 
-    # Check ownership
-    if job.created_by != current_user.username: # and not current_user.is_superuser:
+    # Check ownership or admin status
+    if job.created_by != current_user.username and not current_user.is_superuser:
         logger.warning("User attempted to download results for job they do not own", extra={"job_owner": job.created_by})
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to download results for this job")
 
@@ -388,14 +391,13 @@ async def download_results(job_id: str, current_user: User = Depends(get_current
     base_name = "results";
     if job.input_file_name: base_name, _ = os.path.splitext(job.input_file_name)
     download_filename = f"{base_name}_results.xlsx"
-    # Use FileResponse directly for downloads
     from fastapi.responses import FileResponse
     return FileResponse( output_path, filename=download_filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=\"{download_filename}\""} )
 
 
 @app.post("/api/v1/jobs/{job_id}/notify", response_model=Dict[str, Any])
 async def request_notification(job_id: str, email_payload: Dict[str, str], current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    # ... (endpoint implementation remains the same, add ownership check) ...
+    """Request email notification upon job completion."""
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     email = email_payload.get("email")
@@ -404,8 +406,8 @@ async def request_notification(job_id: str, email_payload: Dict[str, str], curre
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
 
-    # Check ownership
-    if job.created_by != current_user.username: # and not current_user.is_superuser:
+    # Check ownership or admin status
+    if job.created_by != current_user.username and not current_user.is_superuser:
         logger.warning("User attempted to set notification for job they do not own", extra={"job_owner": job.created_by})
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to set notification for this job")
 
@@ -421,15 +423,15 @@ async def request_notification(job_id: str, email_payload: Dict[str, str], curre
 
 @app.get("/api/v1/jobs/{job_id}/stats", response_model=Dict[str, Any])
 async def get_job_stats(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    # ... (endpoint implementation remains the same, add ownership check) ...
+    """Get processing statistics for a specific job."""
     set_correlation_id(job_id); set_job_id(job_id)
     if current_user: set_user(current_user)
     logger.info(f"Job stats requested", extra={"username": current_user.username if current_user else "unknown"})
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
 
-    # Check ownership
-    if job.created_by != current_user.username: # and not current_user.is_superuser:
+    # Check ownership or admin status
+    if job.created_by != current_user.username and not current_user.is_superuser:
         logger.warning("User attempted to get stats for job they do not own", extra={"job_owner": job.created_by})
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access stats for this job")
 
@@ -441,60 +443,26 @@ async def get_job_stats(job_id: str, current_user: User = Depends(get_current_us
     return { "vendors_processed": job_stats.get("total_vendors", 0), "unique_vendors": job_stats.get("unique_vendors", 0), "api_calls": api_usage.get("openrouter_calls", 0), "tokens_used": api_usage.get("openrouter_total_tokens", 0), "tavily_searches": api_usage.get("tavily_search_calls", 0), "processing_time": job_stats.get("processing_duration_seconds", 0), "invalid_category_errors": job_stats.get("invalid_category_errors", 0), "successfully_classified_l4": job_stats.get("successfully_classified_l4", 0), "search_successful_classifications": job_stats.get("search_successful_classifications", 0) }
 
 
-@app.post("/token", response_model=Dict[str, Any])
-async def login_for_access_token(
-    request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db = Depends(get_db)
-):
-    # ... (endpoint implementation remains the same) ...
-    correlation_id = str(uuid.uuid4())
-    set_correlation_id(correlation_id)
-    client_host = request.client.host if request.client else "Unknown"
-    logger.info(f"Login attempt", extra={"username": form_data.username, "ip": client_host})
-
-    try:
-        user = authenticate_user(db, form_data.username, form_data.password)
-        if not user:
-            logger.warning(f"Login failed: invalid credentials", extra={"username": form_data.username, "ip": client_host})
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        set_user(user)
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user.username}, expires_delta=access_token_expires
-        )
-
-        logger.info(f"Login successful, token generated", extra={ "username": user.username, "ip": client_host, "token_expires_in_minutes": settings.ACCESS_TOKEN_EXPIRE_MINUTES})
-
-        return { "access_token": access_token, "token_type": "bearer", "username": user.username }
-
-    except HTTPException as http_exc:
-        if http_exc.status_code != status.HTTP_401_UNAUTHORIZED:
-             logger.error(f"HTTP exception during login", exc_info=True)
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected login error", exc_info=True, extra={"error": str(e), "username": form_data.username})
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during the login process."
-        )
-
-# --- ADDED: Include the jobs router ---
+# --- Include Routers ---
+# Include Job History Router (requires authentication)
 app.include_router(
     jobs_router.router,
     prefix=settings.API_V1_STR + "/jobs",
-    tags=["jobs"],
-    dependencies=[Depends(get_current_user)] # Apply auth dependency to all job history routes
+    tags=["Job History"], # Changed tag for clarity
+    dependencies=[Depends(get_current_user)] # Apply auth dependency
 )
-# --- END ADDED ---
+
+# Include User Management Router (authentication handled within endpoints)
+app.include_router(
+    users_router.router,
+    prefix=settings.API_V1_STR + "/users",
+    tags=["User Management"], # Changed tag for clarity
+    # Dependencies are applied per-endpoint in users.py
+)
+# --- End Include Routers ---
 
 
-# --- Startup Event (Keep as is) ---
+# --- Startup Event ---
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup."""
@@ -534,15 +502,13 @@ async def startup_event():
 
     try:
         logger.info("Pre-loading taxonomy into cache...")
-        logger.debug("Calling load_taxonomy function...")
         load_taxonomy(force_reload=True)
-        logger.debug("load_taxonomy function returned.")
         logger.info("Taxonomy pre-loading completed.")
     except Exception as e:
         logger.error("Failed to pre-load taxonomy during startup.", exc_info=True)
 
 
-# --- MOUNT STATIC FILES (Vue App) ---
+# --- Mount Static Files (Vue App) ---
 # This should be the LAST app configuration step
 if os.path.exists(VUE_BUILD_DIR) and os.path.exists(VUE_INDEX_FILE):
     logger.info(f"Mounting Vue app from directory: {VUE_BUILD_DIR}")
@@ -556,5 +522,4 @@ else:
             status_code=status.HTTP_404_NOT_FOUND,
             content={"detail": f"Frontend not found. Expected build files in {VUE_BUILD_DIR}"}
         )
-
 # --- END VUE.JS FRONTEND SERVING SETUP ---

@@ -1,4 +1,3 @@
-
 # --- file path='api/auth.py' ---
 # app/api/auth.py
 from fastapi import Depends, HTTPException, status, Request # Added Request
@@ -7,6 +6,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from typing import Optional
+import uuid # Ensure UUID is imported
 
 from core.config import settings
 from core.logging_config import get_logger, LogTimer, log_function_call, set_user, get_user, get_correlation_id # Added context helpers
@@ -54,7 +54,11 @@ def authenticate_user(db, username: str, password: str):
     try:
         logger.info(f"Authentication attempt", extra={"username": username})
         with LogTimer(logger, f"User authentication", include_in_stats=True):
+            # --- MODIFIED: Import service here or pass db ---
+            # Let's keep it simple and use the db directly for now
+            # Alternatively: from services.user_service import get_user_by_username
             user = db.query(User).filter(User.username == username).first()
+            # --- END MODIFIED ---
             if not user:
                 logger.warning(f"Authentication failed: user not found", extra={"username": username})
                 return None # Return None instead of False for clarity
@@ -89,22 +93,19 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         raise
 
 # --- Using manual header read version of get_current_user ---
-# Removed @log_function_call here as it might interfere (relying on manual logs inside)
 async def get_current_user(request: Request, db = Depends(get_db)):
     """Get current user from the JWT token by manually reading header."""
-    # Use correlation ID from middleware if available, otherwise generate one
     correlation_id = get_correlation_id() or str(uuid.uuid4())
     logger.debug(f"===> Entered get_current_user function (manual header read)", extra={'correlation_id': correlation_id})
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer", "X-Correlation-ID": correlation_id}, # Add correlation ID header
+        headers={"WWW-Authenticate": "Bearer", "X-Correlation-ID": correlation_id},
     )
 
     token: Optional[str] = None
     try:
-        # Manually extract token
         logger.debug("Attempting to manually get Authorization header...")
         auth_header: Optional[str] = request.headers.get("Authorization")
         if not auth_header:
@@ -113,29 +114,27 @@ async def get_current_user(request: Request, db = Depends(get_db)):
 
         parts = auth_header.split()
         if len(parts) == 1 or parts[0].lower() != "bearer":
-             logger.warning(f"Invalid Authorization header format. Header starts with: '{auth_header[:20]}...'")
-             # Handle case where token might be missing 'Bearer ' prefix
-             if len(parts) == 1 and len(parts[0]) > 20: # Assume it might be the token itself
-                  token = parts[0]
-                  logger.warning("Assuming token was provided without 'Bearer ' prefix.")
-             else:
-                  raise credentials_exception
+                logger.warning(f"Invalid Authorization header format. Header starts with: '{auth_header[:20]}...'")
+                if len(parts) == 1 and len(parts[0]) > 20:
+                    token = parts[0]
+                    logger.warning("Assuming token was provided without 'Bearer ' prefix.")
+                else:
+                    raise credentials_exception
         elif len(parts) > 2:
-             logger.warning(f"Authorization header has too many parts. Header starts with: '{auth_header[:40]}...'")
-             raise credentials_exception
-        else: # Correct format: Bearer <token>
+                logger.warning(f"Authorization header has too many parts. Header starts with: '{auth_header[:40]}...'")
+                raise credentials_exception
+        else:
             token = parts[1]
 
         token_preview = token[:10] + "..." if token else "None"
         logger.debug(f"Manually extracted token: {token_preview}")
 
-    except HTTPException: # Re-raise credentials_exception directly
+    except HTTPException:
         raise
     except Exception as header_err:
         logger.error(f"Error manually extracting token from header", exc_info=True, extra={"error_details": str(header_err)})
         raise credentials_exception
 
-    # Proceed with JWT decoding
     payload = None
     username = None
     try:
@@ -147,48 +146,62 @@ async def get_current_user(request: Request, db = Depends(get_db)):
             logger.warning("JWT token missing 'sub' (username) claim after decode")
             raise credentials_exception
     except JWTError as jwt_err:
-        # Log specific JWT errors
         logger.error(f"JWT decode error (JWTError): {str(jwt_err)}", exc_info=False, extra={"error_details": str(jwt_err), "token_preview": token_preview})
-        # Map specific errors to user-friendly messages if desired
         detail = "Could not validate credentials"
         if "expired" in str(jwt_err).lower():
             detail = "Token has expired"
         elif "invalid signature" in str(jwt_err).lower():
             detail = "Invalid token signature"
         credentials_exception.detail = detail
-        raise credentials_exception # Re-raise consistent exception
+        raise credentials_exception
     except Exception as decode_err:
         logger.error(f"Unexpected error during JWT decode", exc_info=True, extra={"error_details": str(decode_err)})
         raise credentials_exception
 
-    # Database lookup
     user = None
     try:
         logger.debug(f"Looking up user in database", extra={"username": username})
+        # --- MODIFIED: Import service here or pass db ---
+        # Let's keep it simple and use the db directly for now
+        # Alternatively: from services.user_service import get_user_by_username
         user = db.query(User).filter(User.username == username).first()
+        # --- END MODIFIED ---
         if user is None:
             logger.warning(f"User '{username}' not found in database after token decode")
             raise credentials_exception
 
-        # Check if user is active
-        if not user.is_active:
-            logger.warning(f"Authentication failed: User '{username}' is inactive.")
-            credentials_exception.detail = "Inactive user"
-            raise credentials_exception
-
-        logger.debug(f"User found and active, returning user object.", extra={"username": user.username, "user_id": user.id})
         # --- Set user context HERE after successful validation ---
-        set_user(user)
+        set_user(user) # Store the full user object in context
         # --- End set user context ---
+        logger.debug(f"User found, returning user object.", extra={"username": user.username, "user_id": user.id})
         return user
-    except HTTPException: # Re-raise credentials_exception directly
-         raise
+    except HTTPException:
+            raise
     except Exception as db_err:
         logger.error(f"Database error during user lookup in get_current_user", exc_info=True, extra={"error_details": str(db_err)})
         credentials_exception.detail = "Database error during authentication"
         raise credentials_exception
 # --- END get_current_user ---
 
-# --- ADDED: Import UUID for correlation ID generation if needed ---
-import uuid
+# --- ADDED: get_current_active_user ---
+async def get_current_active_user(current_user: User = Depends(get_current_user)):
+    """Dependency to get the current user and ensure they are active."""
+    if not current_user.is_active:
+        logger.warning(f"Authentication failed: User '{current_user.username}' is inactive.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+    logger.debug(f"User '{current_user.username}' is active.")
+    return current_user
+# --- END ADDED ---
+
+# --- ADDED: get_current_active_superuser ---
+async def get_current_active_superuser(current_user: User = Depends(get_current_active_user)):
+    """Dependency to get the current active user and ensure they are a superuser."""
+    if not current_user.is_superuser:
+        logger.warning(f"Authorization failed: User '{current_user.username}' is not a superuser.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user doesn't have enough privileges"
+        )
+    logger.debug(f"User '{current_user.username}' is an active superuser.")
+    return current_user
 # --- END ADDED ---

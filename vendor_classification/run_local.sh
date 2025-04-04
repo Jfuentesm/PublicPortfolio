@@ -63,7 +63,10 @@ ls -l frontend/vue_frontend/vite.config.js || ls -l frontend/vue_frontend/vite.c
 
 echo "Building Docker images (this will include the Vue frontend build)..."
 # Use the detected compose command
-$COMPOSE_CMD build
+# Force rebuild of web service without cache to pick up code changes like __init__.py
+$COMPOSE_CMD build --no-cache web
+# Build other services normally (they might use cache)
+$COMPOSE_CMD build worker db redis
 
 # Check if build was successful
 if [ $? -ne 0 ]; then

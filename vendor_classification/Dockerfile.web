@@ -85,6 +85,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code (backend only)
 COPY ./app /app
 
+# --- ADDED DIAGNOSTIC ---
+# Verify that __init__.py and users.py are present in /app/api/
+RUN echo ">>> [Final Stage 2] Verifying contents of /app/api/:" && \
+    ls -lA /app/api/ || echo ">>> [Final Stage 2] WARNING: Cannot list /app/api/"
+# --- END ADDED DIAGNOSTIC ---
+
 # Copy Built Frontend from Builder Stage
 RUN echo ">>> [Final Stage 2] Copying built frontend from builder stage (/frontend/dist) to /app/frontend/dist..."
 COPY --from=builder /frontend/dist /app/frontend/dist
