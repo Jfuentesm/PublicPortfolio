@@ -24,17 +24,23 @@
                   <strong class="text-gray-600 font-medium">Unique Vendors:</strong>
                   <span class="text-gray-800 font-semibold">{{ stats.unique_vendors?.toLocaleString() ?? 'N/A' }}</span>
               </p>
+              <!-- UPDATED: Display L5 Success -->
               <p class="flex justify-between">
-                  <strong class="text-gray-600 font-medium">Successfully Classified (L4):</strong>
-                  <span class="text-green-700 font-semibold">{{ stats.successfully_classified_l4?.toLocaleString() ?? 'N/A' }}</span>
+                  <strong class="text-gray-600 font-medium">Successfully Classified (L5):</strong>
+                  <span class="text-green-700 font-semibold">{{ stats.successfully_classified_l5?.toLocaleString() ?? 'N/A' }}</span>
               </p>
+              <!-- UPDATED: Display L5 Search Success -->
               <p class="flex justify-between">
-                  <strong class="text-gray-600 font-medium">Search Assisted (L4):</strong>
-                  <span class="text-gray-800 font-semibold">{{ stats.search_successful_classifications?.toLocaleString() ?? 'N/A' }}</span>
+                  <strong class="text-gray-600 font-medium">Search Assisted (L5):</strong>
+                  <span class="text-gray-800 font-semibold">{{ stats.search_assisted_l5?.toLocaleString() ?? 'N/A' }}</span>
+              </p>
+              <!-- Keep L4 for reference if desired -->
+               <p class="flex justify-between text-xs text-gray-500">
+                  <strong class="font-normal">Ref: Classified (L4):</strong>
+                  <span class="font-normal">{{ stats.successfully_classified_l4?.toLocaleString() ?? 'N/A' }}</span>
               </p>
               <p class="flex justify-between">
                   <strong class="text-gray-600 font-medium">Invalid Category Errors:</strong>
-                  <!-- Safely check for null before comparing -->
                   <span :class="(stats.invalid_category_errors ?? 0) > 0 ? 'text-red-600 font-semibold' : 'text-gray-800 font-semibold'">
                       {{ stats.invalid_category_errors?.toLocaleString() ?? 'N/A' }}
                   </span>
@@ -66,20 +72,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
-import apiService from '@/services/api';
+// --- MODIFIED: Import JobStatsData from apiService ---
+import apiService, { type JobStatsData } from '@/services/api';
+// --- END MODIFIED ---
 
-// Define the structure for the stats data received from the API
-interface JobStatsData {
-    vendors_processed: number | null;
-    unique_vendors: number | null;
-    api_calls: number | null; // LLM API calls
-    tokens_used: number | null; // LLM tokens
-    tavily_searches: number | null; // Search API calls
-    processing_time: number | null; // In seconds
-    successfully_classified_l4: number | null; // Vendors reaching L4
-    search_successful_classifications: number | null; // Vendors classified via search (L4)
-    invalid_category_errors: number | null; // Count of invalid category IDs from LLM
-}
+// --- REMOVED: Redundant local interface definition ---
+// interface JobStatsData { ... }
+// --- END REMOVED ---
 
 // Define the component props
 interface Props {
@@ -88,7 +87,7 @@ interface Props {
 const props = defineProps<Props>();
 
 // Reactive state variables
-const stats = ref<JobStatsData | null>(null);
+const stats = ref<JobStatsData | null>(null); // Use the imported type
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 
@@ -125,6 +124,7 @@ const fetchStats = async (id: string | null | undefined) => {
 
   try {
       console.log(`JobStats: Fetching stats for job ID: ${id}`); // Logging
+      // The API service now returns the updated structure
       stats.value = await apiService.getJobStats(id);
       console.log(`JobStats: Received stats:`, JSON.parse(JSON.stringify(stats.value))); // Log a deep copy
   } catch (err: any) {
@@ -144,9 +144,7 @@ onMounted(() => {
 
 // Watch for changes in the jobId prop and refetch stats
 watch(() => props.jobId,
-  // --- CORRECTED: Added type annotation for newJobId ---
   (newJobId: string | null | undefined) => {
-  // --- END CORRECTION ---
     console.log(`JobStats: Watched jobId changed to: ${newJobId}`); // Logging
     fetchStats(newJobId); // fetchStats handles null/undefined check internally
   },

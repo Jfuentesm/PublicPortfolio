@@ -1,4 +1,3 @@
-# <file path='app/tasks/classification_tasks.py'>
 # --- file path='app/tasks/classification_tasks.py' ---
 # app/tasks/classification_tasks.py
 import os
@@ -305,6 +304,7 @@ async def process_vendors(
 
     # --- Initial Hierarchical Classification (Levels 1-5) ---
     vendors_to_process_next_level_names = set(unique_vendor_names) # Start with all unique vendor names for Level 1
+    initial_l4_success_count = 0 # Track L4 for stats
 
     # --- MODIFIED: Loop up to Level 5 ---
     for level in range(1, 6):
@@ -373,6 +373,11 @@ async def process_vendors(
                             if not classification.get("classification_not_possible", True):
                                 vendors_successfully_classified_in_level_names.add(vendor_name)
                                 logger.debug(f"Vendor '{vendor_name}' successfully classified at Level {level} (ID: {classification.get('category_id')}). Added for L{level+1}.")
+                                # --- ADDED: Increment L4 success count here ---
+                                if level == 4:
+                                    initial_l4_success_count += 1
+                                    logger.debug(f"Incremented initial_l4_success_count for {vendor_name}. Current L4 count: {initial_l4_success_count}")
+                                # --- END ADDED ---
                             else:
                                 logger.debug(f"Vendor '{vendor_name}' not successfully classified at Level {level}. Reason: {classification.get('classification_not_possible_reason', 'Unknown')}. Will not proceed.")
                         else:
@@ -412,24 +417,20 @@ async def process_vendors(
         vendors_to_process_next_level_names = vendors_successfully_classified_in_level_names
 
     # --- End of Initial Level Loop ---
-    logger.info("===== Finished Initial Hierarchical Classification Loop (Levels 1-5) =====")
+    logger.info(f"===== Finished Initial Hierarchical Classification Loop (Levels 1-5) =====")
 
     # --- Identify initially unclassifiable vendors (based on reaching L5) ---
     unknown_vendors_data_to_search = []
     initial_l5_success_count = 0
-    initial_l4_success_count = 0 # Keep track of L4 success too
     for vendor_name in unique_vendor_names:
         is_classified_l5 = False
-        is_classified_l4 = False # Track L4 separately
         if vendor_name in results:
-            l4_result = results[vendor_name].get("level4")
-            if l4_result and not l4_result.get("classification_not_possible", False):
-                 is_classified_l4 = True
-                 initial_l4_success_count += 1
+            # --- MODIFIED: Check L5 result ---
             l5_result = results[vendor_name].get("level5")
             if l5_result and not l5_result.get("classification_not_possible", False):
                  is_classified_l5 = True
                  initial_l5_success_count += 1
+            # --- END MODIFIED ---
 
         if not is_classified_l5: # If didn't reach L5 successfully
             logger.debug(f"Vendor '{vendor_name}' did not initially reach/pass Level 5 classification. Adding to search list.")
@@ -440,10 +441,11 @@ async def process_vendors(
                 unknown_vendors_data_to_search.append({'vendor_name': vendor_name})
 
     stats["classification_not_possible_initial"] = len(unknown_vendors_data_to_search)
-    stats["successfully_classified_l4"] = initial_l4_success_count # Store initial L4 count
+    stats["successfully_classified_l4"] = initial_l4_success_count # Store initial L4 count (calculated during the loop)
     stats["successfully_classified_l5"] = initial_l5_success_count # Store initial L5 count
 
     logger.info(f"Initial Classification Summary: {initial_l5_success_count} reached L5, {stats['classification_not_possible_initial']} did not.")
+    logger.info(f"Initial Classification Summary: {initial_l4_success_count} reached L4.") # Log L4 count
 
     # --- Search and Recursive Classification for Unknown Vendors ---
     if unknown_vendors_data_to_search:
@@ -529,7 +531,12 @@ async def process_vendors(
                                 successful_l5_searches += 1
                                 logger.info(f"Vendor '{vendor_name}' reached L5 classification via search.")
                         else:
+                            # Explicitly remove higher levels if recursion stopped early
                             results[vendor_name].pop(f"level{lvl}", None)
+                            # --- ADDED: Log why recursion might have stopped ---
+                            if f"classification_l{lvl-1}" in search_data:
+                                logger.debug(f"Recursion for {vendor_name} stopped before L{lvl}, likely due to L{lvl-1} failure or no children.")
+                            # --- END ADDED ---
 
                 else: # L1 classification via search failed or wasn't possible
                     reason = "Search did not yield L1 classification"
@@ -553,15 +560,6 @@ async def process_vendors(
                 for lvl in range(2, 6): results[vendor_name].pop(f"level{lvl}", None)
 
             # --- REMOVED: Progress update within this loop, moved after gather ---
-            # search_progress_fraction = processed_search_count / len(unknown_vendors_data_to_search) if unknown_vendors_data_to_search else 1
-            # job.progress = min(0.98, 0.8 + (0.18 * search_progress_fraction))
-            # try:
-            #     logger.info(f"[process_vendors] Committing progress update after search task {processed_search_count}/{len(unknown_vendors_data_to_search)}: {job.progress:.3f}")
-            #     db.commit()
-            # except Exception as db_err:
-            #      logger.error("Failed to commit progress update during search processing", exc_info=True)
-            #      db.rollback()
-            # --- END REMOVED ---
 
         stats["search_successful_classifications_l1"] = successful_l1_searches
         stats["search_successful_classifications_l5"] = successful_l5_searches # Updated stat

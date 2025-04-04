@@ -1,4 +1,3 @@
-
 // frontend/vue_frontend/src/services/api.ts
 import axios, {
     type AxiosInstance,
@@ -83,16 +82,19 @@ export interface JobResponse {
 }
 
 // Matches backend response for /api/v1/jobs/{job_id}/stats
-interface JobStatsData {
+export interface JobStatsData {
     vendors_processed: number | null;
     unique_vendors: number | null;
-    api_calls: number | null;
-    tokens_used: number | null;
-    tavily_searches: number | null;
-    processing_time: number | null;
-    successfully_classified_l4: number | null;
-    search_successful_classifications: number | null;
-    invalid_category_errors: number | null;
+    api_calls: number | null; // LLM API calls
+    tokens_used: number | null; // LLM tokens
+    tavily_searches: number | null; // Search API calls
+    processing_time: number | null; // In seconds
+    successfully_classified_l4: number | null; // Vendors reaching L4 (reference)
+    successfully_classified_l5: number | null; // NEW: Vendors reaching L5
+    search_assisted_l5: number | null; // NEW: Vendors reaching L5 via search
+    invalid_category_errors: number | null; // Count of invalid category IDs from LLM
+    // --- Deprecated/Optional ---
+    // search_successful_classifications?: number | null; // Old field name, API might still return it for compatibility
 }
 
 // Structure for download result helper
@@ -199,11 +201,13 @@ const apiService = {
         const params = new URLSearchParams();
         params.append('username', usernameInput);
         params.append('password', passwordInput);
+        // --- MODIFIED: Use absolute path for /token ---
         // Use base axios to avoid default JSON headers and ensure correct Content-Type
         const response = await axios.post<AuthResponse>('/token', params, {
-            baseURL: '/', // Use root base URL for the token endpoint
+            // baseURL: '/', // REMOVED: Let Vite proxy handle the root path
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         });
+        // --- END MODIFIED ---
         return response.data;
     },
 
@@ -211,8 +215,9 @@ const apiService = {
         * Uploads the vendor file.
         */
     async uploadFile(formData: FormData): Promise<UploadResponse> {
+        // This uses axiosInstance, so /api/v1 prefix is added automatically
         const response = await axiosInstance.post<UploadResponse>('/upload', formData, {
-                headers: { 'Content-Type': undefined }
+                headers: { 'Content-Type': undefined } // Let browser set Content-Type for FormData
         });
         return response.data;
     },
@@ -228,7 +233,7 @@ const apiService = {
     /**
         * Fetches statistics for a specific job.
         */
-    async getJobStats(jobId: string): Promise<JobStatsData> {
+    async getJobStats(jobId: string): Promise<JobStatsData> { // Use the updated interface here
         const response = await axiosInstance.get<JobStatsData>(`/jobs/${jobId}/stats`);
         return response.data;
     },
@@ -274,7 +279,7 @@ const apiService = {
         return response.data;
     },
 
-    // --- ADDED User Management API Methods ---
+    // --- User Management API Methods ---
 
     /**
         * Fetches the current logged-in user's details.

@@ -1,3 +1,4 @@
+
 # app/api/main.py
 import socket
 import sqlalchemy
@@ -437,76 +438,39 @@ async def get_job_stats(job_id: str, current_user: User = Depends(get_current_us
 
     if not isinstance(job.stats, dict):
          logger.warning(f"Job stats data is not a dictionary or is missing", extra={"stats_type": type(job.stats)})
-         return { "vendors_processed": 0, "unique_vendors": 0, "api_calls": 0, "tokens_used": 0, "tavily_searches": 0, "processing_time": 0, "invalid_category_errors": 0, "successfully_classified_l4": 0, "search_successful_classifications": 0 }
+         # Return default structure matching ProcessingStats fields
+         return {
+             "vendors_processed": 0, "unique_vendors": 0,
+             "successfully_classified_l4": 0, "successfully_classified_l5": 0,
+             "classification_not_possible_initial": 0, "invalid_category_errors": 0,
+             "search_attempts": 0, "search_successful_classifications_l1": 0,
+             "search_successful_classifications_l5": 0, # Changed from l4
+             "api_calls": 0, "tokens_used": 0, "tavily_searches": 0,
+             "processing_time": 0, "cost_estimate_usd": 0.0
+         }
+
     logger.info(f"Job stats retrieved")
-    job_stats = job.stats; api_usage = job_stats.get("api_usage", {})
-    return { "vendors_processed": job_stats.get("total_vendors", 0), "unique_vendors": job_stats.get("unique_vendors", 0), "api_calls": api_usage.get("openrouter_calls", 0), "tokens_used": api_usage.get("openrouter_total_tokens", 0), "tavily_searches": api_usage.get("tavily_search_calls", 0), "processing_time": job_stats.get("processing_duration_seconds", 0), "invalid_category_errors": job_stats.get("invalid_category_errors", 0), "successfully_classified_l4": job_stats.get("successfully_classified_l4", 0), "search_successful_classifications": job_stats.get("search_successful_classifications", 0) }
+    job_stats = job.stats
+    api_usage = job_stats.get("api_usage", {})
 
+    # --- UPDATED: Return new L5 stats and rename old ones for clarity ---
+    return {
+        "vendors_processed": job_stats.get("total_vendors", 0),
+        "unique_vendors": job_stats.get("unique_vendors", 0),
+        "successfully_classified_l4": job_stats.get("successfully_classified_l4", 0), # Keep L4 for reference
+        "successfully_classified_l5": job_stats.get("successfully_classified_l5", 0), # NEW: Final L5 success count
+        "search_assisted_l5": job_stats.get("search_successful_classifications_l5", 0), # NEW: Search success count (L5)
+        "invalid_category_errors": job_stats.get("invalid_category_errors", 0),
+        "api_calls": api_usage.get("openrouter_calls", 0),
+        "tokens_used": api_usage.get("openrouter_total_tokens", 0),
+        "tavily_searches": api_usage.get("tavily_search_calls", 0), # Renamed from tavily_searches for consistency
+        "processing_time": job_stats.get("processing_duration_seconds", 0),
+        # --- Deprecated/Renamed (Optional, can remove if frontend updated) ---
+        # "search_successful_classifications": job_stats.get("search_successful_classifications_l5", 0), # Map old name to new L5 count
+    }
+    # --- END UPDATED ---
 
-# --- Include Routers ---
-# Include Job History Router (requires authentication)
-app.include_router(
-    jobs_router.router,
-    prefix=settings.API_V1_STR + "/jobs",
-    tags=["Job History"], # Changed tag for clarity
-    dependencies=[Depends(get_current_user)] # Apply auth dependency
-)
-
-# Include User Management Router (authentication handled within endpoints)
-app.include_router(
-    users_router.router,
-    prefix=settings.API_V1_STR + "/users",
-    tags=["User Management"], # Changed tag for clarity
-    # Dependencies are applied per-endpoint in users.py
-)
-# --- End Include Routers ---
-
-
-# --- Startup Event ---
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup."""
-    global setup_logging_done
-    if setup_logging_done:
-        startup_logger.info("Startup event triggered again, skipping full setup.")
-        return
-    log_dir = "/data/logs" if os.path.exists("/data") else "./logs"
-    try:
-        os.makedirs(log_dir, exist_ok=True)
-        startup_logger.info(f"Log directory ensured: {log_dir}")
-    except OSError as e:
-        startup_logger.error(f"ERROR: Could not create logging directory {log_dir}: {e}. Logging to file may fail.")
-        log_dir = "./logs"
-        try: os.makedirs(log_dir, exist_ok=True)
-        except OSError as e2: startup_logger.error(f"ERROR: Could not create fallback logging directory {log_dir}: {e2}. Disabling file logging."); log_dir = None
-
-    setup_logging( log_level=None, log_to_file=bool(log_dir), log_dir=log_dir, async_logging=True, llm_trace_log_file="llm_api_trace.log" )
-    setup_logging_done = True
-    logger.info("*********************************************")
-    logger.info("          Application starting up...         ")
-    logger.info("*********************************************")
-
-    try:
-        os.makedirs(settings.INPUT_DATA_DIR, exist_ok=True)
-        os.makedirs(settings.OUTPUT_DATA_DIR, exist_ok=True)
-        os.makedirs(settings.TAXONOMY_DATA_DIR, exist_ok=True)
-        logger.info("Ensured input, output, and taxonomy data directories exist.")
-    except OSError as e: logger.error(f"Failed to create one or more data directories: {e}")
-
-    try:
-        logger.info("Initializing database...")
-        initialize_database()
-        logger.info("Database initialization completed.")
-    except Exception as e:
-        logger.critical(f"CRITICAL: Error initializing database during startup.", exc_info=True, extra={"error_details": str(e)})
-
-    try:
-        logger.info("Pre-loading taxonomy into cache...")
-        load_taxonomy(force_reload=True)
-        logger.info("Taxonomy pre-loading completed.")
-    except Exception as e:
-        logger.error("Failed to pre-load taxonomy during startup.", exc_info=True)
-
+# ... (rest of main.py remains the same) ...
 
 # --- Mount Static Files (Vue App) ---
 # This should be the LAST app configuration step

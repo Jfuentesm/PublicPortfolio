@@ -13,7 +13,7 @@ class VendorClassification(BaseModel):
     classification_not_possible: bool = False
     classification_not_possible_reason: Optional[str] = None
     sources: Optional[List[Dict[str, str]]] = None
-    classification_source: Optional[str] = None # ADDED: e.g., 'Initial', 'Search'
+    classification_source: Optional[str] = None # e.g., 'Initial', 'Search'
 
 class ClassificationBatchResponse(BaseModel):
     """Response model for classification batch (expected from LLM)."""
@@ -26,13 +26,12 @@ class ClassificationBatchResponse(BaseModel):
 
 class ApiUsage(BaseModel):
     """API usage statistics."""
-    # --- UPDATED Field Names ---
+    # Field names match the keys used in the stats dictionary
     openrouter_calls: int = 0
     openrouter_prompt_tokens: int = 0
     openrouter_completion_tokens: int = 0
     openrouter_total_tokens: int = 0
     tavily_search_calls: int = 0
-    # --- END UPDATED ---
     cost_estimate_usd: float = 0.0
 
 class ProcessingStats(BaseModel):
@@ -45,7 +44,7 @@ class ProcessingStats(BaseModel):
     total_vendors: int = 0
     unique_vendors: int = 0
     # --- UPDATED/ADDED Fields ---
-    successfully_classified_l4: int = 0 # Keep L4 count
+    successfully_classified_l4: int = 0 # Keep L4 count for reference/comparison
     successfully_classified_l5: int = 0 # NEW: Total vendors reaching L5 (initial or post-search)
     classification_not_possible_initial: int = 0 # Vendors needing search initially
     invalid_category_errors: int = 0 # Count of times LLM returned invalid category ID
