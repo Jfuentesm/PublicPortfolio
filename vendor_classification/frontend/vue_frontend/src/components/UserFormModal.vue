@@ -102,7 +102,7 @@
                  <div class="flex items-center space-x-8 pt-2">
                     <div class="flex items-center">
                        <Switch
-                         :modelValue="Boolean(formData.is_active)" @update:modelValue="formData.is_active = $event" <!-- FIX: Ensure boolean -->
+                         :modelValue="Boolean(formData.is_active)" @update:modelValue="formData.is_active = $event"
                          :class="formData.is_active ? 'bg-primary' : 'bg-gray-200'"
                          class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                        >
@@ -117,7 +117,7 @@
                     </div>
                      <div class="flex items-center">
                        <Switch
-                         :modelValue="Boolean(formData.is_superuser)" @update:modelValue="formData.is_superuser = $event" <!-- FIX: Ensure boolean -->
+                         :modelValue="Boolean(formData.is_superuser)" @update:modelValue="formData.is_superuser = $event"
                          :class="formData.is_superuser ? 'bg-indigo-600' : 'bg-gray-200'"
                          class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                        >
@@ -185,47 +185,71 @@ const props = defineProps<Props>();
 const emit = defineEmits(['close', 'save']);
 
 // --- Form Data ---
-// Define the type for the reactive form data explicitly
 interface FormDataState {
     username: string;
     email: string;
-    full_name: string | null; // Allow null for full_name
-    password?: string; // Optional password
-    is_active: boolean; // Ensure this is always boolean
-    is_superuser: boolean; // Ensure this is always boolean
+    full_name: string | null;
+    password?: string;
+    is_active: boolean;
+    is_superuser: boolean;
 }
 
 const defaultFormData: FormDataState = {
     username: '',
     email: '',
-    full_name: null, // Use null as default for optional string
+    full_name: null,
     password: '',
     is_active: true,
     is_superuser: false,
 };
-const formData = ref<FormDataState>({ ...defaultFormData });
+
+// Helper to initialize or reset form data
+const initializeFormData = (user: UserResponse | null): FormDataState => {
+    if (user) {
+        return {
+            username: user.username,
+            email: user.email,
+            full_name: user.full_name || null,
+            password: '', // Always clear password field on open
+            is_active: user.is_active ?? true,
+            is_superuser: user.is_superuser ?? false,
+        };
+    } else {
+        return { ...defaultFormData };
+    }
+};
+
+const formData = ref<FormDataState>(initializeFormData(props.userToEdit));
 const formError = ref<string | null>(null);
-const isSubmitting = ref(false); // Track submission state
+const isSubmitting = ref(false);
 
 const isEditing = computed(() => !!props.userToEdit);
 
-// --- Watcher to populate form when editing ---
+// --- Watcher to populate form when userToEdit prop changes ---
+// --- REMOVED immediate: true ---
 watch(() => props.userToEdit, (newUser) => {
-  if (newUser) {
-    formData.value = {
-      username: newUser.username,
-      email: newUser.email,
-      full_name: newUser.full_name || null, // Ensure null if empty
-      password: '', // Clear password field for editing
-      is_active: newUser.is_active ?? true, // Default null/undefined to true
-      is_superuser: newUser.is_superuser ?? false, // Default null/undefined to false
-    };
-  } else {
-    formData.value = { ...defaultFormData }; // Reset to default for creation
-  }
-  formError.value = null; // Clear error when modal opens/user changes
-  isSubmitting.value = false; // Reset submitting state
-}, { immediate: true }); // Run immediately to set initial state
+    console.log("UserFormModal: Watcher triggered for userToEdit:", newUser ? newUser.username : 'null');
+    formData.value = initializeFormData(newUser); // Use the helper function to reset/populate
+    formError.value = null; // Clear error when user changes
+    isSubmitting.value = false; // Reset submitting state
+});
+
+// Watcher to reset state when modal is closed (show becomes false)
+watch(() => props.show, (newVal, oldVal) => {
+    // Only reset when closing (transitioning from true to false)
+    if (oldVal === true && newVal === false) {
+        console.log("UserFormModal: Watcher triggered for show=false. Resetting form.");
+        // Reset form data to default when modal closes
+        formData.value = { ...defaultFormData };
+        formError.value = null;
+        isSubmitting.value = false;
+    }
+    // Optionally populate when opening if needed, though the userToEdit watcher handles it
+    // if (oldVal === false && newVal === true) {
+    //    formData.value = initializeFormData(props.userToEdit);
+    // }
+});
+
 
 const closeModal = () => {
   if (isSubmitting.value) return; // Prevent closing while submitting
@@ -253,11 +277,10 @@ const submitForm = async () => {
     if (isEditing.value) {
         const updateData: UserUpdateData = {
             email: formData.value.email,
-            full_name: formData.value.full_name?.trim() || null, // Send null if empty/whitespace
+            full_name: formData.value.full_name?.trim() || null,
             is_active: formData.value.is_active,
             is_superuser: formData.value.is_superuser,
         };
-        // Only include password if it's entered and valid
         if (formData.value.password && formData.value.password.length >= 8) {
             updateData.password = formData.value.password;
         } else if (formData.value.password && formData.value.password.length > 0) {
@@ -267,7 +290,6 @@ const submitForm = async () => {
         }
         dataToSend = updateData;
     } else {
-        // Password is required for creation
         if (!formData.value.password || formData.value.password.length < 8) {
              formError.value = "Password is required and must be at least 8 characters long.";
              isSubmitting.value = false;
@@ -277,7 +299,7 @@ const submitForm = async () => {
             username: formData.value.username.trim(),
             email: formData.value.email.trim(),
             full_name: formData.value.full_name?.trim() || null,
-            password: formData.value.password, // Required
+            password: formData.value.password,
             is_active: formData.value.is_active,
             is_superuser: formData.value.is_superuser,
         };
@@ -285,24 +307,16 @@ const submitForm = async () => {
     }
 
     try {
-        // Emit the save event - the parent (UserManagement) will handle the API call
-        // It's the parent's responsibility to set isSubmitting back to false on success/error
-        emit('save', dataToSend);
+        // Emit the save event - parent handles API call & closing/resetting isSubmitting
+        await emit('save', dataToSend);
     } catch (err: any) {
-        // This catch block might be less useful now as the parent handles API errors
-        console.error("Error emitting save event:", err);
-        formError.value = "An unexpected error occurred preparing the form data.";
-        isSubmitting.value = false; // Reset submitting state on local error
+        // If the parent re-throws the error after handling it
+        console.error("Error during form submission (caught in modal):", err);
+        formError.value = err.message || "Failed to save user.";
+        isSubmitting.value = false; // Ensure button is re-enabled on error
     }
-    // NOTE: isSubmitting is NOT reset here on successful emit. The parent should handle it.
+    // Do NOT set isSubmitting to false here if emit was successful, parent controls it.
 };
-
-// Watch the show prop to reset submitting state if modal is closed externally
-watch(() => props.show, (newVal) => {
-    if (!newVal) {
-        isSubmitting.value = false;
-    }
-});
 
 </script>
 
