@@ -1,15 +1,19 @@
-# --- file path='api/auth.py' ---
+
 # app/api/auth.py
-from fastapi import Depends, HTTPException, status, Request # Added Request
-from fastapi.security import OAuth2PasswordBearer # Keep for credentials_exception header
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from typing import Optional
-import uuid # Ensure UUID is imported
+import uuid
 
 from core.config import settings
-from core.logging_config import get_logger, LogTimer, log_function_call, set_user, get_user, get_correlation_id # Added context helpers
+# Import logger and context functions from refactored modules
+from core.logging_config import get_logger
+from core.log_context import set_user, get_user, get_correlation_id
+# Import log helpers from utils
+from utils.log_utils import LogTimer, log_function_call
 
 from models.user import User
 from core.database import get_db
@@ -18,8 +22,7 @@ from core.database import get_db
 logger = get_logger("vendor_classification.auth")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-# Keep oauth2_scheme instance for potential use elsewhere or headers in exception
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token") # tokenUrl='token' should match your login endpoint path
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @log_function_call(logger, include_args=False) # Don't log passwords
 def verify_password(plain_password, hashed_password):
@@ -32,7 +35,6 @@ def verify_password(plain_password, hashed_password):
             logger.debug(f"Password verification result", extra={"result": result})
             return result
     except Exception as e:
-        # Log the error type, but not the password details
         logger.error(f"Password verification error: {type(e).__name__}", exc_info=False)
         return False
 
@@ -54,23 +56,19 @@ def authenticate_user(db, username: str, password: str):
     try:
         logger.info(f"Authentication attempt", extra={"username": username})
         with LogTimer(logger, f"User authentication", include_in_stats=True):
-            # --- MODIFIED: Import service here or pass db ---
-            # Let's keep it simple and use the db directly for now
-            # Alternatively: from services.user_service import get_user_by_username
             user = db.query(User).filter(User.username == username).first()
-            # --- END MODIFIED ---
             if not user:
                 logger.warning(f"Authentication failed: user not found", extra={"username": username})
-                return None # Return None instead of False for clarity
+                return None
             logger.debug(f"User found in database", extra={"username": user.username, "user_id": user.id})
             if not verify_password(password, user.hashed_password):
                 logger.warning(f"Authentication failed: invalid password", extra={"username": username})
-                return None # Return None instead of False
+                return None
             logger.info(f"Authentication successful", extra={"username": username, "user_id": user.id})
             return user
     except Exception as e:
         logger.error(f"Authentication error", exc_info=True, extra={"username": username})
-        return None # Return None on error
+        return None
 
 @log_function_call(logger)
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -92,7 +90,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         logger.error(f"Token creation error", exc_info=True)
         raise
 
-# --- Using manual header read version of get_current_user ---
 async def get_current_user(request: Request, db = Depends(get_db)):
     """Get current user from the JWT token by manually reading header."""
     correlation_id = get_correlation_id() or str(uuid.uuid4())
@@ -161,11 +158,7 @@ async def get_current_user(request: Request, db = Depends(get_db)):
     user = None
     try:
         logger.debug(f"Looking up user in database", extra={"username": username})
-        # --- MODIFIED: Import service here or pass db ---
-        # Let's keep it simple and use the db directly for now
-        # Alternatively: from services.user_service import get_user_by_username
         user = db.query(User).filter(User.username == username).first()
-        # --- END MODIFIED ---
         if user is None:
             logger.warning(f"User '{username}' not found in database after token decode")
             raise credentials_exception
@@ -181,9 +174,7 @@ async def get_current_user(request: Request, db = Depends(get_db)):
         logger.error(f"Database error during user lookup in get_current_user", exc_info=True, extra={"error_details": str(db_err)})
         credentials_exception.detail = "Database error during authentication"
         raise credentials_exception
-# --- END get_current_user ---
 
-# --- ADDED: get_current_active_user ---
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
     """Dependency to get the current user and ensure they are active."""
     if not current_user.is_active:
@@ -191,9 +182,7 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     logger.debug(f"User '{current_user.username}' is active.")
     return current_user
-# --- END ADDED ---
 
-# --- ADDED: get_current_active_superuser ---
 async def get_current_active_superuser(current_user: User = Depends(get_current_active_user)):
     """Dependency to get the current active user and ensure they are a superuser."""
     if not current_user.is_superuser:
@@ -204,4 +193,3 @@ async def get_current_active_superuser(current_user: User = Depends(get_current_
         )
     logger.debug(f"User '{current_user.username}' is an active superuser.")
     return current_user
-# --- END ADDED ---

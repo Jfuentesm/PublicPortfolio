@@ -1,9 +1,8 @@
-# --- file path='app/api/main.py' ---
 # app/api/main.py
 import socket
 import sqlalchemy
 import httpx
-from fastapi import ( # Ensure all necessary imports are present
+from fastapi import (
     FastAPI, Depends, HTTPException, UploadFile, File, Form,
     BackgroundTasks, status, Request
 )
@@ -16,28 +15,29 @@ import uuid
 import os
 from datetime import datetime, timedelta
 import logging
-import time # Added for sleep
-# --- ADDED: Import Session ---
+import time
 from sqlalchemy.orm import Session
-# --- END ADDED ---
 
 # --- Model Imports ---
-from models.job import Job, JobStatus, ProcessingStage # Import Job and enums
+from models.job import Job, JobStatus, ProcessingStage
 from models.user import User
 
 # --- Core Imports ---
 from core.config import settings
-from core.logging_config import setup_logging, get_logger, set_correlation_id, set_user, set_job_id, log_function_call, get_correlation_id
+# Import logger and context functions from refactored modules
+from core.logging_config import setup_logging, get_logger
+from core.log_context import set_correlation_id, set_user, set_job_id, get_correlation_id
+# Import middleware (which now uses updated context functions)
 from middleware.logging_middleware import RequestLoggingMiddleware
-from core.database import get_db, SessionLocal, engine # Import engine
-from core.initialize_db import initialize_database # Keep for potential direct call if needed
+from core.database import get_db, SessionLocal, engine
+from core.initialize_db import initialize_database
 
 # --- Service Imports ---
-from services.file_service import save_upload_file # Import file saving service
+from services.file_service import save_upload_file
 
 # --- Task Imports ---
 from tasks.celery_app import celery_app
-from tasks.classification_tasks import process_vendor_file # Import the Celery task
+from tasks.classification_tasks import process_vendor_file
 
 # --- Utility Imports ---
 from utils.taxonomy_loader import load_taxonomy
@@ -48,22 +48,19 @@ from api.auth import (
     get_current_user,
     authenticate_user,
     create_access_token,
-    get_current_active_user # Keep this if needed elsewhere, though often get_current_user is enough
+    get_current_active_user
 )
 
 # --- Router Imports ---
-from api import jobs as jobs_router        # <--- IMPORTED jobs_router
-from api import users as users_router      # <--- IMPORTED users_router
+from api import jobs as jobs_router
+from api import users as users_router
 
 # --- Schema Imports ---
-from schemas.job import JobResponse # Import JobResponse schema for upload return
-from schemas.user import UserResponse as UserResponseSchema # Import UserResponse schema
-
+from schemas.job import JobResponse
+from schemas.user import UserResponse as UserResponseSchema
 
 # --- Logging Setup ---
-# Setup logging early (assuming it's called elsewhere or handled by Docker entrypoint)
-logger = get_logger("vendor_classification.api") # Get the main API logger
-
+logger = get_logger("vendor_classification.api")
 
 # --- FastAPI App Initialization ---
 app = FastAPI(
@@ -76,7 +73,7 @@ app = FastAPI(
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -86,21 +83,19 @@ app.add_middleware(
 logger.info("Including API routers...")
 app.include_router(
     jobs_router.router,
-    prefix="/api/v1/jobs", # <--- PREFIX for job routes
-    tags=["Jobs"],         # <--- Tag for Swagger UI
-    dependencies=[Depends(get_current_user)] # <--- Add auth dependency to all job routes
+    prefix="/api/v1/jobs",
+    tags=["Jobs"],
+    dependencies=[Depends(get_current_user)]
 )
 logger.info("Included jobs router with prefix /api/v1/jobs")
 
 app.include_router(
     users_router.router,
-    prefix="/api/v1/users", # <--- PREFIX for user routes
-    tags=["Users"],         # <--- Tag for Swagger UI
-    # Dependencies are handled within the user routes (e.g., get_current_active_superuser)
+    prefix="/api/v1/users",
+    tags=["Users"],
 )
 logger.info("Included users router with prefix /api/v1/users")
 # --- End Include Routers ---
-
 
 # --- Vue.js Frontend Serving Setup ---
 VUE_BUILD_DIR = "/app/frontend/dist"
@@ -112,10 +107,8 @@ elif not os.path.exists(VUE_INDEX_FILE):
     logger.error(f"Vue index.html NOT FOUND at {VUE_INDEX_FILE}. Frontend serving might fail.")
 else:
     logger.info(f"Vue build directory and index.html found. Static files will be mounted.")
-# Static files are mounted at the end of the file
 
-
-# --- API ROUTES (Keep root routes like health, token directly under app) ---
+# --- API ROUTES ---
 
 @app.get("/health")
 async def health_check():
@@ -231,11 +224,11 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 # --- Authentication Endpoint ---
-@app.post("/token", response_model=Dict[str, Any]) # Keep response model generic Dict or create specific AuthResponse schema
+@app.post("/token", response_model=Dict[str, Any])
 async def login_for_access_token(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db) # Use imported Session here
+    db: Session = Depends(get_db)
 ):
     """Handles user login and returns JWT token and user details."""
     correlation_id = str(uuid.uuid4())
@@ -253,11 +246,10 @@ async def login_for_access_token(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Check if user is active *after* authentication
         if not user.is_active:
              logger.warning(f"Login failed: user '{user.username}' is inactive.", extra={"ip": client_host})
              raise HTTPException(
-                 status_code=status.HTTP_400_BAD_REQUEST, # Use 400 for inactive user
+                 status_code=status.HTTP_400_BAD_REQUEST,
                  detail="Inactive user.",
              )
 
@@ -269,18 +261,16 @@ async def login_for_access_token(
 
         logger.info(f"Login successful, token generated", extra={ "username": user.username, "ip": client_host, "token_expires_in_minutes": settings.ACCESS_TOKEN_EXPIRE_MINUTES})
 
-        # Return user details along with token using the UserResponseSchema
         return {
             "access_token": access_token,
             "token_type": "bearer",
-            "user": UserResponseSchema.model_validate(user) # Validate and structure user data
+            "user": UserResponseSchema.model_validate(user)
         }
 
     except HTTPException as http_exc:
-        # Avoid logging expected 401/400 errors as exceptions unless debugging needed
         if http_exc.status_code not in [status.HTTP_401_UNAUTHORIZED, status.HTTP_400_BAD_REQUEST]:
              logger.error(f"HTTP exception during login", exc_info=True)
-        raise # Re-raise the exception
+        raise
     except Exception as e:
         logger.error(f"Unexpected login error", exc_info=True, extra={"error": str(e), "username": form_data.username})
         raise HTTPException(
@@ -294,27 +284,24 @@ async def upload_vendor_file(
     background_tasks: BackgroundTasks,
     company_name: str = Form(...),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db), # Use imported Session here
-    current_user: User = Depends(get_current_user) # Ensure user is logged in
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Accepts vendor file upload, creates a job, and queues it for processing.
     """
     job_id = str(uuid.uuid4())
-    set_job_id(job_id) # Set job ID in context for subsequent logs
-    set_user(current_user) # Set user context
+    set_job_id(job_id)
+    set_user(current_user)
 
-    # --- MODIFIED: Renamed 'filename' key to avoid conflict ---
     logger.info(f"Upload request received", extra={
         "job_id": job_id,
         "company_name": company_name,
-        "uploaded_filename": file.filename, # Renamed key
+        "uploaded_filename": file.filename,
         "content_type": file.content_type,
         "username": current_user.username
     })
-    # --- END MODIFIED ---
 
-    # --- File Validation (Basic) ---
     if not file.filename:
         logger.warning("Upload attempt with no filename.", extra={"job_id": job_id})
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No filename provided.")
@@ -322,7 +309,6 @@ async def upload_vendor_file(
         logger.warning(f"Invalid file type uploaded: {file.filename}", extra={"job_id": job_id})
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type. Please upload an Excel file (.xlsx or .xls).")
 
-    # --- Save File ---
     saved_file_path = None
     try:
         logger.debug(f"Attempting to save uploaded file for job {job_id}")
@@ -331,18 +317,17 @@ async def upload_vendor_file(
     except IOError as e:
         logger.error(f"Failed to save uploaded file for job {job_id}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Could not save file: {e}")
-    except Exception as e: # Catch potential FastAPI upload errors too
+    except Exception as e:
         logger.error(f"Unexpected error during file upload/saving for job {job_id}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error processing upload: {e}")
 
-    # --- Create Job Record ---
     job = None
     try:
         logger.debug(f"Creating database job record for job {job_id}")
         job = Job(
             id=job_id,
             company_name=company_name,
-            input_file_name=os.path.basename(saved_file_path), # Store just the filename
+            input_file_name=os.path.basename(saved_file_path),
             status=JobStatus.PENDING.value,
             current_stage=ProcessingStage.INGESTION.value,
             created_by=current_user.username
@@ -354,39 +339,32 @@ async def upload_vendor_file(
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to create database job record for job {job_id}", exc_info=True)
-        # Attempt to clean up saved file if DB record fails
         if saved_file_path and os.path.exists(saved_file_path):
             try: os.remove(saved_file_path)
             except OSError: logger.warning(f"Could not remove file {saved_file_path} after DB error.")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create job record.")
 
-    # --- Queue Celery Task ---
     try:
         logger.info(f"Adding Celery task 'process_vendor_file' to background tasks for job {job_id}")
-        # Ensure the task is called with keyword arguments for clarity and robustness
         background_tasks.add_task(process_vendor_file.delay, job_id=job_id, file_path=saved_file_path)
         logger.info(f"Celery task queued successfully for job {job_id}")
     except Exception as e:
         logger.error(f"Failed to queue Celery task for job {job_id}", exc_info=True)
-        # Update job status to failed if task queueing fails
         job.fail(f"Failed to queue processing task: {str(e)}")
         db.commit()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to queue job for processing.")
 
-    # Return the initial job details (use JobResponse schema)
     logger.info(f"Upload request for job {job_id} processed successfully, returning 202 Accepted.")
-    return JobResponse.model_validate(job) # Use Pydantic v2 validation
+    return JobResponse.model_validate(job)
 # --- END UPLOAD ROUTE ---
 
 
 # --- Mount Static Files (Vue App) ---
-# This should be the LAST app configuration step
 if os.path.exists(VUE_BUILD_DIR) and os.path.exists(VUE_INDEX_FILE):
     logger.info(f"Mounting Vue app from directory: {VUE_BUILD_DIR}")
     app.mount("/", StaticFiles(directory=VUE_BUILD_DIR, html=True), name="app")
 else:
     logger.error(f"Cannot mount Vue app: Directory {VUE_BUILD_DIR} or index file {VUE_INDEX_FILE} not found.")
-    # Add a fallback route to show an error if the frontend isn't mounted
     @app.get("/")
     async def missing_frontend():
         return JSONResponse(
