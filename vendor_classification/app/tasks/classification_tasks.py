@@ -1,5 +1,5 @@
+# <file path='app/tasks/classification_tasks.py'>
 # --- file path='app/tasks/classification_tasks.py' ---
-# app/tasks/classification_tasks.py
 import os
 import time
 import asyncio
@@ -8,12 +8,13 @@ from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
 from celery import shared_task
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError # Import specific DB errors
 
 from core.database import SessionLocal
 from core.config import settings
 from core.logging_config import (
     get_logger, LogTimer, set_correlation_id, set_job_id,
-    log_function_call, set_log_context, log_duration
+    log_function_call, set_log_context, log_duration, clear_all_context # Added clear_all_context
 )
 from models.job import Job, JobStatus, ProcessingStage # Updated import
 # --- MODIFIED IMPORT: Include L5 ---
@@ -40,21 +41,23 @@ def process_vendor_file(self, job_id: str, file_path: str):
         file_path: Path to vendor file
     """
     task_id = self.request.id if self.request and self.request.id else "UnknownTaskID"
-    logger.info(f"***** process_vendor_file TASK STARTED *****",
-               extra={
-                   "celery_task_id": task_id,
-                   "job_id_arg": job_id,
-                   "file_path_arg": file_path
-               })
+    # --- ADDED: More detailed entry log ---
+    logger.info(f"***** process_vendor_file TASK RECEIVED *****",
+                extra={
+                    "celery_task_id": task_id,
+                    "job_id_arg": job_id,
+                    "file_path_arg": file_path
+                })
 
-    set_correlation_id(job_id)
+    set_correlation_id(job_id) # Set correlation ID early
     set_job_id(job_id)
     logger.info(f"Starting vendor file processing task (inside function)",
-               extra={"job_id": job_id, "file_path": file_path})
+                extra={"job_id": job_id, "file_path": file_path})
 
     # Initialize loop within the task context
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    logger.debug(f"Created and set new asyncio event loop for job {job_id}")
 
     db = SessionLocal()
     job = None # Initialize job to None
@@ -68,20 +71,24 @@ def process_vendor_file(self, job_id: str, file_path: str):
                 "file_name": job.input_file_name
             })
             logger.info(f"Processing file for company",
-                       extra={"company": job.company_name})
+                        extra={"company": job.company_name})
         else:
             logger.error("Job not found in database at start of task!", extra={"job_id": job_id})
             loop.close() # Close loop if job not found
             db.close() # Close db session
-            return
+            return # Exit task if job doesn't exist
 
+        # --- ADDED: Log before starting async part ---
+        logger.info(f"About to run async processing for job {job_id}")
         with LogTimer(logger, "Complete file processing", level=logging.INFO, include_in_stats=True):
-             # Run the async function within the loop created for this task
+                # Run the async function within the loop created for this task
             loop.run_until_complete(_process_vendor_file_async(job_id, file_path, db))
 
         logger.info(f"Vendor file processing completed successfully (async part finished)")
+        # --- End ADDED ---
+
     except Exception as e:
-        logger.error(f"Error processing vendor file task", exc_info=True)
+        logger.error(f"Error processing vendor file task (in main try block)", exc_info=True, extra={"job_id": job_id}) # Log error with job_id
         try:
             # Re-query the job within this exception handler if it wasn't fetched initially or became None
             # Use a new session for safety in exception handling
@@ -94,10 +101,10 @@ def process_vendor_file(self, job_id: str, file_path: str):
                         job_in_error.fail(f"Task failed: {str(e)}")
                         db_error_session.commit()
                         logger.info(f"Job status updated to failed due to task error",
-                                   extra={"error": str(e)})
+                                    extra={"error": str(e)})
                     else:
                         logger.warning(f"Task error occurred after job was marked completed, status not changed.",
-                                       extra={"error": str(e)})
+                                        extra={"error": str(e)})
                 else:
                     logger.error("Job not found when trying to mark as failed.", extra={"job_id": job_id})
             except Exception as db_error:
@@ -105,9 +112,9 @@ def process_vendor_file(self, job_id: str, file_path: str):
                             extra={"original_error": str(e), "db_error": str(db_error)})
                 db_error_session.rollback()
             finally:
-                 db_error_session.close()
+                    db_error_session.close()
         except Exception as final_db_error:
-             logger.critical(f"CRITICAL: Failed even to handle database update in task error handler.", exc_info=final_db_error)
+                logger.critical(f"CRITICAL: Failed even to handle database update in task error handler.", exc_info=final_db_error)
 
     finally:
         if db: # Close the main session used by the async function
@@ -117,6 +124,10 @@ def process_vendor_file(self, job_id: str, file_path: str):
         if loop and not loop.is_closed():
             loop.close()
             logger.debug(f"Event loop closed for task.")
+        # --- ADDED: Clear context at the very end ---
+        clear_all_context()
+        logger.info(f"***** process_vendor_file TASK FINISHED *****", extra={"job_id": job_id})
+        # --- END ADDED ---
 
 
 async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
@@ -210,22 +221,33 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
 
         logger.info(f"Starting vendor classification process")
         await process_vendors(unique_vendors_map, taxonomy, results, stats, job, db, llm_service, search_service)
-        logger.info(f"Vendor classification process completed")
+        logger.info(f"Vendor classification process completed") # Log completion of the async call
+
+        # --- ADDED: Explicit log before result generation ---
+        logger.info("Starting result generation phase.")
+        # --- END ADDED ---
 
         # --- UPDATE STAGE AND PROGRESS ---
         job.current_stage = ProcessingStage.RESULT_GENERATION.value
         job.progress = 0.98 # Progress after all classification/search
-        logger.info(f"[_process_vendor_file_async] Committing status update: {job.status}, {job.current_stage}, {job.progress}")
+        logger.info(f"[_process_vendor_file_async] Committing status update before result generation: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
         logger.info(f"Job status updated",
                    extra={"stage": job.current_stage, "progress": job.progress})
         # --- END UPDATE ---
 
-        logger.info(f"Generating output file")
-        with log_duration(logger, "Generating output file"):
-            output_file_name = generate_output_file(normalized_vendors_data, results, job_id) # Can raise IOError
-        logger.info(f"Output file generated",
-                   extra={"output_file": output_file_name})
+        output_file_name = None # Initialize
+        try:
+             logger.info(f"Generating output file")
+             with log_duration(logger, "Generating output file"):
+                 output_file_name = generate_output_file(normalized_vendors_data, results, job_id) # Can raise IOError
+             logger.info(f"Output file generated", extra={"output_file": output_file_name})
+        except Exception as gen_err:
+             logger.error("Failed during output file generation", exc_info=True)
+             # If file generation fails, fail the job
+             job.fail(f"Failed to generate output file: {str(gen_err)}")
+             db.commit()
+             return # Stop processing
 
         # --- Finalize stats ---
         end_time = datetime.now()
@@ -241,21 +263,35 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
         stats["api_usage"]["cost_estimate_usd"] = round(estimated_cost, 4)
         # --- End Finalize stats ---
 
-        job.complete(output_file_name, stats)
-        job.progress = 1.0 # Ensure progress is 1.0 on completion
-        logger.info(f"[_process_vendor_file_async] Committing final job completion status.")
-        db.commit()
-        logger.info(f"Job completed successfully",
-                   extra={
-                       "processing_duration": processing_duration,
-                       "output_file": output_file_name,
-                       "openrouter_calls": stats["api_usage"]["openrouter_calls"],
-                       "tokens_used": stats["api_usage"]["openrouter_total_tokens"],
-                       "tavily_calls": stats["api_usage"]["tavily_search_calls"],
-                       "estimated_cost": stats["api_usage"]["cost_estimate_usd"],
-                       "invalid_category_errors": stats.get("invalid_category_errors", 0),
-                       "successfully_classified_l5_total": stats.get("successfully_classified_l5", 0) # Final L5 count
-                   })
+        # --- Final Commit Block ---
+        try:
+            logger.info("Attempting final job completion update in database.")
+            job.complete(output_file_name, stats)
+            job.progress = 1.0 # Ensure progress is 1.0 on completion
+            logger.info(f"[_process_vendor_file_async] Committing final job completion status.")
+            db.commit()
+            logger.info(f"Job completed successfully",
+                       extra={
+                           "processing_duration": processing_duration,
+                           "output_file": output_file_name,
+                           "openrouter_calls": stats["api_usage"]["openrouter_calls"],
+                           "tokens_used": stats["api_usage"]["openrouter_total_tokens"],
+                           "tavily_calls": stats["api_usage"]["tavily_search_calls"],
+                           "estimated_cost": stats["api_usage"]["cost_estimate_usd"],
+                           "invalid_category_errors": stats.get("invalid_category_errors", 0),
+                           "successfully_classified_l5_total": stats.get("successfully_classified_l5", 0) # Final L5 count
+                       })
+        except Exception as final_commit_err:
+            logger.error("CRITICAL: Failed to commit final job completion status!", exc_info=True)
+            db.rollback() # Rollback the failed commit
+            # Attempt to mark as failed again, just in case the complete() call was the issue
+            try:
+                job.fail(f"Failed during final commit: {str(final_commit_err)}")
+                db.commit()
+            except Exception as fail_err:
+                logger.error("CRITICAL: Also failed to mark job as failed after final commit error.", exc_info=fail_err)
+                db.rollback()
+        # --- End Final Commit Block ---
 
     except (ValueError, FileNotFoundError, IOError) as file_err:
         logger.error(f"[_process_vendor_file_async] File reading or writing error", exc_info=True,
@@ -265,6 +301,18 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
             db.commit() # Commit the failure status
         else:
             logger.error("Job object was None during file error handling.")
+    except SQLAlchemyError as db_err: # Catch specific DB errors
+        logger.error(f"[_process_vendor_file_async] Database error during processing", exc_info=True,
+                    extra={"error": str(db_err)})
+        if job:
+            if job.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
+                job.fail(f"Database error: {str(db_err)}")
+                db.commit()
+            else:
+                 logger.warning(f"Database error occurred but job status was already {job.status}. Error: {db_err}")
+                 db.rollback()
+        else:
+            logger.error("Job object was None during database error handling.")
     except Exception as async_err:
         logger.error(f"[_process_vendor_file_async] Unexpected error during async processing", exc_info=True,
                     extra={"error": str(async_err)})
@@ -325,7 +373,7 @@ async def process_vendors(
 
         # Adjust progress calculation: Spread 0.1 to 0.8 across 5 levels
         job.progress = min(0.8, 0.1 + ((level - 1) * 0.14)) # 0.7 / 5 = 0.14 per level
-        logger.info(f"[process_vendors] Committing status update before Level {level}: {job.status}, {job.current_stage}, {job.progress}")
+        logger.info(f"[process_vendors] Committing status update before Level {level}: {job.status}, {job.current_stage}, {job.progress:.3f}")
         db.commit()
         logger.info(f"===== Starting Initial Level {level} Classification =====",
                    extra={ "vendors_to_process": len(current_vendors_for_this_level), "progress": job.progress })
@@ -343,6 +391,9 @@ async def process_vendors(
         processed_in_level_count = 0
         batch_counter_for_level = 0
         total_batches_for_level = sum( (len(names) + settings.BATCH_SIZE - 1) // settings.BATCH_SIZE for names in grouped_vendors_names.values() )
+        # --- ADDED: Log total batches ---
+        logger.info(f"Level {level}: Total batches to process: {total_batches_for_level}")
+        # --- END ADDED ---
 
         for parent_category_id, group_vendor_names in grouped_vendors_names.items():
             if not group_vendor_names:
@@ -360,10 +411,13 @@ async def process_vendors(
                 batch_counter_for_level += 1
                 batch_names = [vd['vendor_name'] for vd in batch_data] # Get names for logging
                 logger.info(f"Processing Level {level} batch {i+1}/{len(level_batches_data)} for parent '{parent_category_id or 'None'}'",
-                           extra={"batch_size": len(batch_data), "first_vendor": batch_names[0] if batch_names else 'N/A'})
+                           extra={"batch_size": len(batch_data), "first_vendor": batch_names[0] if batch_names else 'N/A', "batch_num": batch_counter_for_level, "total_batches": total_batches_for_level})
                 try:
                     # Process batch WITHOUT search context initially
                     batch_results = await process_batch(batch_data, level, parent_category_id, taxonomy, llm_service, stats, search_context=None)
+                    # --- ADDED: Log batch results count ---
+                    logger.debug(f"Level {level} batch {i+1} results received. Count: {len(batch_results)}.")
+                    # --- END ADDED ---
 
                     for vendor_name, classification in batch_results.items():
                         if vendor_name in results:
@@ -404,6 +458,7 @@ async def process_vendors(
                 # Spread progress for this level within its 0.14 range (updated for 5 levels)
                 job.progress = min(0.8, 0.1 + ((level - 1) * 0.14) + (0.14 * level_progress_fraction))
                 try:
+                    # --- ADDED: More frequent progress logging ---
                     logger.info(f"[process_vendors] Committing progress update after batch {batch_counter_for_level}/{total_batches_for_level} (Level {level}): {job.progress:.3f}")
                     db.commit()
                 except Exception as db_err:
@@ -414,6 +469,9 @@ async def process_vendors(
         logger.info(f"  Processed {processed_in_level_count} vendor results at Level {level}.")
         logger.info(f"  {len(vendors_successfully_classified_in_level_names)} vendors successfully classified and validated at Level {level}, proceeding to L{level+1}.")
 
+        # --- ADDED: Log the set of vendors proceeding ---
+        logger.debug(f"Vendors proceeding to Level {level+1}: {list(vendors_successfully_classified_in_level_names)[:10]}...") # Log first 10
+        # --- END ADDED ---
         vendors_to_process_next_level_names = vendors_successfully_classified_in_level_names
 
     # --- End of Initial Level Loop ---
@@ -458,7 +516,13 @@ async def process_vendors(
         stats["search_attempts"] = len(unknown_vendors_data_to_search)
 
         search_tasks = []
+        # --- ADDED: Log semaphore value check ---
+        if MAX_CONCURRENT_SEARCHES <= 0:
+            logger.error(f"MAX_CONCURRENT_SEARCHES is {MAX_CONCURRENT_SEARCHES}. Cannot proceed with search tasks.")
+            raise ValueError("MAX_CONCURRENT_SEARCHES must be positive.")
         search_semaphore = asyncio.Semaphore(MAX_CONCURRENT_SEARCHES)
+        logger.info(f"Created search semaphore with concurrency limit: {MAX_CONCURRENT_SEARCHES}")
+        # --- END ADDED ---
 
         for vendor_data in unknown_vendors_data_to_search:
             task = asyncio.create_task(
@@ -469,8 +533,13 @@ async def process_vendors(
             search_tasks.append(task)
 
         logger.info(f"Gathering results for {len(search_tasks)} search & recursive classification tasks...")
+        # --- ADDED: Log before gather ---
+        logger.debug(f"Starting asyncio.gather for {len(search_tasks)} tasks.")
+        gather_start_time = time.monotonic()
         search_and_recursive_results = await asyncio.gather(*search_tasks, return_exceptions=True)
-        logger.info(f"Search & recursive classification tasks completed.")
+        gather_duration = time.monotonic() - gather_start_time
+        logger.info(f"Search & recursive classification tasks completed (asyncio.gather finished). Duration: {gather_duration:.3f}s")
+        # --- END ADDED ---
 
         # --- ADDED: Progress update after gather ---
         job.progress = 0.95 # Indicate search phase is done, before result processing/generation
@@ -482,6 +551,9 @@ async def process_vendors(
         successful_l5_searches = 0 # Track L5 success via search
         processed_search_count = 0
 
+        # --- ADDED: Log before processing results ---
+        logger.info(f"Processing {len(search_and_recursive_results)} results from search/recursive tasks.")
+        # --- END ADDED ---
         for i, result_or_exc in enumerate(search_and_recursive_results):
             processed_search_count += 1
             if i >= len(unknown_vendors_data_to_search):
@@ -573,9 +645,12 @@ async def process_vendors(
         logger.info(f"  Total vendors successfully classified at L5: {stats['successfully_classified_l5']}") # Updated stat
     else:
         logger.info("No unknown vendors required search.")
-        job.progress = 0.98 # Set progress high if search wasn't needed
-        logger.info(f"[process_vendors] Committing status update as search was skipped: {job.status}, {job.current_stage}, {job.progress}")
+        job.progress = 0.95 # Set progress high if search wasn't needed
+        logger.info(f"[process_vendors] Committing status update as search was skipped: {job.progress:.3f}")
         db.commit()
+    # --- ADDED: Log before returning from process_vendors ---
+    logger.info("process_vendors function is returning.")
+    # --- END ADDED ---
 
 
 @log_function_call(logger, include_args=False) # Keep args=False
@@ -602,8 +677,9 @@ async def process_batch(
     batch_names = [vd.get('vendor_name', f'Unknown_{i}') for i, vd in enumerate(batch_data)] # For logging
     context_type = "Search Context" if search_context else "Initial Data"
 
-    logger.debug(f"process_batch: Preparing Level {level} batch using {context_type}.",
-               extra={"batch_size": len(batch_data), "parent_category_id": parent_category_id})
+    # --- ADDED: Log entry ---
+    logger.info(f"process_batch: Starting Level {level} batch using {context_type}.",
+               extra={"batch_size": len(batch_data), "parent_category_id": parent_category_id, "first_vendor": batch_names[0] if batch_names else 'N/A'})
 
     # --- Get valid category IDs for this level/parent (Updated for L5) ---
     valid_category_ids: Set[str] = set()
@@ -625,6 +701,7 @@ async def process_batch(
                 categories = taxonomy.get_level5_categories(parent_category_id)
             # --- END ADDED ---
             else:
+                 logger.error(f"process_batch: Invalid level {level} requested.")
                  categories = [] # Should not happen
         else: # level > 1 and no parent_category_id
              logger.error(f"process_batch: Parent category ID is required for Level {level} but was not provided.")
@@ -650,6 +727,8 @@ async def process_batch(
     # --- Call LLM ---
     llm_response_data = None
     try:
+        # --- ADDED: Log before LLM call ---
+        logger.info(f"process_batch: Calling LLM for Level {level}, Parent '{parent_category_id or 'None'}', Context: {context_type}")
         with LogTimer(logger, f"LLM classification - Level {level}, Parent '{parent_category_id or 'None'}' ({context_type})", include_in_stats=True):
             llm_response_data = await llm_service.classify_batch(
                 batch_data=batch_data,
@@ -658,6 +737,8 @@ async def process_batch(
                 parent_category_id=parent_category_id,
                 search_context=search_context
             )
+        # --- ADDED: Log after LLM call ---
+        logger.info(f"process_batch: LLM call completed for Level {level}, Parent '{parent_category_id or 'None'}'.")
 
         if llm_response_data and isinstance(llm_response_data.get("usage"), dict):
             usage = llm_response_data["usage"]
@@ -750,6 +831,9 @@ async def process_batch(
                 "notes": notes,
                 "vendor_name": target_vendor_name
             }
+            # --- ADDED: Log individual classification result ---
+            logger.debug(f"process_batch: Processed result for '{target_vendor_name}' at Level {level}. Possible: {not classification_not_possible}, ID: {category_id}")
+            # --- END ADDED ---
 
         # Handle missing vendors from batch
         missing_vendors = set(batch_names) - processed_vendors_in_response
@@ -775,6 +859,9 @@ async def process_batch(
                 "notes": None,
                 "vendor_name": vendor_name
             }
+    # --- ADDED: Log before returning ---
+    logger.info(f"process_batch: Finished Level {level} batch for parent '{parent_category_id or 'None'}'. Returning {len(results)} results.")
+    # --- END ADDED ---
     return results
 
 
@@ -794,8 +881,11 @@ async def search_and_classify_recursively(
     classification results for L1-L5 (keyed as classification_l1, classification_l2, etc.).
     """
     vendor_name = vendor_data.get('vendor_name', 'UnknownVendor')
+    # --- ADDED: Log semaphore acquisition attempt ---
+    logger.debug(f"search_and_classify_recursively: Waiting to acquire semaphore for vendor '{vendor_name}'.")
     async with semaphore: # Limit concurrency
-        logger.info(f"search_and_classify_recursively: Starting for vendor", extra={"vendor": vendor_name})
+        logger.info(f"search_and_classify_recursively: Acquired semaphore. Starting for vendor", extra={"vendor": vendor_name})
+        # --- END ADDED ---
         search_result_data = {
             "vendor": vendor_name,
             "search_query": f"{vendor_name} company business type industry",
@@ -814,8 +904,12 @@ async def search_and_classify_recursively(
 
         # --- 1. Perform Tavily Search ---
         try:
+            # --- ADDED: Log before search call ---
+            logger.debug(f"search_and_classify_recursively: Calling search_service.search_vendor for '{vendor_name}'.")
             with LogTimer(logger, f"Tavily search for '{vendor_name}'", include_in_stats=True):
                 tavily_response = await search_service.search_vendor(vendor_name)
+            # --- ADDED: Log after search call ---
+            logger.debug(f"search_and_classify_recursively: search_service.search_vendor returned for '{vendor_name}'.")
 
             stats["api_usage"]["tavily_search_calls"] += 1
             search_result_data.update(tavily_response) # Update with actual search results or error
@@ -828,6 +922,7 @@ async def search_and_classify_recursively(
                      "classification_not_possible_reason": f"Search error: {str(search_result_data['error'])[:100]}",
                      "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Failed"
                 }
+                logger.debug(f"search_and_classify_recursively: Releasing semaphore early due to search error for '{vendor_name}'.")
                 return search_result_data # Stop if search failed
             else:
                 logger.info(f"search_and_classify_recursively: Search completed", extra={"vendor": vendor_name, "source_count": source_count, "summary_present": bool(search_result_data.get('summary'))})
@@ -839,7 +934,8 @@ async def search_and_classify_recursively(
                  "classification_not_possible": True,
                  "classification_not_possible_reason": f"Search task error: {str(search_exc)[:100]}",
                  "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Failed"
-            }
+             }
+            logger.debug(f"search_and_classify_recursively: Releasing semaphore early due to search exception for '{vendor_name}'.")
             return search_result_data # Stop if search failed
 
         # --- 2. Attempt L1 Classification using Search Results ---
@@ -851,13 +947,18 @@ async def search_and_classify_recursively(
                  "classification_not_possible_reason": "No search results content found",
                  "confidence": 0.0, "vendor_name": vendor_name, "notes": "No Search Content"
             }
+            logger.debug(f"search_and_classify_recursively: Releasing semaphore early due to no search content for '{vendor_name}'.")
             return search_result_data # Stop if no content
 
         valid_l1_category_ids: Set[str] = set(taxonomy.categories.keys())
         llm_response_l1 = None
         try:
+            # --- ADDED: Log before L1 post-search LLM call ---
+            logger.debug(f"search_and_classify_recursively: Calling llm_service.process_search_results (L1) for '{vendor_name}'.")
             with LogTimer(logger, f"LLM L1 classification from search for '{vendor_name}'", include_in_stats=True):
                 llm_response_l1 = await llm_service.process_search_results(vendor_data, search_result_data, taxonomy)
+            # --- ADDED: Log after L1 post-search LLM call ---
+            logger.debug(f"search_and_classify_recursively: llm_service.process_search_results (L1) returned for '{vendor_name}'.")
 
             if llm_response_l1 and isinstance(llm_response_l1.get("usage"), dict):
                 usage = llm_response_l1["usage"]
@@ -902,6 +1003,7 @@ async def search_and_classify_recursively(
                  "classification_not_possible_reason": f"LLM L1 processing error: {str(llm_err)[:100]}",
                  "confidence": 0.0, "vendor_name": vendor_name, "notes": "LLM L1 Error"
              }
+             logger.debug(f"search_and_classify_recursively: Releasing semaphore early due to L1 LLM exception for '{vendor_name}'.")
              return search_result_data # Stop if L1 classification failed
 
         # --- 3. Recursive Classification L2-L5 using Search Context ---
@@ -914,6 +1016,8 @@ async def search_and_classify_recursively(
             for level in range(2, 6):
                 logger.debug(f"Attempting post-search Level {level} for {vendor_name}, parent {current_parent_id}")
                 try:
+                    # --- ADDED: Log before recursive process_batch call ---
+                    logger.debug(f"search_and_classify_recursively: Calling process_batch (Level {level}) for '{vendor_name}' with search context.")
                     batch_result_dict = await process_batch(
                         batch_data=[vendor_data], # Batch of one
                         level=level,
@@ -923,6 +1027,8 @@ async def search_and_classify_recursively(
                         stats=stats,
                         search_context=search_result_data # Pass the full search results as context
                     )
+                    # --- ADDED: Log after recursive process_batch call ---
+                    logger.debug(f"search_and_classify_recursively: process_batch (Level {level}) returned for '{vendor_name}'.")
 
                     level_result = batch_result_dict.get(vendor_name)
                     if level_result:
@@ -956,6 +1062,8 @@ async def search_and_classify_recursively(
             logger.info(f"search_and_classify_recursively: L1 classification failed or not possible for {vendor_name}, skipping L2-L5.")
 
         logger.info(f"search_and_classify_recursively: Finished for vendor", extra={"vendor": vendor_name})
+        # --- ADDED: Log semaphore release ---
+        logger.debug(f"search_and_classify_recursively: Releasing semaphore for vendor '{vendor_name}'.")
         return search_result_data
 
 
@@ -992,6 +1100,7 @@ def group_by_parent_category(
         vendor_results = results.get(vendor_name)
         level_result = vendor_results.get(parent_key) if vendor_results else None
 
+        # --- ADDED: Check if level_result is actually a dictionary ---
         if level_result and isinstance(level_result, dict) and not level_result.get("classification_not_possible", True):
             category_id = level_result.get("category_id")
             if category_id and category_id not in ["N/A", "ERROR"]:
@@ -999,6 +1108,9 @@ def group_by_parent_category(
                     grouped[category_id] = []
                 grouped[category_id].append(vendor_name)
                 grouped_count += 1
+                # --- ADDED: Log successful grouping ---
+                logger.debug(f"  Grouping vendor '{vendor_name}' under parent '{category_id}'.")
+                # --- END ADDED ---
             else:
                 logger.debug(f"  Excluding vendor '{vendor_name}': classified at '{parent_key}' but has invalid category_id '{category_id}'.")
                 excluded_count += 1
@@ -1008,8 +1120,11 @@ def group_by_parent_category(
                 reason = level_result.get('classification_not_possible_reason', 'Marked not possible')
             elif not level_result:
                  reason = f"No result found for {parent_key}"
-            logger.debug(f"  Excluding vendor '{vendor_name}': not successfully classified at '{parent_key}'. Reason: {reason}.")
+            # --- MODIFIED: Use INFO level for exclusion logging ---
+            logger.info(f"  Excluding vendor '{vendor_name}' from Level {parent_level + 1}: not successfully classified at '{parent_key}'. Reason: {reason}.")
             excluded_count += 1
 
-    logger.info(f"group_by_parent_category: Finished grouping. Created {len(grouped)} groups, included {grouped_count} vendors, excluded {excluded_count} vendors.")
+    logger.info(f"group_by_parent_category: Finished grouping for Level {parent_level + 1}. Created {len(grouped)} groups, included {grouped_count} vendors, excluded {excluded_count} vendors.")
     return grouped
+
+# </file>

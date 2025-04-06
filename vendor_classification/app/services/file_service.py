@@ -471,6 +471,9 @@ def generate_output_file(
     output_file_name = f"classification_results_{job_id[:8]}_{timestamp_str}.xlsx"
     output_path = os.path.join(output_dir, output_file_name)
 
+    # --- ADDED: Logging before write ---
+    logger.info("Attempting to write final results to Excel file.", extra={"output_path": output_path})
+    # --- END ADDED ---
     with LogTimer(logger, "Writing Excel file"):
         try:
             df.to_excel(output_path, index=False, engine='xlsxwriter')
@@ -486,3 +489,5 @@ def generate_output_file(
          logger.warning(f"Could not get size of generated output file", exc_info=False, extra={"output_path": output_path, "error": str(e)})
 
     return output_file_name # Return only the filename
+
+# </file>

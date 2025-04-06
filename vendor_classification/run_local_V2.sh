@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 
-# ./run_local.sh [PORT]
-# Run this script to setup and initialize the local development environment for the NAICS vendor classification system.
+# ./run_local_persistent_db.sh [PORT]
+# Run this script to setup and initialize the local development environment
+# for the NAICS vendor classification system, PERSISTING THE DATABASE VOLUME
+# and CLEARING LOGS each time.
 # Optional parameter:
 #   PORT - The host port to use (default: 8001)
 
 set -e
 
-echo "Starting vendor classification setup..."
+echo "Starting vendor classification setup (with persistent database & fresh logs)..."
 
 # Check if a port was provided as an argument, otherwise use default
 WEB_PORT=${1:-8001}
 echo "Using host port $WEB_PORT for the web service"
 
-# ----- DOCKER CLEANUP SECTION -----
-echo "Cleaning up Docker resources..."
+# ----- DOCKER CLEANUP SECTION (MODIFIED FOR DB PERSISTENCE) -----
+echo "Cleaning up Docker resources (Containers and Networks only)..."
 # Use docker compose command based on version (v1 or v2+)
 if docker compose version >/dev/null 2>&1; then
     COMPOSE_CMD="docker compose"
@@ -30,25 +32,36 @@ else
     exit 1
 fi
 echo "Using compose command: '$COMPOSE_CMD'"
+echo "Database volume name expected: '$VOLUME_NAME' (will NOT be removed)"
 
-$COMPOSE_CMD down -v --remove-orphans || echo "Warning: Initial docker compose down failed, continuing cleanup..."
-# Force remove network if it persists
+# Bring down containers and networks, but DO NOT remove volumes (-v flag removed)
+$COMPOSE_CMD down --remove-orphans || echo "Warning: docker compose down failed, continuing cleanup..."
+
+# Force remove network if it persists (compose down should handle this, but just in case)
 if docker network inspect $NETWORK_NAME >/dev/null 2>&1; then
     echo "Network '$NETWORK_NAME' still exists, attempting force removal..."
     docker network rm -f $NETWORK_NAME || echo "Warning: Failed to force remove network '$NETWORK_NAME'"
 else
     echo "Network '$NETWORK_NAME' does not exist or was removed."
 fi
-# Force remove volume (already done by -v, but belt-and-suspenders)
-docker volume rm -f $VOLUME_NAME || true
-echo "Docker cleanup attempt finished."
+
+# DO NOT explicitly remove the database volume
+echo "Skipping explicit removal of volume '$VOLUME_NAME' to preserve data."
+echo "Docker container/network cleanup attempt finished."
 # ----- END DOCKER CLEANUP -----
 
 # Create necessary directories
 echo "Creating data directories..."
-mkdir -p data/input data/output data/taxonomy data/logs
+mkdir -p data/input data/output data/taxonomy data/logs # Ensures structure exists
 
-# Set permissions for log directory
+# --- ADDED: Clear logs directory ---
+echo "Clearing previous contents of data/logs/ ..."
+# Remove the directory and its contents, then recreate it to ensure it's empty
+# Using rm -rf followed by mkdir -p is robust
+rm -rf data/logs && mkdir -p data/logs || { echo "ERROR: Failed to clear and recreate data/logs directory. Check permissions."; exit 1; }
+# --- END: Clear logs directory ---
+
+# Set permissions for log directory (needs to happen AFTER recreation)
 echo "Setting permissions for log directory..."
 chmod -R 777 data/logs || echo "Warning: Could not set permissions on data/logs. Logging might fail if user IDs mismatch."
 
@@ -63,9 +76,7 @@ ls -l frontend/vue_frontend/vite.config.js || ls -l frontend/vue_frontend/vite.c
 
 echo "Building Docker images (this will include the Vue frontend build)..."
 # Use the detected compose command
-# Force rebuild of web service without cache to pick up code changes like __init__.py
 $COMPOSE_CMD build --no-cache web
-# Build other services normally (they might use cache)
 $COMPOSE_CMD build worker db redis
 
 # Check if build was successful
@@ -90,11 +101,9 @@ echo "Waiting $WAIT_SECONDS seconds for containers to start..."
 sleep $WAIT_SECONDS
 
 echo "===> Checking container statuses:"
-# Use the detected compose command
 $COMPOSE_CMD ps
 
 # Check if web container is running
-# Use the detected compose command
 WEB_CONTAINER_ID=$($COMPOSE_CMD ps -q web)
 if [ -z "$WEB_CONTAINER_ID" ]; then
     echo "Web container failed to start! Check logs with: $COMPOSE_CMD logs web"
@@ -104,11 +113,9 @@ else
 fi
 
 echo "===> Checking web container logs (last 30 lines):"
-# Use the detected compose command
 $COMPOSE_CMD logs web --tail 30
 
 echo "===> Testing web service connectivity (Health Check):"
-# Add retry logic for health check
 retry_count=0
 max_retries=5
 until curl -f -s -o /dev/null "http://localhost:$WEB_PORT/health"; do
@@ -126,15 +133,17 @@ fi
 
 
 echo ""
-echo "===> Setup completed."
+echo "===> Setup completed (Database Persisted, Logs Cleared)."
 echo "Access the web interface (built Vue app) at: http://localhost:$WEB_PORT"
 echo "Login with username: admin, password: password"
 echo "PostgreSQL is available on host port 5433"
+echo "Database data in volume '$VOLUME_NAME' should persist across runs."
+echo "Log directory 'data/logs' was cleared before this run."
 echo ""
 echo "*** Frontend Development Note ***"
 echo "The frontend served by this container is the *built* version."
 echo "For frontend development, run the Vue dev server separately:"
-echo "  cd frontend/vue_frontend" # Corrected path
+echo "  cd frontend/vue_frontend"
 echo "  npm install  # If needed"
 echo "  npm run dev"
 echo "Then access the dev server (usually http://localhost:5173 or similar)."
@@ -143,5 +152,4 @@ echo "*******************************"
 echo ""
 echo "Press Enter to show continuous logs, or Ctrl+C to exit."
 read -r
-# Use the detected compose command
 $COMPOSE_CMD logs -f

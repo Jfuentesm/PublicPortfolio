@@ -83,19 +83,22 @@ try:
     @task_prerun.connect
     def handle_task_prerun(task_id, task, args, kwargs, **extra_options): # Added args/kwargs
         """Signal handler before task runs."""
-        from core.logging_config import set_correlation_id, set_job_id
+        from core.logging_config import set_correlation_id, set_job_id, clear_all_context
+        # Clear any lingering context from previous tasks in the same worker process
+        clear_all_context()
         # Assume job_id is the first argument for process_vendor_file
-        job_id_from_args = args[0] if args else task_id
-        set_correlation_id(job_id_from_args)
-        set_job_id(job_id_from_args)
+        # Or look in kwargs if it's passed by name
+        job_id = kwargs.get('job_id') or (args[0] if args else None) or task_id
+        set_correlation_id(job_id) # Use job_id as correlation_id for the task
+        set_job_id(job_id)
         logger.info(
             "Task about to run",
             extra={
                 "signal": "task_prerun",
                 "task_id": task_id,
                 "task_name": task.name,
-                "args": args,
-                "kwargs": kwargs
+                "args": args, # Log args
+                "kwargs": kwargs # Log kwargs
             }
         )
 
@@ -119,17 +122,22 @@ try:
     def handle_task_failure(task_id, exception, args, kwargs, traceback, einfo, **extra_options): # Added args/kwargs/etc.
         """Signal handler if task fails."""
         from core.logging_config import clear_all_context
+        # Attempt to get task name safely from the task object if available
+        task_name = getattr(kwargs.get('task'), 'name', None) or getattr(einfo, 'task', {}).get('name', 'UnknownTask')
+
         logger.error(
             "Task failed",
-            exc_info=(type(exception), exception, traceback),
+            exc_info=(type(exception), exception, traceback), # Log full traceback here
             extra={
                 "signal": "task_failure",
                 "task_id": task_id,
-                "task_name": kwargs.get('task').name if 'task' in kwargs else 'UnknownTask', # Get task name safely
-                "args": args,
-                "kwargs": kwargs,
+                "task_name": task_name,
+                "args": args, # Log args
+                "kwargs": kwargs, # Log kwargs
                 "exception_type": type(exception).__name__,
                 "error": str(exception),
+                # einfo can contain more detailed exception info
+                "einfo": str(einfo)[:1000] if einfo else None
             }
         )
         clear_all_context() # Clean up context

@@ -1,9 +1,12 @@
-
+# --- file path='app/api/main.py' ---
 # app/api/main.py
 import socket
 import sqlalchemy
 import httpx
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status, Request
+from fastapi import ( # Ensure all necessary imports are present
+    FastAPI, Depends, HTTPException, UploadFile, File, Form,
+    BackgroundTasks, status, Request
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,23 +16,28 @@ import uuid
 import os
 from datetime import datetime, timedelta
 import logging
+import time # Added for sleep
+# --- ADDED: Import Session ---
+from sqlalchemy.orm import Session
+# --- END ADDED ---
 
 # --- Model Imports ---
-from models.job import Job, JobStatus, ProcessingStage
+from models.job import Job, JobStatus, ProcessingStage # Import Job and enums
 from models.user import User
 
 # --- Core Imports ---
 from core.config import settings
 from core.logging_config import setup_logging, get_logger, set_correlation_id, set_user, set_job_id, log_function_call, get_correlation_id
 from middleware.logging_middleware import RequestLoggingMiddleware
-from core.database import get_db, SessionLocal
-from core.initialize_db import initialize_database
+from core.database import get_db, SessionLocal, engine # Import engine
+from core.initialize_db import initialize_database # Keep for potential direct call if needed
 
 # --- Service Imports ---
-from services.file_service import save_upload_file
+from services.file_service import save_upload_file # Import file saving service
 
 # --- Task Imports ---
 from tasks.celery_app import celery_app
+from tasks.classification_tasks import process_vendor_file # Import the Celery task
 
 # --- Utility Imports ---
 from utils.taxonomy_loader import load_taxonomy
@@ -44,23 +52,16 @@ from api.auth import (
 )
 
 # --- Router Imports ---
-from api import jobs as jobs_router
-from api import users as users_router # Import the new users router
+from api import jobs as jobs_router        # <--- IMPORTED jobs_router
+from api import users as users_router      # <--- IMPORTED users_router
 
 # --- Schema Imports ---
-from schemas.job import JobResponse
+from schemas.job import JobResponse # Import JobResponse schema for upload return
 from schemas.user import UserResponse as UserResponseSchema # Import UserResponse schema
 
 
 # --- Logging Setup ---
-setup_logging_done = False
-try:
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    startup_logger = logging.getLogger("vendor_classification.startup")
-except Exception as e:
-    print(f"Initial basic logging config failed: {e}")
-    startup_logger = logging.getLogger("vendor_classification.startup")
-
+# Setup logging early (assuming it's called elsewhere or handled by Docker entrypoint)
 logger = get_logger("vendor_classification.api") # Get the main API logger
 
 
@@ -81,6 +82,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Include Routers ---
+logger.info("Including API routers...")
+app.include_router(
+    jobs_router.router,
+    prefix="/api/v1/jobs", # <--- PREFIX for job routes
+    tags=["Jobs"],         # <--- Tag for Swagger UI
+    dependencies=[Depends(get_current_user)] # <--- Add auth dependency to all job routes
+)
+logger.info("Included jobs router with prefix /api/v1/jobs")
+
+app.include_router(
+    users_router.router,
+    prefix="/api/v1/users", # <--- PREFIX for user routes
+    tags=["Users"],         # <--- Tag for Swagger UI
+    # Dependencies are handled within the user routes (e.g., get_current_active_superuser)
+)
+logger.info("Included users router with prefix /api/v1/users")
+# --- End Include Routers ---
+
+
 # --- Vue.js Frontend Serving Setup ---
 VUE_BUILD_DIR = "/app/frontend/dist"
 VUE_INDEX_FILE = os.path.join(VUE_BUILD_DIR, "index.html")
@@ -94,7 +115,7 @@ else:
 # Static files are mounted at the end of the file
 
 
-# --- API ROUTES ---
+# --- API ROUTES (Keep root routes like health, token directly under app) ---
 
 @app.get("/health")
 async def health_check():
@@ -214,7 +235,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def login_for_access_token(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db = Depends(get_db)
+    db: Session = Depends(get_db) # Use imported Session here
 ):
     """Handles user login and returns JWT token and user details."""
     correlation_id = str(uuid.uuid4())
@@ -267,210 +288,96 @@ async def login_for_access_token(
             detail="An error occurred during the login process."
         )
 
-
-# --- Job Related API Endpoints ---
-
-@app.post("/api/v1/upload", response_model=Dict[str, Any])
-async def upload_file(
-    file: UploadFile = File(...),
+# --- UPLOAD ROUTE ---
+@app.post("/api/v1/upload", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def upload_vendor_file(
+    background_tasks: BackgroundTasks,
     company_name: str = Form(...),
-    current_user: User = Depends(get_current_user), # Use get_current_user for basic auth check
-    db = Depends(get_db)
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db), # Use imported Session here
+    current_user: User = Depends(get_current_user) # Ensure user is logged in
 ):
-    """Handles file upload and initiates the classification job."""
+    """
+    Accepts vendor file upload, creates a job, and queues it for processing.
+    """
     job_id = str(uuid.uuid4())
-    set_correlation_id(job_id); set_job_id(job_id)
-    if current_user: set_user(current_user)
-    logger.info(f"===> Entered upload_file endpoint", extra={ "company_name": company_name, "uploaded_filename": file.filename, "content_type": file.content_type, "file_size": getattr(file, 'size', 'unknown'), "username": current_user.username if current_user else "unknown" })
+    set_job_id(job_id) # Set job ID in context for subsequent logs
+    set_user(current_user) # Set user context
 
-    if not file.filename: raise HTTPException(status_code=400, detail="File must have a filename.")
-    if not file.filename.lower().endswith(('.xlsx', '.xls')): raise HTTPException(status_code=400, detail="Only Excel files (.xlsx, .xls) are supported")
-    if not company_name or not company_name.strip(): raise HTTPException(status_code=400, detail="Company name cannot be empty.")
+    # --- MODIFIED: Renamed 'filename' key to avoid conflict ---
+    logger.info(f"Upload request received", extra={
+        "job_id": job_id,
+        "company_name": company_name,
+        "uploaded_filename": file.filename, # Renamed key
+        "content_type": file.content_type,
+        "username": current_user.username
+    })
+    # --- END MODIFIED ---
 
+    # --- File Validation (Basic) ---
+    if not file.filename:
+        logger.warning("Upload attempt with no filename.", extra={"job_id": job_id})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No filename provided.")
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        logger.warning(f"Invalid file type uploaded: {file.filename}", extra={"job_id": job_id})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type. Please upload an Excel file (.xlsx or .xls).")
+
+    # --- Save File ---
+    saved_file_path = None
+    try:
+        logger.debug(f"Attempting to save uploaded file for job {job_id}")
+        saved_file_path = save_upload_file(file=file, job_id=job_id)
+        logger.info(f"File saved successfully for job {job_id}", extra={"saved_path": saved_file_path})
+    except IOError as e:
+        logger.error(f"Failed to save uploaded file for job {job_id}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Could not save file: {e}")
+    except Exception as e: # Catch potential FastAPI upload errors too
+        logger.error(f"Unexpected error during file upload/saving for job {job_id}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error processing upload: {e}")
+
+    # --- Create Job Record ---
     job = None
     try:
-        input_file_path = save_upload_file(file, job_id)
-        logger.info(f"File saved successfully", extra={"filepath": input_file_path})
-
-        logger.info("Creating Job record in database...")
-        job = Job( id=job_id, company_name=company_name, input_file_name=file.filename, status=JobStatus.PENDING, current_stage=ProcessingStage.INGESTION, created_by=current_user.username )
-        db.add(job); db.commit()
-        logger.info(f"Job created successfully in database", extra={"company": company_name, "status": JobStatus.PENDING})
-
-        logger.info(f"Attempting to send task to Celery", extra={"input_file_path": input_file_path})
-        try:
-            task_name = 'tasks.classification_tasks.process_vendor_file'
-            celery_app.send_task(task_name, args=[job_id, input_file_path])
-            logger.info("Celery task sent successfully", extra={"task_name": task_name})
-        except Exception as task_error:
-             logger.error("Failed to send Celery task!", exc_info=True)
-             if job: job.fail(f"Failed to queue processing task: {str(task_error)}"); db.commit()
-             else: logger.error("Job object was None when trying to mark as failed due to Celery task send error.")
-             raise HTTPException(status_code=500, detail=f"Error scheduling processing task: {str(task_error)}")
-
-        logger.info(f"File uploaded successfully, processing scheduled via Celery")
-        return { "job_id": job_id, "status": job.status, "current_stage": job.current_stage, "progress": job.progress, "created_at": job.created_at.isoformat() if job.created_at else None, "message": f"File '{file.filename}' uploaded. Processing started." }
-
-    except HTTPException as http_exc:
-        logger.warning(f"HTTP exception during upload", extra={"status_code": http_exc.status_code, "detail": http_exc.detail})
-        raise http_exc
-    except IOError as io_err:
-        logger.error(f"File saving error during upload", exc_info=True, extra={"error": str(io_err)})
-        error_db = None
-        try:
-            error_db = SessionLocal()
-            job_in_error = error_db.query(Job).filter(Job.id == job_id).first()
-            if job_in_error and job_in_error.status != JobStatus.FAILED.value:
-                 job_in_error.fail(f"Upload endpoint failed (file save): {str(io_err)}"); error_db.commit()
-                 logger.info("Upload IOError: Marked job as failed due to file save error.")
-            elif not job_in_error: logger.error("Upload IOError: Could not find job to mark as failed during file save error handling.")
-        except Exception as db_err:
-             logger.error("Upload IOError: Error updating job status during file save error handling", exc_info=True, extra={"db_error": str(db_err)})
-             if error_db: error_db.rollback()
-        finally:
-             if error_db: error_db.close()
-        raise HTTPException(status_code=500, detail=f"Could not save uploaded file: {str(io_err)}")
+        logger.debug(f"Creating database job record for job {job_id}")
+        job = Job(
+            id=job_id,
+            company_name=company_name,
+            input_file_name=os.path.basename(saved_file_path), # Store just the filename
+            status=JobStatus.PENDING.value,
+            current_stage=ProcessingStage.INGESTION.value,
+            created_by=current_user.username
+        )
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        logger.info(f"Database job record created successfully for job {job_id}")
     except Exception as e:
-        logger.error(f"Unexpected error processing upload", exc_info=True, extra={"error": str(e)})
-        error_db_unexpected = None
-        try:
-            error_db_unexpected = SessionLocal()
-            job_in_error = error_db_unexpected.query(Job).filter(Job.id == job_id).first()
-            if job_in_error and job_in_error.status != JobStatus.FAILED.value:
-                job_in_error.fail(f"Upload endpoint failed (unexpected): {str(e)}"); error_db_unexpected.commit()
-                logger.info("Upload Unexpected Error: Marked job as failed due to upload error.")
-            elif not job_in_error: logger.error("Upload Unexpected Error: Could not find job to mark as failed during upload error handling.")
-        except Exception as db_err_unexpected:
-             logger.error("Upload Unexpected Error: Error updating job status during unexpected error handling", exc_info=True, extra={"db_error": str(db_err_unexpected)})
-             if error_db_unexpected: error_db_unexpected.rollback()
-        finally:
-             if error_db_unexpected: error_db_unexpected.close()
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during upload.")
+        db.rollback()
+        logger.error(f"Failed to create database job record for job {job_id}", exc_info=True)
+        # Attempt to clean up saved file if DB record fails
+        if saved_file_path and os.path.exists(saved_file_path):
+            try: os.remove(saved_file_path)
+            except OSError: logger.warning(f"Could not remove file {saved_file_path} after DB error.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create job record.")
 
-
-@app.get("/api/v1/jobs/{job_id}", response_model=JobResponse)
-async def get_job_status(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    """Get status and details for a specific job."""
-    set_correlation_id(job_id); set_job_id(job_id)
-    if current_user: set_user(current_user)
-    logger.info(f"Job status requested", extra={"username": current_user.username if current_user else "unknown"})
-    job = db.query(Job).filter(Job.id == job_id).first()
-    if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
-
-    # Check ownership or admin status
-    if job.created_by != current_user.username and not current_user.is_superuser:
-        logger.warning("User attempted to access job they do not own", extra={"job_owner": job.created_by})
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this job")
-
-    logger.info(f"Job status retrieved", extra={ "status": job.status, "progress": job.progress, "stage": job.current_stage})
-    response_data = JobResponse.model_validate(job) # Pydantic v2
-    return response_data
-
-
-@app.get("/api/v1/jobs/{job_id}/download")
-async def download_results(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    """Download the results file for a completed job."""
-    set_correlation_id(job_id); set_job_id(job_id)
-    if current_user: set_user(current_user)
-    logger.info(f"Results download requested", extra={"username": current_user.username if current_user else "unknown"})
-    job = db.query(Job).filter(Job.id == job_id).first()
-    if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
-
-    # Check ownership or admin status
-    if job.created_by != current_user.username and not current_user.is_superuser:
-        logger.warning("User attempted to download results for job they do not own", extra={"job_owner": job.created_by})
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to download results for this job")
-
-    if job.status == JobStatus.FAILED.value: raise HTTPException(status_code=400, detail=f"Job failed: {job.error_message}")
-    if job.status != JobStatus.COMPLETED.value: raise HTTPException(status_code=400, detail="Job processing has not completed yet")
-    if not job.output_file_name: raise HTTPException(status_code=404, detail="Output file name not recorded for this job.")
-
-    output_path = os.path.join(settings.OUTPUT_DATA_DIR, job_id, job.output_file_name)
-    if not os.path.exists(output_path): raise HTTPException(status_code=404, detail="Output file not found on server.")
-
-    logger.info(f"Serving result file", extra={"output_filename": job.output_file_name, "path": output_path})
-    base_name = "results";
-    if job.input_file_name: base_name, _ = os.path.splitext(job.input_file_name)
-    download_filename = f"{base_name}_results.xlsx"
-    from fastapi.responses import FileResponse
-    return FileResponse( output_path, filename=download_filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=\"{download_filename}\""} )
-
-
-@app.post("/api/v1/jobs/{job_id}/notify", response_model=Dict[str, Any])
-async def request_notification(job_id: str, email_payload: Dict[str, str], current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    """Request email notification upon job completion."""
-    set_correlation_id(job_id); set_job_id(job_id)
-    if current_user: set_user(current_user)
-    email = email_payload.get("email")
-    if not email: raise HTTPException(status_code=400, detail="Email address is required in the request body.")
-    logger.info(f"Notification requested", extra={"username": current_user.username if current_user else "unknown", "email": email})
-    job = db.query(Job).filter(Job.id == job_id).first()
-    if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
-
-    # Check ownership or admin status
-    if job.created_by != current_user.username and not current_user.is_superuser:
-        logger.warning("User attempted to set notification for job they do not own", extra={"job_owner": job.created_by})
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to set notification for this job")
-
-    if "@" not in email or "." not in email.split('@')[-1]: raise HTTPException(status_code=400, detail="Invalid email address format provided.")
-    job.notification_email = email
+    # --- Queue Celery Task ---
     try:
-        db.commit(); logger.info(f"Notification email set successfully", extra={"email": email})
-        return { "success": True, "message": f"Notification will be sent to {email} when job completes" }
+        logger.info(f"Adding Celery task 'process_vendor_file' to background tasks for job {job_id}")
+        # Ensure the task is called with keyword arguments for clarity and robustness
+        background_tasks.add_task(process_vendor_file.delay, job_id=job_id, file_path=saved_file_path)
+        logger.info(f"Celery task queued successfully for job {job_id}")
     except Exception as e:
-        db.rollback(); logger.error("Failed to save notification email to database", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to update notification preferences.")
+        logger.error(f"Failed to queue Celery task for job {job_id}", exc_info=True)
+        # Update job status to failed if task queueing fails
+        job.fail(f"Failed to queue processing task: {str(e)}")
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to queue job for processing.")
 
+    # Return the initial job details (use JobResponse schema)
+    logger.info(f"Upload request for job {job_id} processed successfully, returning 202 Accepted.")
+    return JobResponse.model_validate(job) # Use Pydantic v2 validation
+# --- END UPLOAD ROUTE ---
 
-@app.get("/api/v1/jobs/{job_id}/stats", response_model=Dict[str, Any])
-async def get_job_stats(job_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
-    """Get processing statistics for a specific job."""
-    set_correlation_id(job_id); set_job_id(job_id)
-    if current_user: set_user(current_user)
-    logger.info(f"Job stats requested", extra={"username": current_user.username if current_user else "unknown"})
-    job = db.query(Job).filter(Job.id == job_id).first()
-    if not job: raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
-
-    # Check ownership or admin status
-    if job.created_by != current_user.username and not current_user.is_superuser:
-        logger.warning("User attempted to get stats for job they do not own", extra={"job_owner": job.created_by})
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access stats for this job")
-
-    if not isinstance(job.stats, dict):
-         logger.warning(f"Job stats data is not a dictionary or is missing", extra={"stats_type": type(job.stats)})
-         # Return default structure matching ProcessingStats fields
-         return {
-             "vendors_processed": 0, "unique_vendors": 0,
-             "successfully_classified_l4": 0, "successfully_classified_l5": 0,
-             "classification_not_possible_initial": 0, "invalid_category_errors": 0,
-             "search_attempts": 0, "search_successful_classifications_l1": 0,
-             "search_successful_classifications_l5": 0, # Changed from l4
-             "api_calls": 0, "tokens_used": 0, "tavily_searches": 0,
-             "processing_time": 0, "cost_estimate_usd": 0.0
-         }
-
-    logger.info(f"Job stats retrieved")
-    job_stats = job.stats
-    api_usage = job_stats.get("api_usage", {})
-
-    # --- UPDATED: Return new L5 stats and rename old ones for clarity ---
-    return {
-        "vendors_processed": job_stats.get("total_vendors", 0),
-        "unique_vendors": job_stats.get("unique_vendors", 0),
-        "successfully_classified_l4": job_stats.get("successfully_classified_l4", 0), # Keep L4 for reference
-        "successfully_classified_l5": job_stats.get("successfully_classified_l5", 0), # NEW: Final L5 success count
-        "search_assisted_l5": job_stats.get("search_successful_classifications_l5", 0), # NEW: Search success count (L5)
-        "invalid_category_errors": job_stats.get("invalid_category_errors", 0),
-        "api_calls": api_usage.get("openrouter_calls", 0),
-        "tokens_used": api_usage.get("openrouter_total_tokens", 0),
-        "tavily_searches": api_usage.get("tavily_search_calls", 0), # Renamed from tavily_searches for consistency
-        "processing_time": job_stats.get("processing_duration_seconds", 0),
-        # --- Deprecated/Renamed (Optional, can remove if frontend updated) ---
-        # "search_successful_classifications": job_stats.get("search_successful_classifications_l5", 0), # Map old name to new L5 count
-    }
-    # --- END UPDATED ---
-
-# ... (rest of main.py remains the same) ...
 
 # --- Mount Static Files (Vue App) ---
 # This should be the LAST app configuration step

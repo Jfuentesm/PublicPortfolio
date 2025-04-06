@@ -110,12 +110,13 @@ class LLMService:
         set_log_context({"vendor_count": len(batch_data), "taxonomy_level": level, "context_type": context_type})
         batch_id = str(uuid.uuid4())
         logger.debug(f"Generated batch ID", extra={"batch_id": batch_id})
-        correlation_id = get_correlation_id()
+        correlation_id = get_correlation_id() # Get correlation ID for tracing
         llm_trace_logger.debug(f"LLM_TRACE: Starting classify_batch (Batch ID: {batch_id}, Level: {level}, Parent: {parent_category_id}, Context: {context_type})", extra={'correlation_id': correlation_id})
 
         if not self.api_key:
             logger.error("Cannot classify batch: OpenRouter API key is missing.")
             llm_trace_logger.error(f"LLM_TRACE: LLM API Error (Batch ID: {batch_id}): API key missing.", extra={'correlation_id': correlation_id})
+            # Return a structured error response
             return {
                 "result": {
                     "level": level, "batch_id": batch_id, "parent_category_id": parent_category_id,
@@ -132,11 +133,9 @@ class LLMService:
 
         logger.debug(f"Creating classification prompt with {context_type}")
         with LogTimer(logger, "Prompt creation", include_in_stats=True):
-            # --- MODIFIED: Pass search_context to prompt creation ---
             prompt = self._create_classification_prompt(
                 batch_data, level, taxonomy, parent_category_id, batch_id, search_context
             )
-            # --- END MODIFIED ---
             prompt_length = len(prompt)
             logger.debug(f"Classification prompt created", extra={"prompt_length": prompt_length})
             llm_trace_logger.debug(f"LLM_TRACE: Generated Prompt (Batch ID: {batch_id}):\n-------\n{prompt}\n-------", extra={'correlation_id': correlation_id})
@@ -155,6 +154,7 @@ class LLMService:
             "response_format": {"type": "json_object"} # Request JSON output mode
         }
 
+        # --- Log Request Details (Trace Log) ---
         try:
             log_headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
             log_headers['Authorization'] = 'Bearer [REDACTED]'
@@ -168,16 +168,19 @@ class LLMService:
             logger.debug(f"Sending request to OpenRouter API")
             start_time = time.time()
             async with httpx.AsyncClient() as client:
-                response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=90.0)
-                response.raise_for_status()
-                response_data = response.json()
+                response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=90.0) # Increased timeout
+                # --- ADDED: Log raw response immediately ---
+                raw_content = response.text # Get raw text
+                status_code = response.status_code
+                api_duration = time.time() - start_time
+                llm_trace_logger.debug(f"LLM_TRACE: LLM Raw Response (Batch ID: {batch_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
+                # --- END ADDED ---
+                response.raise_for_status() # Check for HTTP errors AFTER logging raw response
+                response_data = response.json() # Parse JSON only if status is OK
+                # Extract raw content from JSON if structure is as expected
                 if response_data and response_data.get("choices") and isinstance(response_data["choices"], list) and len(response_data["choices"]) > 0:
                      message = response_data["choices"][0].get("message")
-                     if message and isinstance(message, dict): raw_content = message.get("content")
-            api_duration = time.time() - start_time
-
-            status_code = response.status_code if response else 'N/A'
-            llm_trace_logger.debug(f"LLM_TRACE: LLM Raw Response (Batch ID: {batch_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
+                     if message and isinstance(message, dict): raw_content = message.get("content") # Overwrite with content field if possible
 
             usage = response_data.get("usage", {}) if response_data else {}
             prompt_tokens = usage.get("prompt_tokens", 0)
@@ -187,6 +190,7 @@ class LLMService:
             logger.info(f"OpenRouter API response received",
                        extra={
                            "duration": api_duration, "batch_id": batch_id, "level": level,
+                           "status_code": status_code, # Log status code
                            "openrouter_prompt_tokens": prompt_tokens,
                            "openrouter_completion_tokens": completion_tokens,
                            "openrouter_total_tokens": total_tokens
@@ -209,7 +213,7 @@ class LLMService:
             if response_batch_id != batch_id:
                 logger.warning(f"LLM response batch_id mismatch!",
                                extra={"expected_batch_id": batch_id, "received_batch_id": response_batch_id})
-                result["batch_id_mismatch"] = True
+                result["batch_id_mismatch"] = True # Add flag but continue processing
 
             usage_data = { "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": total_tokens }
             set_log_context({
@@ -228,22 +232,23 @@ class LLMService:
             return { "result": result, "usage": usage_data }
 
         except httpx.HTTPStatusError as e:
-             response_text = e.response.text[:500] if hasattr(e.response, 'text') else "[No Response Body]"
+             # Log the raw content we captured earlier
+             response_text = raw_content or (e.response.text[:500] if hasattr(e.response, 'text') else "[No Response Body]")
              status_code = e.response.status_code
-             logger.error(f"HTTP error during LLM batch classification", exc_info=False,
+             logger.error(f"HTTP error during LLM batch classification", exc_info=False, # Don't need full stack trace here
                          extra={ "status_code": status_code, "response_text": response_text, "batch_id": batch_id, "level": level })
-             llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Batch ID: {batch_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
-             raise
+             llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Batch ID: {batch_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+             raise # Re-raise for tenacity
         except httpx.RequestError as e:
-             logger.error(f"Network error during LLM batch classification", exc_info=False,
+             logger.error(f"Network error during LLM batch classification", exc_info=False, # Don't need full stack trace here
                          extra={ "error_details": str(e), "batch_id": batch_id, "level": level })
-             llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
-             raise
+             llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+             raise # Re-raise for tenacity
         except Exception as e:
             error_context = { "batch_size": len(batch_data), "level": level, "parent_category_id": parent_category_id, "error": str(e), "model": self.model, "batch_id": batch_id }
             logger.error(f"Unexpected error during LLM batch classification", exc_info=True, extra=error_context)
-            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
-            raise
+            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+            raise # Re-raise for tenacity
 
     @retry(stop=stop_after_attempt(settings.MAX_RETRIES), wait=wait_exponential(multiplier=1, min=settings.RETRY_DELAY, max=10))
     @log_function_call(logger, include_args=False)
@@ -276,7 +281,6 @@ class LLMService:
             }
 
         with LogTimer(logger, "Search prompt creation", include_in_stats=True):
-            # Use the specific prompt designed for L1 classification from search results
             prompt = self._create_search_results_prompt(vendor_data, search_results, taxonomy, attempt_id)
             prompt_length = len(prompt)
             logger.debug(f"Search results prompt created", extra={"prompt_length": prompt_length})
@@ -296,6 +300,7 @@ class LLMService:
             "response_format": {"type": "json_object"} # Request JSON output mode
         }
 
+        # --- Log Request Details (Trace Log) ---
         try:
             log_headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
             log_headers['Authorization'] = 'Bearer [REDACTED]'
@@ -310,15 +315,18 @@ class LLMService:
             start_time = time.time()
             async with httpx.AsyncClient() as client:
                 response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=60.0)
-                response.raise_for_status()
-                response_data = response.json()
+                # --- ADDED: Log raw response immediately ---
+                raw_content = response.text # Get raw text
+                status_code = response.status_code
+                api_duration = time.time() - start_time
+                llm_trace_logger.debug(f"LLM_TRACE: LLM Raw Response (Attempt ID: {attempt_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
+                # --- END ADDED ---
+                response.raise_for_status() # Check for HTTP errors AFTER logging raw response
+                response_data = response.json() # Parse JSON only if status is OK
+                # Extract raw content from JSON if structure is as expected
                 if response_data and response_data.get("choices") and isinstance(response_data["choices"], list) and len(response_data["choices"]) > 0:
                      message = response_data["choices"][0].get("message")
-                     if message and isinstance(message, dict): raw_content = message.get("content")
-            api_duration = time.time() - start_time
-
-            status_code = response.status_code if response else 'N/A'
-            llm_trace_logger.debug(f"LLM_TRACE: LLM Raw Response (Attempt ID: {attempt_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
+                     if message and isinstance(message, dict): raw_content = message.get("content") # Overwrite with content field if possible
 
             usage = response_data.get("usage", {}) if response_data else {}
             prompt_tokens = usage.get("prompt_tokens", 0)
@@ -326,7 +334,7 @@ class LLMService:
             total_tokens = usage.get("total_tokens", 0)
 
             logger.info(f"OpenRouter API response received for search results",
-                       extra={ "duration": api_duration, "vendor": vendor_name, "openrouter_prompt_tokens": prompt_tokens, "openrouter_completion_tokens": completion_tokens, "openrouter_total_tokens": total_tokens, "attempt_id": attempt_id })
+                       extra={ "duration": api_duration, "vendor": vendor_name, "status_code": status_code, "openrouter_prompt_tokens": prompt_tokens, "openrouter_completion_tokens": completion_tokens, "openrouter_total_tokens": total_tokens, "attempt_id": attempt_id })
 
             logger.debug("Raw LLM response content received (search)", extra={"content_preview": str(raw_content)[:500]})
             with LogTimer(logger, "JSON parsing and extraction (search)", include_in_stats=True):
@@ -354,22 +362,24 @@ class LLMService:
             return { "result": result, "usage": usage_data }
 
         except httpx.HTTPStatusError as e:
-             response_text = e.response.text[:500] if hasattr(e.response, 'text') else "[No Response Body]"
+             # Log the raw content we captured earlier
+             response_text = raw_content or (e.response.text[:500] if hasattr(e.response, 'text') else "[No Response Body]")
              status_code = e.response.status_code
-             logger.error(f"HTTP error during search result processing", exc_info=False,
+             logger.error(f"HTTP error during search result processing", exc_info=False, # Don't need full stack trace here
                          extra={ "status_code": status_code, "response_text": response_text, "vendor": vendor_name, "attempt_id": attempt_id })
-             llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Attempt ID: {attempt_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
-             raise
+             llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Attempt ID: {attempt_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+             raise # Re-raise for tenacity
         except httpx.RequestError as e:
-             logger.error(f"Network error during search result processing", exc_info=False,
+             logger.error(f"Network error during search result processing", exc_info=False, # Don't need full stack trace here
                          extra={ "error_details": str(e), "vendor": vendor_name, "attempt_id": attempt_id })
-             llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
-             raise
+             llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+             raise # Re-raise for tenacity
         except Exception as e:
             error_context = { "vendor": vendor_name, "error": str(e), "model": self.model, "attempt_id": attempt_id }
             logger.error(f"Unexpected error during search result processing", exc_info=True, extra=error_context)
-            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
-            raise
+            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+            raise # Re-raise for tenacity
+
 
     # --- UPDATED PROMPT GENERATION METHOD ---
     @log_function_call(logger, include_args=False)
@@ -565,7 +575,7 @@ json
 3.  Assign the **single most specific and appropriate** category ID and name from the list.
 4.  Provide a confidence score (0.0 to 1.0).
 5.  **CRITICAL:** If the vendor's primary activity is genuinely ambiguous, cannot be determined from the provided information, or does not fit well into *any* of the specific categories listed in `<category_options>`, **DO NOT GUESS**. Instead: Set `classification_not_possible` to `true`, `confidence` to `0.0`, provide a brief `classification_not_possible_reason`, and set `category_id`/`category_name` to "N/A".
-6.  If classification *is* possible (`classification_not_possible: false`), ensure `confidence` is > 0.0 and `category_id`/`category_name` are populated correctly from `<category_options>`.
+6.  If classification *is* possible (`classification_not_possible: false`), ensure `confidence` > 0.0 and `category_id`/`category_name` are populated correctly from `<category_options>`.
 7.  Provide brief optional `notes` for reasoning, especially if confidence is low or classification was not possible.
 8.  Ensure the `batch_id` in the final JSON output matches the `batch_id` specified in `<output_format>`.
 9.  Ensure the output contains an entry for **every** vendor listed in `<vendor_data>`.

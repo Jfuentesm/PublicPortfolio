@@ -1,4 +1,3 @@
-
 # --- file path='app/core/logging_config.py' ---
 # app/core/logging_config.py
 import logging
@@ -230,11 +229,6 @@ def clear_log_context(keys: Optional[List[str]] = None):
                 local_storage.context.pop(key, None)
         else:
             local_storage.context = {}
-
-
-def get_log_context():
-    """Get the current log context."""
-    return getattr(local_storage, 'context', {}).copy()
 
 
 def clear_all_context():
