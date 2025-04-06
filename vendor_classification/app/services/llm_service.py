@@ -1,3 +1,4 @@
+
 # <file path='app/services/llm_service.py'>
 # app/services/llm_service.py
 import httpx
@@ -43,6 +44,7 @@ def _extract_json_from_response(response_content: str) -> Optional[Dict[str, Any
         end_index = content.rfind('}')
         if start_index != -1 and end_index != -1 and end_index > start_index:
             potential_json = content[start_index:end_index+1]
+            # Basic brace count check
             if potential_json.count('{') == potential_json.count('}'):
                  content = potential_json
                  logger.debug("Extracted potential JSON content based on first '{' and last '}'.")
@@ -58,7 +60,7 @@ def _extract_json_from_response(response_content: str) -> Optional[Dict[str, Any
         return parsed_json
     except json.JSONDecodeError as e:
         logger.error("JSONDecodeError after cleaning/extraction attempt.",
-                     exc_info=False,
+                     exc_info=False, # Less noise in main log, trace log has full info
                      extra={"error": str(e), "cleaned_content_preview": content[:500]})
         return None
     except Exception as e:
@@ -116,7 +118,7 @@ class LLMService:
         if not self.api_key:
             logger.error("Cannot classify batch: OpenRouter API key is missing.")
             llm_trace_logger.error(f"LLM_TRACE: LLM API Error (Batch ID: {batch_id}): API key missing.", extra={'correlation_id': correlation_id})
-            # Return a structured error response
+            # Return a structured error response matching expected format
             return {
                 "result": {
                     "level": level, "batch_id": batch_id, "parent_category_id": parent_category_id,
@@ -163,24 +165,32 @@ class LLMService:
         except Exception as log_err:
             llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM request details (Batch ID: {batch_id}): {log_err}", extra={'correlation_id': correlation_id})
 
-        response_data = None; raw_content = None; response = None
+        response_data = None; raw_content = None; response = None; status_code = None; api_duration = 0.0
         try:
             logger.debug(f"Sending request to OpenRouter API")
             start_time = time.time()
             async with httpx.AsyncClient() as client:
                 response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=90.0) # Increased timeout
-                # --- ADDED: Log raw response immediately ---
-                raw_content = response.text # Get raw text
+                raw_content = response.text # Get raw text immediately
                 status_code = response.status_code
                 api_duration = time.time() - start_time
                 llm_trace_logger.debug(f"LLM_TRACE: LLM Raw Response (Batch ID: {batch_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
-                # --- END ADDED ---
                 response.raise_for_status() # Check for HTTP errors AFTER logging raw response
                 response_data = response.json() # Parse JSON only if status is OK
-                # Extract raw content from JSON if structure is as expected
-                if response_data and response_data.get("choices") and isinstance(response_data["choices"], list) and len(response_data["choices"]) > 0:
-                     message = response_data["choices"][0].get("message")
-                     if message and isinstance(message, dict): raw_content = message.get("content") # Overwrite with content field if possible
+
+            # --- FIX: Extract raw content field AFTER potential JSON parse ---
+            if response_data and response_data.get("choices") and isinstance(response_data["choices"], list) and len(response_data["choices"]) > 0:
+                 message = response_data["choices"][0].get("message")
+                 if message and isinstance(message, dict):
+                     content_field = message.get("content")
+                     if content_field:
+                         raw_content = content_field # Overwrite with content field if possible
+                         logger.debug("Extracted 'content' field from LLM JSON response.")
+                     else:
+                         logger.warning("LLM response message object missing 'content' field.", extra={"message_obj": message})
+                 else:
+                     logger.warning("LLM response choice missing 'message' object or it's not a dict.", extra={"choice_obj": response_data["choices"][0]})
+            # --- END FIX ---
 
             usage = response_data.get("usage", {}) if response_data else {}
             prompt_tokens = usage.get("prompt_tokens", 0)
@@ -190,26 +200,29 @@ class LLMService:
             logger.info(f"OpenRouter API response received",
                        extra={
                            "duration": api_duration, "batch_id": batch_id, "level": level,
-                           "status_code": status_code, # Log status code
+                           "status_code": status_code,
                            "openrouter_prompt_tokens": prompt_tokens,
                            "openrouter_completion_tokens": completion_tokens,
                            "openrouter_total_tokens": total_tokens
                        })
 
-            logger.debug("Raw LLM response content received", extra={"content_preview": str(raw_content)[:500]})
+            logger.debug("Raw LLM response content received (after potential extraction)", extra={"content_preview": str(raw_content)[:500]})
             with LogTimer(logger, "JSON parsing and extraction", include_in_stats=True):
-                result = _extract_json_from_response(raw_content)
+                result = _extract_json_from_response(raw_content) # Parse the potentially extracted content
 
+            # --- FIX: Check if result is None after parsing ---
             if result is None:
                 llm_trace_logger.error(f"LLM_TRACE: LLM JSON Parse Error (Batch ID: {batch_id}). Raw content logged above.", extra={'correlation_id': correlation_id})
+                # Raise a specific error to be caught by the caller or tenacity
                 raise ValueError(f"LLM response was not valid JSON or could not be extracted. Preview: {str(raw_content)[:200]}")
+            # --- END FIX ---
 
             try:
                  llm_trace_logger.debug(f"LLM_TRACE: LLM Parsed Response (Batch ID: {batch_id}):\n{json.dumps(result, indent=2)}", extra={'correlation_id': correlation_id})
             except Exception as log_err:
                  llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM parsed response (Batch ID: {batch_id}): {log_err}", extra={'correlation_id': correlation_id})
 
-            response_batch_id = result.get("batch_id")
+            response_batch_id = result.get("batch_id") # Now safe to call .get()
             if response_batch_id != batch_id:
                 logger.warning(f"LLM response batch_id mismatch!",
                                extra={"expected_batch_id": batch_id, "received_batch_id": response_batch_id})
@@ -232,22 +245,26 @@ class LLMService:
             return { "result": result, "usage": usage_data }
 
         except httpx.HTTPStatusError as e:
-             # Log the raw content we captured earlier
              response_text = raw_content or (e.response.text[:500] if hasattr(e.response, 'text') else "[No Response Body]")
              status_code = e.response.status_code
-             logger.error(f"HTTP error during LLM batch classification", exc_info=False, # Don't need full stack trace here
+             logger.error(f"HTTP error during LLM batch classification", exc_info=False,
                          extra={ "status_code": status_code, "response_text": response_text, "batch_id": batch_id, "level": level })
-             llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Batch ID: {batch_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+             llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Batch ID: {batch_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
              raise # Re-raise for tenacity
         except httpx.RequestError as e:
-             logger.error(f"Network error during LLM batch classification", exc_info=False, # Don't need full stack trace here
+             logger.error(f"Network error during LLM batch classification", exc_info=False,
                          extra={ "error_details": str(e), "batch_id": batch_id, "level": level })
-             llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+             llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
+             raise # Re-raise for tenacity
+        except ValueError as ve: # Catch the specific error raised on JSON parse failure
+             logger.error(f"LLM response parsing error during batch classification", exc_info=False,
+                          extra={"error": str(ve), "batch_id": batch_id, "level": level})
+             # No need to log again in trace, already logged by the check
              raise # Re-raise for tenacity
         except Exception as e:
             error_context = { "batch_size": len(batch_data), "level": level, "parent_category_id": parent_category_id, "error": str(e), "model": self.model, "batch_id": batch_id }
             logger.error(f"Unexpected error during LLM batch classification", exc_info=True, extra=error_context)
-            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
             raise # Re-raise for tenacity
 
     @retry(stop=stop_after_attempt(settings.MAX_RETRIES), wait=wait_exponential(multiplier=1, min=settings.RETRY_DELAY, max=10))
@@ -275,6 +292,7 @@ class LLMService:
         if not self.api_key:
             logger.error("Cannot process search results: OpenRouter API key is missing.")
             llm_trace_logger.error(f"LLM_TRACE: LLM API Error (Attempt ID: {attempt_id}): API key missing.", extra={'correlation_id': correlation_id})
+            # Return structured error
             return {
                 "result": { "vendor_name": vendor_name, "category_id": "ERROR", "category_name": "ERROR", "confidence": 0.0, "classification_not_possible": True, "classification_not_possible_reason": "API key missing", "notes": "" },
                 "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
@@ -309,24 +327,32 @@ class LLMService:
         except Exception as log_err:
             llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM request details (Attempt ID: {attempt_id}): {log_err}", extra={'correlation_id': correlation_id})
 
-        response_data = None; raw_content = None; response = None
+        response_data = None; raw_content = None; response = None; status_code = None; api_duration = 0.0
         try:
             logger.debug(f"Sending search results to OpenRouter API")
             start_time = time.time()
             async with httpx.AsyncClient() as client:
                 response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=60.0)
-                # --- ADDED: Log raw response immediately ---
-                raw_content = response.text # Get raw text
+                raw_content = response.text # Get raw text immediately
                 status_code = response.status_code
                 api_duration = time.time() - start_time
                 llm_trace_logger.debug(f"LLM_TRACE: LLM Raw Response (Attempt ID: {attempt_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
-                # --- END ADDED ---
                 response.raise_for_status() # Check for HTTP errors AFTER logging raw response
                 response_data = response.json() # Parse JSON only if status is OK
-                # Extract raw content from JSON if structure is as expected
-                if response_data and response_data.get("choices") and isinstance(response_data["choices"], list) and len(response_data["choices"]) > 0:
-                     message = response_data["choices"][0].get("message")
-                     if message and isinstance(message, dict): raw_content = message.get("content") # Overwrite with content field if possible
+
+            # --- FIX: Extract raw content field AFTER potential JSON parse ---
+            if response_data and response_data.get("choices") and isinstance(response_data["choices"], list) and len(response_data["choices"]) > 0:
+                 message = response_data["choices"][0].get("message")
+                 if message and isinstance(message, dict):
+                     content_field = message.get("content")
+                     if content_field:
+                         raw_content = content_field # Overwrite with content field if possible
+                         logger.debug("Extracted 'content' field from LLM JSON response (search).")
+                     else:
+                         logger.warning("LLM response message object missing 'content' field (search).", extra={"message_obj": message})
+                 else:
+                     logger.warning("LLM response choice missing 'message' object or it's not a dict (search).", extra={"choice_obj": response_data["choices"][0]})
+            # --- END FIX ---
 
             usage = response_data.get("usage", {}) if response_data else {}
             prompt_tokens = usage.get("prompt_tokens", 0)
@@ -336,20 +362,23 @@ class LLMService:
             logger.info(f"OpenRouter API response received for search results",
                        extra={ "duration": api_duration, "vendor": vendor_name, "status_code": status_code, "openrouter_prompt_tokens": prompt_tokens, "openrouter_completion_tokens": completion_tokens, "openrouter_total_tokens": total_tokens, "attempt_id": attempt_id })
 
-            logger.debug("Raw LLM response content received (search)", extra={"content_preview": str(raw_content)[:500]})
+            logger.debug("Raw LLM response content received (search, after potential extraction)", extra={"content_preview": str(raw_content)[:500]})
             with LogTimer(logger, "JSON parsing and extraction (search)", include_in_stats=True):
-                result = _extract_json_from_response(raw_content)
+                result = _extract_json_from_response(raw_content) # Parse the potentially extracted content
 
+            # --- FIX: Check if result is None after parsing ---
             if result is None:
                 llm_trace_logger.error(f"LLM_TRACE: LLM JSON Parse Error (Attempt ID: {attempt_id}). Raw content logged above.", extra={'correlation_id': correlation_id})
+                # Raise a specific error to be caught by the caller or tenacity
                 raise ValueError(f"LLM response after search was not valid JSON or could not be extracted. Preview: {str(raw_content)[:200]}")
+            # --- END FIX ---
 
             try:
                  llm_trace_logger.debug(f"LLM_TRACE: LLM Parsed Response (Attempt ID: {attempt_id}):\n{json.dumps(result, indent=2)}", extra={'correlation_id': correlation_id})
             except Exception as log_err:
                  llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM parsed response (Attempt ID: {attempt_id}): {log_err}", extra={'correlation_id': correlation_id})
 
-            response_vendor = result.get("vendor_name")
+            response_vendor = result.get("vendor_name") # Now safe to call .get()
             if response_vendor != vendor_name:
                 logger.warning(f"LLM search response vendor name mismatch!",
                                extra={"expected_vendor": vendor_name, "received_vendor": response_vendor})
@@ -362,22 +391,26 @@ class LLMService:
             return { "result": result, "usage": usage_data }
 
         except httpx.HTTPStatusError as e:
-             # Log the raw content we captured earlier
              response_text = raw_content or (e.response.text[:500] if hasattr(e.response, 'text') else "[No Response Body]")
              status_code = e.response.status_code
-             logger.error(f"HTTP error during search result processing", exc_info=False, # Don't need full stack trace here
+             logger.error(f"HTTP error during search result processing", exc_info=False,
                          extra={ "status_code": status_code, "response_text": response_text, "vendor": vendor_name, "attempt_id": attempt_id })
-             llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Attempt ID: {attempt_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+             llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Attempt ID: {attempt_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
              raise # Re-raise for tenacity
         except httpx.RequestError as e:
-             logger.error(f"Network error during search result processing", exc_info=False, # Don't need full stack trace here
+             logger.error(f"Network error during search result processing", exc_info=False,
                          extra={ "error_details": str(e), "vendor": vendor_name, "attempt_id": attempt_id })
-             llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+             llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
+             raise # Re-raise for tenacity
+        except ValueError as ve: # Catch the specific error raised on JSON parse failure
+             logger.error(f"LLM response parsing error during search result processing", exc_info=False,
+                          extra={"error": str(ve), "vendor": vendor_name, "attempt_id": attempt_id})
+             # No need to log again in trace, already logged by the check
              raise # Re-raise for tenacity
         except Exception as e:
             error_context = { "vendor": vendor_name, "error": str(e), "model": self.model, "attempt_id": attempt_id }
             logger.error(f"Unexpected error during search result processing", exc_info=True, extra=error_context)
-            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id}) # Include stack trace in trace log
+            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
             raise # Re-raise for tenacity
 
 
@@ -724,3 +757,4 @@ json
 """
         return prompt
     # --- END UPDATED ---
+# </file>
