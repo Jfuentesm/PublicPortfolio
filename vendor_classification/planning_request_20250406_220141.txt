@@ -1,0 +1,21 @@
+
+# Goal Description
+
+fix an error in the job stats
+
+# Instructions for LLM
+
+Based on the goal described above and your general knowledge of software development, please identify the files within a typical project structure that would likely need to be:
+a) Modified to implement the goal.
+b) Provided as essential context for understanding the relevant parts of the codebase.
+
+Please list the relevant file paths **relative to the project root**.
+
+**Output Format:** Provide the list as a single line of comma-separated file paths. Use forward slashes `/` as path separators.
+
+Example Output:
+src/core/feature.py, src/utils/helpers.py, tests/test_feature.py, config/settings.yaml
+
+# Identified Files (Provide comma-separated list below):
+
+
