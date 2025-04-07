@@ -1,6 +1,7 @@
+
 # <file path='app/models/job.py'>
 # --- file path='app/models/job.py' ---
-from sqlalchemy import Column, String, Float, DateTime, Enum as SQLEnum, JSON, Text # Renamed Enum import
+from sqlalchemy import Column, String, Float, DateTime, Enum as SQLEnum, JSON, Text, Integer # <<< ADDED Integer
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Session # <<< ADDED IMPORT FOR TYPE HINTING
 from enum import Enum as PyEnum
@@ -24,9 +25,7 @@ class ProcessingStage(str, PyEnum):
     CLASSIFICATION_L2 = "classification_level_2"
     CLASSIFICATION_L3 = "classification_level_3"
     CLASSIFICATION_L4 = "classification_level_4"
-    # --- ADDED: Level 5 ---
     CLASSIFICATION_L5 = "classification_level_5"
-    # --- END ADDED ---
     SEARCH = "search_unknown_vendors" # This stage now covers search AND recursive post-search classification
     RESULT_GENERATION = "result_generation"
 
@@ -49,6 +48,9 @@ class Job(Base):
     error_message = Column(Text, nullable=True)
     stats = Column(JSON, default={}) # Structure defined by ProcessingStats model
     created_by = Column(String, nullable=False)
+    # --- ADDED: Target Level ---
+    target_level = Column(Integer, nullable=False, default=5) # Store the desired classification depth (1-5)
+    # --- END ADDED ---
 
     def update_progress(self, progress: float, stage: ProcessingStage, db_session: Optional[Session] = None): # Type hint now valid
         """Update job progress and stage, optionally committing."""

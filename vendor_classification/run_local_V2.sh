@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
 
-# ./run_local_persistent_db.sh [PORT]
+# ./run_local_V2.sh [PORT]
 # Run this script to setup and initialize the local development environment
-# for the NAICS vendor classification system, PERSISTING THE DATABASE VOLUME
-# and CLEARING LOGS each time.
+# for the NAICS vendor classification system.
+# WARNING: THIS VERSION *REMOVES* THE DATABASE VOLUME ON EACH RUN,
+#          CLEARING ALL PREVIOUS DATA.
 # Optional parameter:
 #   PORT - The host port to use (default: 8001)
 
 set -e
 
-echo "Starting vendor classification setup (with persistent database & fresh logs)..."
+echo "Starting vendor classification setup (DATABASE WILL BE RESET)..." # Updated message
 
 # Check if a port was provided as an argument, otherwise use default
 WEB_PORT=${1:-8001}
 echo "Using host port $WEB_PORT for the web service"
 
-# ----- DOCKER CLEANUP SECTION (MODIFIED FOR DB PERSISTENCE) -----
-echo "Cleaning up Docker resources (Containers and Networks only)..."
+# ----- DOCKER CLEANUP SECTION (MODIFIED TO REMOVE DB VOLUME) -----
+echo "Cleaning up Docker resources (Containers, Networks, and DB Volume)..."
 # Use docker compose command based on version (v1 or v2+)
 if docker compose version >/dev/null 2>&1; then
     COMPOSE_CMD="docker compose"
@@ -32,10 +33,10 @@ else
     exit 1
 fi
 echo "Using compose command: '$COMPOSE_CMD'"
-echo "Database volume name expected: '$VOLUME_NAME' (will NOT be removed)"
+echo "Database volume name expected: '$VOLUME_NAME' (will be REMOVED)"
 
-# Bring down containers and networks, but DO NOT remove volumes (-v flag removed)
-$COMPOSE_CMD down --remove-orphans || echo "Warning: docker compose down failed, continuing cleanup..."
+# Bring down containers and networks, AND remove volumes (-v flag ADDED)
+$COMPOSE_CMD down --remove-orphans -v || echo "Warning: docker compose down failed, continuing cleanup..."
 
 # Force remove network if it persists (compose down should handle this, but just in case)
 if docker network inspect $NETWORK_NAME >/dev/null 2>&1; then
@@ -45,9 +46,10 @@ else
     echo "Network '$NETWORK_NAME' does not exist or was removed."
 fi
 
-# DO NOT explicitly remove the database volume
-echo "Skipping explicit removal of volume '$VOLUME_NAME' to preserve data."
-echo "Docker container/network cleanup attempt finished."
+# Explicitly remove the database volume (compose down -v should handle this, but belt-and-suspenders)
+echo "Attempting explicit removal of volume '$VOLUME_NAME'..."
+docker volume rm -f $VOLUME_NAME || echo "Warning: Failed to remove volume '$VOLUME_NAME' or it didn't exist."
+echo "Docker container/network/volume cleanup attempt finished."
 # ----- END DOCKER CLEANUP -----
 
 # Create necessary directories
@@ -76,7 +78,7 @@ ls -l frontend/vue_frontend/vite.config.js || ls -l frontend/vue_frontend/vite.c
 
 echo "Building Docker images (this will include the Vue frontend build)..."
 # Use the detected compose command
-$COMPOSE_CMD build --no-cache web
+$COMPOSE_CMD build --no-cache web # Rebuild web to ensure latest code
 $COMPOSE_CMD build worker db redis
 
 # Check if build was successful
@@ -96,8 +98,8 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-WAIT_SECONDS=15
-echo "Waiting $WAIT_SECONDS seconds for containers to start..."
+WAIT_SECONDS=15 # Keep wait time as DB init might take a moment
+echo "Waiting $WAIT_SECONDS seconds for containers to start and DB to initialize..."
 sleep $WAIT_SECONDS
 
 echo "===> Checking container statuses:"
@@ -133,11 +135,11 @@ fi
 
 
 echo ""
-echo "===> Setup completed (Database Persisted, Logs Cleared)."
+echo "===> Setup completed (Database RESET, Logs Cleared)." # Updated message
 echo "Access the web interface (built Vue app) at: http://localhost:$WEB_PORT"
 echo "Login with username: admin, password: password"
 echo "PostgreSQL is available on host port 5433"
-echo "Database data in volume '$VOLUME_NAME' should persist across runs."
+echo "Database data in volume '$VOLUME_NAME' was REMOVED and recreated." # Updated message
 echo "Log directory 'data/logs' was cleared before this run."
 echo ""
 echo "*** Frontend Development Note ***"

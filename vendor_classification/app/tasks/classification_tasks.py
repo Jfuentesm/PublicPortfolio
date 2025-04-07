@@ -33,7 +33,9 @@ logger.debug("Successfully imported Dict and Any from typing for classification 
 # --- END ADDED ---
 
 @shared_task(bind=True)
-def process_vendor_file(self, job_id: str, file_path: str):
+# --- UPDATED: Added target_level parameter ---
+def process_vendor_file(self, job_id: str, file_path: str, target_level: int):
+# --- END UPDATED ---
     """
     Celery task entry point for processing a vendor file.
     Orchestrates the overall process by calling the main async helper.
@@ -41,19 +43,39 @@ def process_vendor_file(self, job_id: str, file_path: str):
     Args:
         job_id: Job ID
         file_path: Path to vendor file
+        target_level: The desired maximum classification level (1-5)
     """
     task_id = self.request.id if self.request and self.request.id else "UnknownTaskID"
     logger.info(f"***** process_vendor_file TASK RECEIVED *****",
                 extra={
                     "celery_task_id": task_id,
                     "job_id_arg": job_id,
-                    "file_path_arg": file_path
+                    "file_path_arg": file_path,
+                    "target_level_arg": target_level # Log received target level
                 })
 
     set_correlation_id(job_id) # Set correlation ID early
     set_job_id(job_id)
+    set_log_context({"target_level": target_level}) # Add target level to context
     logger.info(f"Starting vendor file processing task (inside function)",
-                extra={"job_id": job_id, "file_path": file_path})
+                extra={"job_id": job_id, "file_path": file_path, "target_level": target_level})
+
+    # Validate target_level
+    if not 1 <= target_level <= 5:
+        logger.error(f"Invalid target_level received: {target_level}. Must be between 1 and 5.")
+        # Fail the job immediately if level is invalid
+        db_fail = SessionLocal()
+        try:
+            job_fail = db_fail.query(Job).filter(Job.id == job_id).first()
+            if job_fail:
+                job_fail.fail(f"Invalid target level specified: {target_level}. Must be 1-5.")
+                db_fail.commit()
+        except Exception as db_err:
+            logger.error("Failed to mark job as failed due to invalid target level", exc_info=db_err)
+            db_fail.rollback()
+        finally:
+            db_fail.close()
+        return # Stop task execution
 
     # Initialize loop within the task context
     loop = asyncio.new_event_loop()
@@ -66,10 +88,16 @@ def process_vendor_file(self, job_id: str, file_path: str):
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
         if job:
+            # Verify the target level matches the job record (optional sanity check)
+            if job.target_level != target_level:
+                logger.warning(f"Task received target_level {target_level} but job record has {job.target_level}. Using task value: {target_level}.")
+                # Optionally update job record here if desired, or just proceed with task value
+
             set_log_context({
                 "company_name": job.company_name,
                 "creator": job.created_by,
                 "file_name": job.input_file_name
+                # target_level already set above
             })
             logger.info(f"Processing file for company",
                         extra={"company": job.company_name})
@@ -82,7 +110,9 @@ def process_vendor_file(self, job_id: str, file_path: str):
         logger.info(f"About to run async processing for job {job_id}")
         with LogTimer(logger, "Complete file processing", level=logging.INFO, include_in_stats=True):
             # Run the async function within the loop created for this task
-            loop.run_until_complete(_process_vendor_file_async(job_id, file_path, db))
+            # --- UPDATED: Pass target_level to async helper ---
+            loop.run_until_complete(_process_vendor_file_async(job_id, file_path, db, target_level))
+            # --- END UPDATED ---
 
         logger.info(f"Vendor file processing completed successfully (async part finished)")
 
@@ -125,13 +155,15 @@ def process_vendor_file(self, job_id: str, file_path: str):
         logger.info(f"***** process_vendor_file TASK FINISHED *****", extra={"job_id": job_id})
 
 
-async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
+# --- UPDATED: Added target_level parameter ---
+async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, target_level: int):
+# --- END UPDATED ---
     """
     Asynchronous part of the vendor file processing.
     Sets up services, initializes stats, calls the core processing logic,
     and handles final result generation and job status updates.
     """
-    logger.info(f"[_process_vendor_file_async] Starting async processing for job {job_id}")
+    logger.info(f"[_process_vendor_file_async] Starting async processing for job {job_id} to target level {target_level}")
 
     llm_service = LLMService()
     search_service = SearchService()
@@ -148,18 +180,19 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
     stats: Dict[str, Any] = {
         "job_id": job.id,
         "company_name": job.company_name,
+        "target_level": target_level, # Store target level in stats
         "start_time": start_time.isoformat(),
         "end_time": None,
         "processing_duration_seconds": None,
         "total_vendors": 0,
         "unique_vendors": 0,
         "successfully_classified_l4": 0, # Keep L4 count for reference
-        "successfully_classified_l5": 0, # NEW: Count successful classifications reaching L5
+        "successfully_classified_l5": 0, # Count successful classifications reaching L5 (if target >= 5)
         "classification_not_possible_initial": 0, # Count initially unclassifiable before search
         "invalid_category_errors": 0, # Track validation errors
         "search_attempts": 0, # Count how many vendors needed search
         "search_successful_classifications_l1": 0, # Count successful L1 classifications *after* search
-        "search_successful_classifications_l5": 0, # NEW: Count successful L5 classifications *after* search
+        "search_successful_classifications_l5": 0, # Count successful L5 classifications *after* search (if target >= 5)
         "api_usage": {
             "openrouter_calls": 0,
             "openrouter_prompt_tokens": 0,
@@ -179,26 +212,26 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
         logger.info(f"[_process_vendor_file_async] Committing initial status update: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
         logger.info(f"Job status updated",
-                   extra={"status": job.status, "stage": job.current_stage, "progress": job.progress})
+                    extra={"status": job.status, "stage": job.current_stage, "progress": job.progress})
 
         logger.info(f"Reading vendor file")
         with log_duration(logger, "Reading vendor file"):
             vendors_data = read_vendor_file(file_path)
         logger.info(f"Vendor file read successfully",
-                   extra={"vendor_count": len(vendors_data)})
+                    extra={"vendor_count": len(vendors_data)})
 
         job.current_stage = ProcessingStage.NORMALIZATION.value
         job.progress = 0.1
         logger.info(f"[_process_vendor_file_async] Committing status update: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
         logger.info(f"Job status updated",
-                   extra={"stage": job.current_stage, "progress": job.progress})
+                    extra={"stage": job.current_stage, "progress": job.progress})
 
         logger.info(f"Normalizing vendor data")
         with log_duration(logger, "Normalizing vendor data"):
             normalized_vendors_data = normalize_vendor_data(vendors_data)
         logger.info(f"Vendor data normalized",
-                   extra={"normalized_count": len(normalized_vendors_data)})
+                    extra={"normalized_count": len(normalized_vendors_data)})
 
         logger.info(f"Identifying unique vendors")
         # --- MODIFIED: Type hints added ---
@@ -209,7 +242,7 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
             if name and name not in unique_vendors_map:
                 unique_vendors_map[name] = entry
         logger.info(f"Unique vendors identified",
-                   extra={"unique_count": len(unique_vendors_map)})
+                    extra={"unique_count": len(unique_vendors_map)})
 
         stats["total_vendors"] = len(normalized_vendors_data)
         stats["unique_vendors"] = len(unique_vendors_map)
@@ -218,15 +251,25 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
         with log_duration(logger, "Loading taxonomy"):
             taxonomy = load_taxonomy() # Can raise exceptions
         logger.info(f"Taxonomy loaded",
-                   extra={"taxonomy_version": taxonomy.version})
+                    extra={"taxonomy_version": taxonomy.version})
 
         # --- MODIFIED: Type hints added ---
         results: Dict[str, Dict] = {vendor_name: {} for vendor_name in unique_vendors_map.keys()}
         # --- END MODIFIED ---
 
-        logger.info(f"Starting vendor classification process by calling classification_logic.process_vendors")
-        # --- Call the refactored logic ---
-        await process_vendors(unique_vendors_map, taxonomy, results, stats, job, db, llm_service, search_service)
+        logger.info(f"Starting vendor classification process by calling classification_logic.process_vendors up to Level {target_level}")
+        # --- Call the refactored logic, passing target_level ---
+        await process_vendors(
+            unique_vendors_map=unique_vendors_map,
+            taxonomy=taxonomy,
+            results=results,
+            stats=stats,
+            job=job,
+            db=db,
+            llm_service=llm_service,
+            search_service=search_service,
+            target_level=target_level # Pass the target level
+        )
         # --- End call to refactored logic ---
         logger.info(f"Vendor classification process completed (returned from classification_logic.process_vendors)")
 
@@ -237,29 +280,30 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
         logger.info(f"[_process_vendor_file_async] Committing status update before result generation: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
         logger.info(f"Job status updated",
-                   extra={"stage": job.current_stage, "progress": job.progress})
+                    extra={"stage": job.current_stage, "progress": job.progress})
 
         output_file_name = None # Initialize
         try:
-             logger.info(f"Generating output file")
-             with log_duration(logger, "Generating output file"):
-                 output_file_name = generate_output_file(normalized_vendors_data, results, job_id) # Can raise IOError
-             logger.info(f"Output file generated", extra={"output_file": output_file_name})
+                logger.info(f"Generating output file")
+                with log_duration(logger, "Generating output file"):
+                    output_file_name = generate_output_file(normalized_vendors_data, results, job_id) # Can raise IOError
+                logger.info(f"Output file generated", extra={"output_file": output_file_name})
         except Exception as gen_err:
-             logger.error("Failed during output file generation", exc_info=True)
-             job.fail(f"Failed to generate output file: {str(gen_err)}")
-             db.commit()
-             return # Stop processing
+                logger.error("Failed during output file generation", exc_info=True)
+                job.fail(f"Failed to generate output file: {str(gen_err)}")
+                db.commit()
+                return # Stop processing
 
         # --- Finalize stats ---
         end_time = datetime.now()
         processing_duration = (end_time - datetime.fromisoformat(stats["start_time"])).total_seconds()
         stats["end_time"] = end_time.isoformat()
         stats["processing_duration_seconds"] = round(processing_duration, 2)
+        # Cost calculation remains the same
         cost_input_per_1k = 0.0005
         cost_output_per_1k = 0.0015
         estimated_cost = (stats["api_usage"]["openrouter_prompt_tokens"] / 1000) * cost_input_per_1k + \
-                         (stats["api_usage"]["openrouter_completion_tokens"] / 1000) * cost_output_per_1k
+                            (stats["api_usage"]["openrouter_completion_tokens"] / 1000) * cost_output_per_1k
         estimated_cost += (stats["api_usage"]["tavily_search_calls"] / 1000) * 4.0
         stats["api_usage"]["cost_estimate_usd"] = round(estimated_cost, 4)
         # --- End Finalize stats ---
@@ -272,16 +316,17 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
             logger.info(f"[_process_vendor_file_async] Committing final job completion status.")
             db.commit()
             logger.info(f"Job completed successfully",
-                       extra={
-                           "processing_duration": processing_duration,
-                           "output_file": output_file_name,
-                           "openrouter_calls": stats["api_usage"]["openrouter_calls"],
-                           "tokens_used": stats["api_usage"]["openrouter_total_tokens"],
-                           "tavily_calls": stats["api_usage"]["tavily_search_calls"],
-                           "estimated_cost": stats["api_usage"]["cost_estimate_usd"],
-                           "invalid_category_errors": stats.get("invalid_category_errors", 0),
-                           "successfully_classified_l5_total": stats.get("successfully_classified_l5", 0)
-                       })
+                        extra={
+                            "processing_duration": processing_duration,
+                            "output_file": output_file_name,
+                            "target_level": target_level,
+                            "openrouter_calls": stats["api_usage"]["openrouter_calls"],
+                            "tokens_used": stats["api_usage"]["openrouter_total_tokens"],
+                            "tavily_calls": stats["api_usage"]["tavily_search_calls"],
+                            "estimated_cost": stats["api_usage"]["cost_estimate_usd"],
+                            "invalid_category_errors": stats.get("invalid_category_errors", 0),
+                            "successfully_classified_l5_total": stats.get("successfully_classified_l5", 0)
+                        })
         except Exception as final_commit_err:
             logger.error("CRITICAL: Failed to commit final job completion status!", exc_info=True)
             db.rollback()
@@ -308,12 +353,12 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session):
                     extra={"error": str(db_err)})
         if job:
             if job.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
-                 err_msg = f"Database error: {type(db_err).__name__}: {str(db_err)}"
-                 job.fail(err_msg[:2000])
-                 db.commit()
+                    err_msg = f"Database error: {type(db_err).__name__}: {str(db_err)}"
+                    job.fail(err_msg[:2000])
+                    db.commit()
             else:
-                 logger.warning(f"Database error occurred but job status was already {job.status}. Error: {db_err}")
-                 db.rollback()
+                    logger.warning(f"Database error occurred but job status was already {job.status}. Error: {db_err}")
+                    db.rollback()
         else:
             logger.error("Job object was None during database error handling.")
     except Exception as async_err:

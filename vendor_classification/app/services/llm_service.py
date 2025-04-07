@@ -1,4 +1,3 @@
-
 # app/services/llm_service.py
 import httpx
 import json
@@ -18,8 +17,8 @@ from core.log_context import set_log_context, get_correlation_id
 from utils.log_utils import LogTimer, log_function_call
 
 # --- MODIFIED IMPORT ---
-# Import prompt generation functions from the correct location
-from app.tasks.classification_prompts import generate_batch_prompt, generate_search_prompt
+# Use absolute import path from the root of PYTHONPATH (/app)
+from tasks.classification_prompts import generate_batch_prompt, generate_search_prompt
 # --- END MODIFIED IMPORT ---
 
 # Configure logger
@@ -27,7 +26,7 @@ logger = get_logger("vendor_classification.llm_service")
 llm_trace_logger = logging.getLogger("llm_api_trace") # ENSURE NAME CONSISTENT
 
 # --- ADDED: Log confirmation ---
-logger.debug("Successfully imported generate_batch_prompt and generate_search_prompt from app.tasks.classification_prompts.")
+logger.debug("Successfully imported generate_batch_prompt and generate_search_prompt from tasks.classification_prompts.")
 # --- END ADDED ---
 
 # --- Helper function for JSON parsing (Remains here) ---

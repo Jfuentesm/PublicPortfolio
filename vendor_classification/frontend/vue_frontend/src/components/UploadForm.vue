@@ -1,3 +1,4 @@
+
 <template>
   <div class="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200">
     <div class="bg-primary text-white p-4 sm:p-5">
@@ -30,6 +31,29 @@
             placeholder="e.g., Your Company Inc."
           />
         </div>
+
+        <!-- ADDED: Target Level Selection -->
+        <div class="mb-5">
+          <label for="targetLevel" class="block text-sm font-medium text-gray-700 mb-1.5">
+              Target Classification Level <span class="text-red-500">*</span>
+          </label>
+          <select
+            id="targetLevel"
+            v-model.number="selectedLevel"
+            required
+            :disabled="isLoading"
+            class="block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm disabled:opacity-60 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          >
+            <option value="1">Level 1 (Sector)</option>
+            <option value="2">Level 2 (Subsector)</option>
+            <option value="3">Level 3 (Industry Group)</option>
+            <option value="4">Level 4 (NAICS Industry)</option>
+            <option value="5">Level 5 (National Industry)</option>
+          </select>
+          <p class="mt-1 text-xs text-gray-500">Select the maximum NAICS level you want the classification to reach.</p>
+        </div>
+        <!-- END ADDED -->
+
         <div class="mb-6">
           <label for="vendorFile" class="block text-sm font-medium text-gray-700 mb-1.5">
               Vendor Excel File <span class="text-red-500">*</span>
@@ -63,7 +87,6 @@
 </template>
 
 <script setup lang="ts">
-// ... script remains the same ...
 import { ref } from 'vue';
 import apiService from '@/services/api';
 import { useJobStore } from '@/stores/job';
@@ -76,6 +99,9 @@ const fileInputRef = ref<HTMLInputElement | null>(null);
 const isLoading = ref(false);
 const successMessage = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
+// --- ADDED: State for selected level ---
+const selectedLevel = ref<number>(5); // Default to Level 5
+// --- END ADDED ---
 
 const emit = defineEmits(['upload-successful']);
 
@@ -96,6 +122,14 @@ const handleUpload = async () => {
     successMessage.value = null;
     return;
   }
+  // --- ADDED: Validate selected level ---
+  if (selectedLevel.value < 1 || selectedLevel.value > 5) {
+    errorMessage.value = 'Please select a valid target level (1-5).';
+    successMessage.value = null;
+    return;
+  }
+  // --- END ADDED ---
+
   isLoading.value = true;
   successMessage.value = null;
   errorMessage.value = null;
@@ -103,12 +137,18 @@ const handleUpload = async () => {
   const formData = new FormData();
   formData.append('company_name', companyName.value);
   formData.append('file', selectedFile.value);
+  // --- ADDED: Append selected level to form data ---
+  formData.append('target_level', selectedLevel.value.toString());
+  // --- END ADDED ---
+
   try {
-    const response = await apiService.uploadFile(formData);
-    successMessage.value = `Upload successful! Job ${response.job_id} started. Monitoring status below...`;
+    const response = await apiService.uploadFile(formData); // apiService.uploadFile now handles FormData directly
+    successMessage.value = `Upload successful! Job ${response.job_id} started (Target Level: ${selectedLevel.value}). Monitoring status below...`;
     emit('upload-successful', response.job_id);
+    // Reset form fields
     companyName.value = '';
     selectedFile.value = null;
+    selectedLevel.value = 5; // Reset level to default
     if (fileInputRef.value) {
         fileInputRef.value.value = '';
     }

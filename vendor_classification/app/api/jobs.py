@@ -11,7 +11,10 @@ from api.auth import get_current_user
 from models.user import User
 from models.job import Job, JobStatus
 from schemas.job import JobResponse # Import the new schema
-from core.logging_config import get_logger, set_log_context
+# --- MODIFIED IMPORT: Import set_log_context from core.log_context ---
+from core.logging_config import get_logger
+from core.log_context import set_log_context
+# --- END MODIFIED IMPORT ---
 # --- ADDED: Logging confirmation ---
 from core.config import settings # Need settings for file path construction
 # --- END ADDED ---

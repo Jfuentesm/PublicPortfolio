@@ -1,3 +1,4 @@
+
 # app/api/main.py
 import socket
 import sqlalchemy
@@ -60,6 +61,9 @@ from schemas.job import JobResponse
 from schemas.user import UserResponse as UserResponseSchema
 
 # --- Logging Setup ---
+# Initialize logging BEFORE creating the FastAPI app instance
+# This ensures loggers are ready when middleware/routers are attached
+setup_logging(log_level=logging.DEBUG, log_to_file=True, log_dir=settings.TAXONOMY_DATA_DIR.replace('taxonomy', 'logs')) # Use settings for log dir
 logger = get_logger("vendor_classification.api")
 
 # --- FastAPI App Initialization ---
@@ -73,7 +77,7 @@ app = FastAPI(
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # Allow all origins for now, restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -124,7 +128,7 @@ async def health_check():
             local_ip = s.getsockname()[0]
             s.close()
         except Exception:
-             local_ip = "Could not resolve IP"
+                local_ip = "Could not resolve IP"
 
     logger.info(f"Health check called", extra={"hostname": hostname, "ip": local_ip})
     db_status = "unknown"
@@ -152,32 +156,32 @@ async def health_check():
         logger.error(f"Celery broker connection error during health check: {str(celery_e)}", exc_info=False)
         celery_broker_status = f"error: {str(celery_e)[:100]}"
     finally:
-         if celery_connection:
-              try: celery_connection.close()
-              except Exception as close_err: logger.warning(f"Error closing celery connection in health check: {close_err}")
+            if celery_connection:
+                try: celery_connection.close()
+                except Exception as close_err: logger.warning(f"Error closing celery connection in health check: {close_err}")
 
     openrouter_status = "unknown"
     tavily_status = "unknown"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-             or_url = f"{settings.OPENROUTER_API_BASE}/models"
-             or_headers = {"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"}
-             or_resp = await client.get(or_url, headers=or_headers)
-             openrouter_status = "connected" if or_resp.status_code == 200 else f"error: {or_resp.status_code}"
+                or_url = f"{settings.OPENROUTER_API_BASE}/models"
+                or_headers = {"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"}
+                or_resp = await client.get(or_url, headers=or_headers)
+                openrouter_status = "connected" if or_resp.status_code == 200 else f"error: {or_resp.status_code}"
 
-             tv_url = "https://api.tavily.com/search"
-             tv_payload = {"api_key": settings.TAVILY_API_KEY, "query": "test", "max_results": 1}
-             tv_resp = await client.post(tv_url, json=tv_payload)
-             tavily_status = "connected" if tv_resp.status_code == 200 else f"error: {tv_resp.status_code}"
+                tv_url = "https://api.tavily.com/search"
+                tv_payload = {"api_key": settings.TAVILY_API_KEY, "query": "test", "max_results": 1}
+                tv_resp = await client.post(tv_url, json=tv_payload)
+                tavily_status = "connected" if tv_resp.status_code == 200 else f"error: {tv_resp.status_code}"
 
     except httpx.RequestError as http_err:
-         logger.warning(f"HTTPX RequestError during external API health check: {http_err}")
-         openrouter_status = openrouter_status if openrouter_status != "unknown" else "connection_error"
-         tavily_status = tavily_status if tavily_status != "unknown" else "connection_error"
+            logger.warning(f"HTTPX RequestError during external API health check: {http_err}")
+            openrouter_status = openrouter_status if openrouter_status != "unknown" else "connection_error"
+            tavily_status = tavily_status if tavily_status != "unknown" else "connection_error"
     except Exception as api_err:
-         logger.error(f"Error checking external APIs during health check: {api_err}")
-         openrouter_status = openrouter_status if openrouter_status != "unknown" else "check_error"
-         tavily_status = tavily_status if tavily_status != "unknown" else "check_error"
+            logger.error(f"Error checking external APIs during health check: {api_err}")
+            openrouter_status = openrouter_status if openrouter_status != "unknown" else "check_error"
+            tavily_status = tavily_status if tavily_status != "unknown" else "check_error"
 
     return {
         "status": "healthy",
@@ -247,11 +251,11 @@ async def login_for_access_token(
             )
 
         if not user.is_active:
-             logger.warning(f"Login failed: user '{user.username}' is inactive.", extra={"ip": client_host})
-             raise HTTPException(
-                 status_code=status.HTTP_400_BAD_REQUEST,
-                 detail="Inactive user.",
-             )
+                logger.warning(f"Login failed: user '{user.username}' is inactive.", extra={"ip": client_host})
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Inactive user.",
+                )
 
         set_user(user) # Set context for logging
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -269,7 +273,7 @@ async def login_for_access_token(
 
     except HTTPException as http_exc:
         if http_exc.status_code not in [status.HTTP_401_UNAUTHORIZED, status.HTTP_400_BAD_REQUEST]:
-             logger.error(f"HTTP exception during login", exc_info=True)
+                logger.error(f"HTTP exception during login", exc_info=True)
         raise
     except Exception as e:
         logger.error(f"Unexpected login error", exc_info=True, extra={"error": str(e), "username": form_data.username})
@@ -278,17 +282,21 @@ async def login_for_access_token(
             detail="An error occurred during the login process."
         )
 
-# --- UPLOAD ROUTE ---
+# --- UPLOAD ROUTE (Updated) ---
 @app.post("/api/v1/upload", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def upload_vendor_file(
     background_tasks: BackgroundTasks,
     company_name: str = Form(...),
+    # --- ADDED: target_level parameter ---
+    target_level: int = Form(..., ge=1, le=5, description="Target classification level (1-5)"),
+    # --- END ADDED ---
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Accepts vendor file upload, creates a job, and queues it for processing.
+    Allows specifying the target classification level.
     """
     job_id = str(uuid.uuid4())
     set_job_id(job_id)
@@ -297,6 +305,7 @@ async def upload_vendor_file(
     logger.info(f"Upload request received", extra={
         "job_id": job_id,
         "company_name": company_name,
+        "target_level": target_level, # Log the target level
         "uploaded_filename": file.filename,
         "content_type": file.content_type,
         "username": current_user.username
@@ -330,12 +339,13 @@ async def upload_vendor_file(
             input_file_name=os.path.basename(saved_file_path),
             status=JobStatus.PENDING.value,
             current_stage=ProcessingStage.INGESTION.value,
-            created_by=current_user.username
+            created_by=current_user.username,
+            target_level=target_level # Save the target level
         )
         db.add(job)
         db.commit()
         db.refresh(job)
-        logger.info(f"Database job record created successfully for job {job_id}")
+        logger.info(f"Database job record created successfully for job {job_id}", extra={"target_level": job.target_level})
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to create database job record for job {job_id}", exc_info=True)
@@ -346,7 +356,9 @@ async def upload_vendor_file(
 
     try:
         logger.info(f"Adding Celery task 'process_vendor_file' to background tasks for job {job_id}")
-        background_tasks.add_task(process_vendor_file.delay, job_id=job_id, file_path=saved_file_path)
+        # --- UPDATED: Pass target_level to Celery task ---
+        background_tasks.add_task(process_vendor_file.delay, job_id=job_id, file_path=saved_file_path, target_level=target_level)
+        # --- END UPDATED ---
         logger.info(f"Celery task queued successfully for job {job_id}")
     except Exception as e:
         logger.error(f"Failed to queue Celery task for job {job_id}", exc_info=True)
@@ -355,6 +367,7 @@ async def upload_vendor_file(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to queue job for processing.")
 
     logger.info(f"Upload request for job {job_id} processed successfully, returning 202 Accepted.")
+    # Use model_validate for Pydantic v2
     return JobResponse.model_validate(job)
 # --- END UPLOAD ROUTE ---
 

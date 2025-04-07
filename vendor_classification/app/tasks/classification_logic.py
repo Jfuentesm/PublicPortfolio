@@ -80,7 +80,7 @@ def group_by_parent_category(
             if level_result and isinstance(level_result, dict):
                 reason = level_result.get('classification_not_possible_reason', 'Marked not possible')
             elif not level_result:
-                 reason = f"No result found for {parent_key}"
+                    reason = f"No result found for {parent_key}"
             logger.info(f"  Excluding vendor '{vendor_name}' from Level {parent_level + 1}: not successfully classified at '{parent_key}'. Reason: {reason}.")
             excluded_count += 1
 
@@ -114,7 +114,7 @@ async def process_batch(
     context_type = "Search Context" if search_context else "Initial Data"
 
     logger.info(f"process_batch: Starting Level {level} batch using {context_type}.",
-               extra={"batch_size": len(batch_data), "parent_category_id": parent_category_id, "first_vendor": batch_names[0] if batch_names else 'N/A'})
+                extra={"batch_size": len(batch_data), "parent_category_id": parent_category_id, "first_vendor": batch_names[0] if batch_names else 'N/A'})
 
     # --- Get valid category IDs for this level/parent (Updated for L5) ---
     valid_category_ids: Set[str] = set()
@@ -134,26 +134,26 @@ async def process_batch(
             elif level == 5:
                 categories = taxonomy.get_level5_categories(parent_category_id)
             else:
-                 logger.error(f"process_batch: Invalid level {level} requested.")
-                 categories = [] # Should not happen
+                    logger.error(f"process_batch: Invalid level {level} requested.")
+                    categories = [] # Should not happen
         else: # level > 1 and no parent_category_id
-             logger.error(f"process_batch: Parent category ID is required for Level {level} but was not provided.")
-             categories = []
+                logger.error(f"process_batch: Parent category ID is required for Level {level} but was not provided.")
+                categories = []
 
         valid_category_ids = {cat.id for cat in categories}
 
         if not valid_category_ids:
-             if level > 1 and parent_category_id:
-                 logger.warning(f"process_batch: No valid child categories found or retrieved for Level {level}, Parent '{parent_category_id}'. LLM cannot classify.")
-             elif level == 1:
-                 logger.error("process_batch: No Level 1 categories found in taxonomy!")
-                 category_id_lookup_error = True
+                if level > 1 and parent_category_id:
+                    logger.warning(f"process_batch: No valid child categories found or retrieved for Level {level}, Parent '{parent_category_id}'. LLM cannot classify.")
+                elif level == 1:
+                    logger.error("process_batch: No Level 1 categories found in taxonomy!")
+                    category_id_lookup_error = True
         else:
-             logger.debug(f"process_batch: Found {len(valid_category_ids)} valid IDs for Level {level}, Parent '{parent_category_id}'. Example: {list(valid_category_ids)[:5]}")
+                logger.debug(f"process_batch: Found {len(valid_category_ids)} valid IDs for Level {level}, Parent '{parent_category_id}'. Example: {list(valid_category_ids)[:5]}")
 
     except Exception as tax_err:
         logger.error(f"process_batch: Error getting valid categories from taxonomy", exc_info=True,
-                     extra={"level": level, "parent_category_id": parent_category_id})
+                        extra={"level": level, "parent_category_id": parent_category_id})
         valid_category_ids = set()
         category_id_lookup_error = True
 
@@ -182,18 +182,18 @@ async def process_batch(
             logger.warning("process_batch: LLM response missing or has invalid usage data.")
 
         if llm_response_data is None:
-             logger.error("process_batch: Received None response from llm_service.classify_batch. Cannot process results.")
-             raise ValueError("LLM service returned None, indicating a failure in the call.")
+                logger.error("process_batch: Received None response from llm_service.classify_batch. Cannot process results.")
+                raise ValueError("LLM service returned None, indicating a failure in the call.")
 
         llm_result = llm_response_data.get("result", {})
         classifications = llm_result.get("classifications", [])
         if not isinstance(classifications, list):
-             logger.warning("LLM response 'classifications' is not a list.", extra={"response_preview": str(llm_result)[:500]})
-             classifications = []
+                logger.warning("LLM response 'classifications' is not a list.", extra={"response_preview": str(llm_result)[:500]})
+                classifications = []
 
         logger.debug(f"process_batch: Received {len(classifications)} classifications from LLM for batch size {len(batch_data)} at Level {level}.")
         if llm_result.get("batch_id_mismatch"):
-             logger.warning(f"process_batch: Processing batch despite batch_id mismatch warning from LLM service.")
+                logger.warning(f"process_batch: Processing batch despite batch_id mismatch warning from LLM service.")
 
         # --- Validate and process results ---
         processed_vendors_in_response = set()
@@ -223,7 +223,7 @@ async def process_batch(
                 if category_id not in valid_category_ids:
                     is_valid_category = False
                     logger.warning(f"Invalid category ID '{category_id}' returned by LLM for vendor '{target_vendor_name}' at level {level}, parent '{parent_category_id}'.",
-                                   extra={"valid_ids": list(valid_category_ids)[:10]})
+                                    extra={"valid_ids": list(valid_category_ids)[:10]})
                     classification_not_possible = True
                     reason = f"Invalid category ID '{category_id}' returned by LLM (Valid examples: {list(valid_category_ids)[:3]})"
                     confidence = 0.0
@@ -231,17 +231,17 @@ async def process_batch(
                     category_name = "N/A"
                     stats["invalid_category_errors"] = stats.get("invalid_category_errors", 0) + 1
                 else:
-                     logger.debug(f"Category ID '{category_id}' for '{target_vendor_name}' is valid for Level {level}, Parent '{parent_category_id}'.")
+                        logger.debug(f"Category ID '{category_id}' for '{target_vendor_name}' is valid for Level {level}, Parent '{parent_category_id}'.")
             elif not classification_not_possible and category_id_lookup_error:
-                 logger.warning(f"Cannot validate category ID '{category_id}' for '{target_vendor_name}' due to earlier taxonomy lookup error.")
+                    logger.warning(f"Cannot validate category ID '{category_id}' for '{target_vendor_name}' due to earlier taxonomy lookup error.")
             elif not classification_not_possible and not valid_category_ids and level > 1:
-                 logger.warning(f"Cannot validate category ID '{category_id}' for '{target_vendor_name}' because no valid child categories were found for parent '{parent_category_id}'.")
-                 is_valid_category = False
-                 classification_not_possible = True
-                 reason = f"LLM returned category '{category_id}' but no valid children found for parent '{parent_category_id}'."
-                 confidence = 0.0
-                 category_id = "N/A"; category_name = "N/A"
-                 stats["invalid_category_errors"] = stats.get("invalid_category_errors", 0) + 1
+                    logger.warning(f"Cannot validate category ID '{category_id}' for '{target_vendor_name}' because no valid child categories were found for parent '{parent_category_id}'.")
+                    is_valid_category = False
+                    classification_not_possible = True
+                    reason = f"LLM returned category '{category_id}' but no valid children found for parent '{parent_category_id}'."
+                    confidence = 0.0
+                    category_id = "N/A"; category_name = "N/A"
+                    stats["invalid_category_errors"] = stats.get("invalid_category_errors", 0) + 1
             # --- End TAXONOMY VALIDATION ---
 
             # --- Consistency Checks ---
@@ -249,12 +249,12 @@ async def process_batch(
                 logger.warning("Correcting confidence to 0.0 for classification_not_possible=true", extra={"vendor": target_vendor_name})
                 confidence = 0.0
             if not classification_not_possible and is_valid_category and (category_id == "N/A" or not category_id):
-                 logger.warning("Classification marked possible by LLM but category ID is 'N/A' or empty", extra={"vendor": target_vendor_name, "classification": classification})
-                 classification_not_possible = True
-                 reason = reason or "Missing category ID despite LLM success claim"
-                 confidence = 0.0
-                 category_id = "N/A"
-                 category_name = "N/A"
+                    logger.warning("Classification marked possible by LLM but category ID is 'N/A' or empty", extra={"vendor": target_vendor_name, "classification": classification})
+                    classification_not_possible = True
+                    reason = reason or "Missing category ID despite LLM success claim"
+                    confidence = 0.0
+                    category_id = "N/A"
+                    category_name = "N/A"
             # --- End Consistency Checks ---
 
             results[target_vendor_name] = {
@@ -283,7 +283,7 @@ async def process_batch(
 
     except Exception as e:
         logger.error(f"Failed to process batch at Level {level} ({context_type})", exc_info=True,
-                     extra={"batch_names": batch_names, "error": str(e)})
+                        extra={"batch_names": batch_names, "error": str(e)})
         for vendor_name in batch_names:
             results[vendor_name] = {
                 "category_id": "ERROR", "category_name": "ERROR", "confidence": 0.0,
@@ -303,18 +303,20 @@ async def search_and_classify_recursively(
     llm_service: LLMService,
     search_service: SearchService,
     stats: Dict[str, Any],
-    semaphore: asyncio.Semaphore
+    semaphore: asyncio.Semaphore,
+    target_level: int # <<< ADDED target_level
 ) -> Dict[str, Any]:
     """
     Performs Tavily search, attempts L1 classification, and then recursively
-    attempts L2-L5 classification using the search context. Controlled by semaphore.
+    attempts L2 up to target_level classification using the search context.
+    Controlled by semaphore.
     Returns the search_result_data dictionary, potentially augmented with
-    classification results for L1-L5 (keyed as classification_l1, classification_l2, etc.).
+    classification results (keyed as classification_l1, classification_l2, etc.).
     """
     vendor_name = vendor_data.get('vendor_name', 'UnknownVendor')
     logger.debug(f"search_and_classify_recursively: Waiting to acquire semaphore for vendor '{vendor_name}'.")
     async with semaphore: # Limit concurrency
-        logger.info(f"search_and_classify_recursively: Acquired semaphore. Starting for vendor", extra={"vendor": vendor_name})
+        logger.info(f"search_and_classify_recursively: Acquired semaphore. Starting for vendor '{vendor_name}' up to Level {target_level}.")
         search_result_data = {
             "vendor": vendor_name,
             "search_query": f"{vendor_name} company business type industry",
@@ -327,7 +329,7 @@ async def search_and_classify_recursively(
             "classification_l3": None,
             "classification_l4": None,
             "classification_l5": None
-         }
+            }
 
         # --- 1. Perform Tavily Search ---
         try:
@@ -343,9 +345,9 @@ async def search_and_classify_recursively(
             if search_result_data.get("error"):
                 logger.warning(f"search_and_classify_recursively: Search failed", extra={"vendor": vendor_name, "error": search_result_data["error"]})
                 search_result_data["classification_l1"] = {
-                     "classification_not_possible": True,
-                     "classification_not_possible_reason": f"Search error: {str(search_result_data['error'])[:100]}",
-                     "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Failed"
+                        "classification_not_possible": True,
+                        "classification_not_possible_reason": f"Search error: {str(search_result_data['error'])[:100]}",
+                        "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Failed"
                 }
                 logger.debug(f"search_and_classify_recursively: Releasing semaphore early due to search error for '{vendor_name}'.")
                 return search_result_data # Stop if search failed
@@ -356,10 +358,10 @@ async def search_and_classify_recursively(
             logger.error(f"search_and_classify_recursively: Unexpected error during Tavily search for {vendor_name}", exc_info=True)
             search_result_data["error"] = f"Unexpected search error: {str(search_exc)}"
             search_result_data["classification_l1"] = {
-                 "classification_not_possible": True,
-                 "classification_not_possible_reason": f"Search task error: {str(search_exc)[:100]}",
-                 "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Failed"
-             }
+                    "classification_not_possible": True,
+                    "classification_not_possible_reason": f"Search task error: {str(search_exc)[:100]}",
+                    "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Failed"
+                }
             logger.debug(f"search_and_classify_recursively: Releasing semaphore early due to search exception for '{vendor_name}'.")
             return search_result_data # Stop if search failed
 
@@ -368,9 +370,9 @@ async def search_and_classify_recursively(
         if not search_content_available:
             logger.warning(f"search_and_classify_recursively: No usable search results found for vendor, cannot classify", extra={"vendor": vendor_name})
             search_result_data["classification_l1"] = {
-                 "classification_not_possible": True,
-                 "classification_not_possible_reason": "No search results content found",
-                 "confidence": 0.0, "vendor_name": vendor_name, "notes": "No Search Content"
+                    "classification_not_possible": True,
+                    "classification_not_possible_reason": "No search results content found",
+                    "confidence": 0.0, "vendor_name": vendor_name, "notes": "No Search Content"
             }
             logger.debug(f"search_and_classify_recursively: Releasing semaphore early due to no search content for '{vendor_name}'.")
             return search_result_data # Stop if no content
@@ -384,8 +386,8 @@ async def search_and_classify_recursively(
             logger.debug(f"search_and_classify_recursively: llm_service.process_search_results (L1) returned for '{vendor_name}'.")
 
             if llm_response_l1 is None:
-                 logger.error("search_and_classify_recursively: Received None response from llm_service.process_search_results. Cannot process L1.")
-                 raise ValueError("LLM service (process_search_results) returned None.")
+                    logger.error("search_and_classify_recursively: Received None response from llm_service.process_search_results. Cannot process L1.")
+                    raise ValueError("LLM service (process_search_results) returned None.")
 
             if isinstance(llm_response_l1.get("usage"), dict):
                 usage = llm_response_l1["usage"]
@@ -415,31 +417,33 @@ async def search_and_classify_recursively(
 
             if l1_classification.get("classification_not_possible") and l1_classification.get("confidence", 0.0) > 0.0: l1_classification["confidence"] = 0.0
             if not l1_classification.get("classification_not_possible") and not l1_classification.get("category_id", "N/A"):
-                 l1_classification["classification_not_possible"] = True
-                 l1_classification["classification_not_possible_reason"] = "Missing L1 category ID despite LLM success claim"
-                 l1_classification["confidence"] = 0.0
-                 l1_classification["category_id"] = "N/A"; l1_classification["category_name"] = "N/A"
+                    l1_classification["classification_not_possible"] = True
+                    l1_classification["classification_not_possible_reason"] = "Missing L1 category ID despite LLM success claim"
+                    l1_classification["confidence"] = 0.0
+                    l1_classification["category_id"] = "N/A"; l1_classification["category_name"] = "N/A"
 
             search_result_data["classification_l1"] = l1_classification # Store validated L1 result
 
         except Exception as llm_err:
-             logger.error(f"search_and_classify_recursively: Error during LLM L1 processing for {vendor_name}", exc_info=True)
-             search_result_data["error"] = search_result_data.get("error") or f"LLM L1 processing error: {str(llm_err)}"
-             search_result_data["classification_l1"] = {
-                 "classification_not_possible": True,
-                 "classification_not_possible_reason": f"LLM L1 processing error: {str(llm_err)[:100]}",
-                 "confidence": 0.0, "vendor_name": vendor_name, "notes": "LLM L1 Error"
-             }
-             logger.debug(f"search_and_classify_recursively: Releasing semaphore early due to L1 LLM exception for '{vendor_name}'.")
-             return search_result_data # Stop if L1 classification failed
+                logger.error(f"search_and_classify_recursively: Error during LLM L1 processing for {vendor_name}", exc_info=True)
+                search_result_data["error"] = search_result_data.get("error") or f"LLM L1 processing error: {str(llm_err)}"
+                search_result_data["classification_l1"] = {
+                    "classification_not_possible": True,
+                    "classification_not_possible_reason": f"LLM L1 processing error: {str(llm_err)[:100]}",
+                    "confidence": 0.0, "vendor_name": vendor_name, "notes": "LLM L1 Error"
+                }
+                logger.debug(f"search_and_classify_recursively: Releasing semaphore early due to L1 LLM exception for '{vendor_name}'.")
+                return search_result_data # Stop if L1 classification failed
 
-        # --- 3. Recursive Classification L2-L5 using Search Context ---
+        # --- 3. Recursive Classification L2 up to target_level using Search Context ---
         current_parent_id = search_result_data["classification_l1"].get("category_id")
         classification_possible = not search_result_data["classification_l1"].get("classification_not_possible", True)
 
-        if classification_possible and current_parent_id and current_parent_id != "N/A":
-            logger.info(f"search_and_classify_recursively: L1 successful ({current_parent_id}), proceeding to L2-L5 for {vendor_name} using search context.")
-            for level in range(2, 6):
+        # --- UPDATED: Loop up to target_level ---
+        if classification_possible and current_parent_id and current_parent_id != "N/A" and target_level > 1:
+            logger.info(f"search_and_classify_recursively: L1 successful ({current_parent_id}), proceeding to L2-{target_level} for {vendor_name} using search context.")
+            for level in range(2, target_level + 1):
+        # --- END UPDATED ---
                 logger.debug(f"Attempting post-search Level {level} for {vendor_name}, parent {current_parent_id}")
                 try:
                     logger.debug(f"search_and_classify_recursively: Calling process_batch (Level {level}) for '{vendor_name}' with search context.")
@@ -468,22 +472,22 @@ async def search_and_classify_recursively(
                     else:
                         logger.error(f"Post-search Level {level} batch processing did not return result for {vendor_name}. Stopping recursion.")
                         search_result_data[f"classification_l{level}"] = {
-                             "classification_not_possible": True,
-                             "classification_not_possible_reason": f"Missing result from L{level} post-search batch",
-                             "confidence": 0.0, "vendor_name": vendor_name, "notes": f"L{level} Error"
+                                "classification_not_possible": True,
+                                "classification_not_possible_reason": f"Missing result from L{level} post-search batch",
+                                "confidence": 0.0, "vendor_name": vendor_name, "notes": f"L{level} Error"
                         }
                         break
 
                 except Exception as recursive_err:
                     logger.error(f"search_and_classify_recursively: Error during post-search Level {level} for {vendor_name}", exc_info=True)
                     search_result_data[f"classification_l{level}"] = {
-                         "classification_not_possible": True,
-                         "classification_not_possible_reason": f"L{level} processing error: {str(recursive_err)[:100]}",
-                         "confidence": 0.0, "vendor_name": vendor_name, "notes": f"L{level} Error"
+                            "classification_not_possible": True,
+                            "classification_not_possible_reason": f"L{level} processing error: {str(recursive_err)[:100]}",
+                            "confidence": 0.0, "vendor_name": vendor_name, "notes": f"L{level} Error"
                     }
                     break # Stop recursion on error
         else:
-            logger.info(f"search_and_classify_recursively: L1 classification failed or not possible for {vendor_name}, skipping L2-L5.")
+            logger.info(f"search_and_classify_recursively: L1 classification failed or not possible for {vendor_name}, or target level is 1. Skipping L2-{target_level}.")
 
         logger.info(f"search_and_classify_recursively: Finished for vendor", extra={"vendor": vendor_name})
         logger.debug(f"search_and_classify_recursively: Releasing semaphore for vendor '{vendor_name}'.")
@@ -499,23 +503,27 @@ async def process_vendors(
     job: Job,
     db: Session,
     llm_service: LLMService,
-    search_service: SearchService
+    search_service: SearchService,
+    target_level: int # <<< ADDED target_level
 ):
     """
-    Main orchestration function for processing vendors through the classification workflow (Levels 1-5),
-    including recursive search for unknowns. Updates results and stats dictionaries in place.
+    Main orchestration function for processing vendors through the classification workflow (up to target_level),
+    including recursive search for unknowns (up to target_level). Updates results and stats dictionaries in place.
     """
     unique_vendor_names = list(unique_vendors_map.keys()) # Get names from map
     total_unique_vendors = len(unique_vendor_names)
     processed_count = 0 # Count unique vendors processed in batches
 
-    logger.info(f"Starting classification loop for {total_unique_vendors} unique vendors.")
+    logger.info(f"Starting classification loop for {total_unique_vendors} unique vendors up to target Level {target_level}.")
 
-    # --- Initial Hierarchical Classification (Levels 1-5) ---
+    # --- Initial Hierarchical Classification (Levels 1 to target_level) ---
     vendors_to_process_next_level_names = set(unique_vendor_names) # Start with all unique vendor names for Level 1
     initial_l4_success_count = 0 # Track L4 for stats
+    initial_l5_success_count = 0 # Track L5 for stats
 
-    for level in range(1, 6):
+    # --- UPDATED: Loop up to target_level ---
+    for level in range(1, target_level + 1):
+    # --- END UPDATED ---
         if not vendors_to_process_next_level_names:
             logger.info(f"No vendors remaining to process for Level {level}. Skipping.")
             continue # Skip level if no vendors need processing
@@ -525,16 +533,18 @@ async def process_vendors(
 
         stage_enum_name = f"CLASSIFICATION_L{level}"
         if hasattr(ProcessingStage, stage_enum_name):
-             job.current_stage = getattr(ProcessingStage, stage_enum_name).value
+                job.current_stage = getattr(ProcessingStage, stage_enum_name).value
         else:
-             logger.error(f"ProcessingStage enum does not have member '{stage_enum_name}'. Using default.")
-             job.current_stage = ProcessingStage.PROCESSING.value # Fallback
+                logger.error(f"ProcessingStage enum does not have member '{stage_enum_name}'. Using default.")
+                job.current_stage = ProcessingStage.PROCESSING.value # Fallback
 
-        job.progress = min(0.8, 0.1 + ((level - 1) * 0.14)) # 0.7 / 5 = 0.14 per level
+        # Adjust progress calculation based on target_level (distribute 0.7 across target_level steps)
+        progress_per_level = 0.7 / target_level if target_level > 0 else 0.7
+        job.progress = min(0.8, 0.1 + ((level - 1) * progress_per_level))
         logger.info(f"[process_vendors] Committing status update before Level {level}: {job.status}, {job.current_stage}, {job.progress:.3f}")
         db.commit()
         logger.info(f"===== Starting Initial Level {level} Classification =====",
-                   extra={ "vendors_to_process": len(current_vendors_for_this_level), "progress": job.progress })
+                    extra={ "vendors_to_process": len(current_vendors_for_this_level), "progress": job.progress })
 
         if level == 1:
             grouped_vendors_names = { None: current_vendors_for_this_level }
@@ -544,7 +554,7 @@ async def process_vendors(
             grouped_vendors_names = group_by_parent_category(results, level - 1, current_vendors_for_this_level)
             logger.info(f"Level {level}: Created {len(grouped_vendors_names)} groups for processing.")
             for parent_id, names in grouped_vendors_names.items():
-                 logger.debug(f"  Group Parent ID '{parent_id}': {len(names)} vendors")
+                    logger.debug(f"  Group Parent ID '{parent_id}': {len(names)} vendors")
 
         processed_in_level_count = 0
         batch_counter_for_level = 0
@@ -557,7 +567,7 @@ async def process_vendors(
                 continue
 
             logger.info(f"Processing Level {level} group",
-                       extra={"parent_category_id": parent_category_id, "vendor_count": len(group_vendor_names)})
+                        extra={"parent_category_id": parent_category_id, "vendor_count": len(group_vendor_names)})
 
             group_vendor_data = [unique_vendors_map[name] for name in group_vendor_names if name in unique_vendors_map]
             level_batches_data = create_batches(group_vendor_data, batch_size=settings.BATCH_SIZE)
@@ -567,7 +577,7 @@ async def process_vendors(
                 batch_counter_for_level += 1
                 batch_names = [vd['vendor_name'] for vd in batch_data] # Get names for logging
                 logger.info(f"Processing Level {level} batch {i+1}/{len(level_batches_data)} for parent '{parent_category_id or 'None'}'",
-                           extra={"batch_size": len(batch_data), "first_vendor": batch_names[0] if batch_names else 'N/A', "batch_num": batch_counter_for_level, "total_batches": total_batches_for_level})
+                            extra={"batch_size": len(batch_data), "first_vendor": batch_names[0] if batch_names else 'N/A', "batch_num": batch_counter_for_level, "total_batches": total_batches_for_level})
                 try:
                     # Process batch WITHOUT search context initially
                     batch_results = await process_batch(batch_data, level, parent_category_id, taxonomy, llm_service, stats, search_context=None)
@@ -581,39 +591,43 @@ async def process_vendors(
                             if not classification.get("classification_not_possible", True):
                                 vendors_successfully_classified_in_level_names.add(vendor_name)
                                 logger.debug(f"Vendor '{vendor_name}' successfully classified at Level {level} (ID: {classification.get('category_id')}). Added for L{level+1}.")
+                                # Update stats based on the actual level completed
                                 if level == 4:
                                     initial_l4_success_count += 1
                                     logger.debug(f"Incremented initial_l4_success_count for {vendor_name}. Current L4 count: {initial_l4_success_count}")
+                                if level == 5:
+                                    initial_l5_success_count += 1
+                                    logger.debug(f"Incremented initial_l5_success_count for {vendor_name}. Current L5 count: {initial_l5_success_count}")
                             else:
                                 logger.debug(f"Vendor '{vendor_name}' not successfully classified at Level {level}. Reason: {classification.get('classification_not_possible_reason', 'Unknown')}. Will not proceed.")
                         else:
-                             logger.warning(f"Vendor '{vendor_name}' from batch result not found in main results dictionary.", extra={"level": level})
+                                logger.warning(f"Vendor '{vendor_name}' from batch result not found in main results dictionary.", extra={"level": level})
 
                 except Exception as batch_error:
                     logger.error(f"Error during initial batch processing logic (Level {level}, parent '{parent_category_id or 'None'}')", exc_info=True,
-                                 extra={"batch_vendors": batch_names, "error": str(batch_error)})
+                                    extra={"batch_vendors": batch_names, "error": str(batch_error)})
                     for vendor_name in batch_names:
-                         if vendor_name in results:
-                            if f"level{level}" not in results[vendor_name]:
-                                results[vendor_name][f"level{level}"] = {
-                                    "category_id": "ERROR", "category_name": "ERROR", "confidence": 0.0,
-                                    "classification_not_possible": True,
-                                    "classification_not_possible_reason": f"Batch processing logic error: {str(batch_error)[:100]}",
-                                    "vendor_name": vendor_name
-                                }
-                            processed_in_level_count += 1
-                         else:
-                              logger.warning(f"Vendor '{vendor_name}' from failed batch not found in main results dictionary.", extra={"level": level})
+                            if vendor_name in results:
+                                if f"level{level}" not in results[vendor_name]:
+                                    results[vendor_name][f"level{level}"] = {
+                                        "category_id": "ERROR", "category_name": "ERROR", "confidence": 0.0,
+                                        "classification_not_possible": True,
+                                        "classification_not_possible_reason": f"Batch processing logic error: {str(batch_error)[:100]}",
+                                        "vendor_name": vendor_name
+                                    }
+                                    processed_in_level_count += 1
+                                else: 
+                                    logger.warning(f"Vendor '{vendor_name}' from failed batch not found in main results dictionary.", extra={"level": level})
 
                 # Update progress within the level (based on batches completed)
                 level_progress_fraction = batch_counter_for_level / total_batches_for_level if total_batches_for_level > 0 else 1
-                job.progress = min(0.8, 0.1 + ((level - 1) * 0.14) + (0.14 * level_progress_fraction))
+                job.progress = min(0.8, 0.1 + ((level - 1) * progress_per_level) + (progress_per_level * level_progress_fraction))
                 try:
                     logger.info(f"[process_vendors] Committing progress update after batch {batch_counter_for_level}/{total_batches_for_level} (Level {level}): {job.progress:.3f}")
                     db.commit()
                 except Exception as db_err:
-                     logger.error("Failed to commit progress update during batch processing", exc_info=True)
-                     db.rollback()
+                        logger.error("Failed to commit progress update during batch processing", exc_info=True)
+                        db.rollback()
 
         logger.info(f"===== Initial Level {level} Classification Completed =====")
         logger.info(f"  Processed {processed_in_level_count} vendor results at Level {level}.")
@@ -622,21 +636,19 @@ async def process_vendors(
         vendors_to_process_next_level_names = vendors_successfully_classified_in_level_names
 
     # --- End of Initial Level Loop ---
-    logger.info(f"===== Finished Initial Hierarchical Classification Loop (Levels 1-5) =====")
+    logger.info(f"===== Finished Initial Hierarchical Classification Loop (Up to Level {target_level}) =====")
 
-    # --- Identify initially unclassifiable vendors (based on reaching L5) ---
+    # --- Identify vendors needing search (those not successfully classified at target_level) ---
     unknown_vendors_data_to_search = []
-    initial_l5_success_count = 0
     for vendor_name in unique_vendor_names:
-        is_classified_l5 = False
+        is_classified_target = False
         if vendor_name in results:
-            l5_result = results[vendor_name].get("level5")
-            if l5_result and not l5_result.get("classification_not_possible", False):
-                 is_classified_l5 = True
-                 initial_l5_success_count += 1
+            target_level_result = results[vendor_name].get(f"level{target_level}")
+            if target_level_result and not target_level_result.get("classification_not_possible", False):
+                    is_classified_target = True
 
-        if not is_classified_l5: # If didn't reach L5 successfully
-            logger.debug(f"Vendor '{vendor_name}' did not initially reach/pass Level 5 classification. Adding to search list.")
+        if not is_classified_target:
+            logger.debug(f"Vendor '{vendor_name}' did not initially reach/pass target Level {target_level} classification. Adding to search list.")
             if vendor_name in unique_vendors_map:
                 unknown_vendors_data_to_search.append(unique_vendors_map[vendor_name])
             else:
@@ -647,16 +659,17 @@ async def process_vendors(
     stats["successfully_classified_l4"] = initial_l4_success_count # Store initial L4 count
     stats["successfully_classified_l5"] = initial_l5_success_count # Store initial L5 count
 
-    logger.info(f"Initial Classification Summary: {initial_l5_success_count} reached L5, {stats['classification_not_possible_initial']} did not.")
-    logger.info(f"Initial Classification Summary: {initial_l4_success_count} reached L4.")
+    logger.info(f"Initial Classification Summary (Target L{target_level}): {total_unique_vendors - stats['classification_not_possible_initial']} reached target, {stats['classification_not_possible_initial']} did not.")
+    if target_level >= 4: logger.info(f"  Ref: {initial_l4_success_count} reached L4 initially.")
+    if target_level >= 5: logger.info(f"  Ref: {initial_l5_success_count} reached L5 initially.")
 
-    # --- Search and Recursive Classification for Unknown Vendors ---
+    # --- Search and Recursive Classification for Unknown Vendors (up to target_level) ---
     if unknown_vendors_data_to_search:
         job.current_stage = ProcessingStage.SEARCH.value
         job.progress = 0.8 # Progress after initial classification attempts
         logger.info(f"[process_vendors] Committing status update before Search stage: {job.status}, {job.current_stage}, {job.progress}")
         db.commit()
-        logger.info(f"===== Starting Search and Recursive Classification for {stats['classification_not_possible_initial']} Unclassified Vendors =====")
+        logger.info(f"===== Starting Search and Recursive Classification for {stats['classification_not_possible_initial']} Unclassified Vendors (Up to Level {target_level}) =====")
 
         stats["search_attempts"] = len(unknown_vendors_data_to_search)
 
@@ -670,7 +683,7 @@ async def process_vendors(
         for vendor_data in unknown_vendors_data_to_search:
             task = asyncio.create_task(
                 search_and_classify_recursively(
-                    vendor_data, taxonomy, llm_service, search_service, stats, search_semaphore
+                    vendor_data, taxonomy, llm_service, search_service, stats, search_semaphore, target_level # Pass target_level
                 )
             )
             search_tasks.append(task)
@@ -694,14 +707,14 @@ async def process_vendors(
         for i, result_or_exc in enumerate(search_and_recursive_results):
             processed_search_count += 1
             if i >= len(unknown_vendors_data_to_search):
-                 logger.error(f"Search result index {i} out of bounds for unknown_vendors list.")
-                 continue
+                    logger.error(f"Search result index {i} out of bounds for unknown_vendors list.")
+                    continue
             vendor_data = unknown_vendors_data_to_search[i]
             vendor_name = vendor_data.get('vendor_name', f'UnknownVendor_{i}')
 
             if vendor_name not in results:
-                 logger.warning(f"Vendor '{vendor_name}' from search task not found in main results dict. Initializing.")
-                 results[vendor_name] = {}
+                    logger.warning(f"Vendor '{vendor_name}' from search task not found in main results dict. Initializing.")
+                    results[vendor_name] = {}
 
             results[vendor_name]["search_attempted"] = True # Add flag
 
@@ -725,21 +738,23 @@ async def process_vendors(
                     results[vendor_name]["classified_via_search"] = True # Add flag
 
                     if not results[vendor_name].get("level1") or results[vendor_name]["level1"].get("classification_not_possible", True):
-                         results[vendor_name]["level1"] = l1_classification
-                         if "notes" not in results[vendor_name]["level1"]: results[vendor_name]["level1"]["notes"] = ""
-                         results[vendor_name]["level1"]["notes"] = f"Classified via search: {results[vendor_name]['level1']['notes']}"
+                            results[vendor_name]["level1"] = l1_classification
+                            if "notes" not in results[vendor_name]["level1"]: results[vendor_name]["level1"]["notes"] = ""
+                            results[vendor_name]["level1"]["notes"] = f"Classified via search: {results[vendor_name]['level1']['notes']}"
 
-                    # Store L2-L5 results obtained recursively
-                    for lvl in range(2, 6):
+                    # Store L2-L5 results obtained recursively (up to target_level)
+                    # --- UPDATED: Loop up to target_level ---
+                    for lvl in range(2, target_level + 1):
+                    # --- END UPDATED ---
                         lvl_key = f"classification_l{lvl}"
                         if lvl_key in search_data:
                             results[vendor_name][f"level{lvl}"] = search_data[lvl_key]
-                            # Check if L5 was successfully reached post-search
-                            if lvl == 5 and not search_data[lvl_key].get("classification_not_possible", True):
+                            # Check if L5 was successfully reached post-search (only if target was >= 5)
+                            if lvl == 5 and target_level >= 5 and not search_data[lvl_key].get("classification_not_possible", True):
                                 successful_l5_searches += 1
                                 logger.info(f"Vendor '{vendor_name}' reached L5 classification via search.")
                         else:
-                            # Explicitly remove higher levels if recursion stopped early
+                            # Explicitly remove higher levels if recursion stopped early or target was lower
                             results[vendor_name].pop(f"level{lvl}", None)
                             if f"classification_l{lvl-1}" in search_data:
                                 logger.debug(f"Recursion for {vendor_name} stopped before L{lvl}, likely due to L{lvl-1} failure or no children.")
@@ -754,25 +769,31 @@ async def process_vendors(
                             "classification_not_possible_reason": reason,
                             "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Failed L1"
                         }
-                    for lvl in range(2, 6): results[vendor_name].pop(f"level{lvl}", None)
+                    # --- UPDATED: Loop up to target_level ---
+                    for lvl in range(2, target_level + 1): results[vendor_name].pop(f"level{lvl}", None)
+                    # --- END UPDATED ---
 
             else: # Handle unexpected return type
                 logger.error(f"Unexpected result type for vendor {vendor_name} search task: {type(result_or_exc)}")
                 results[vendor_name]["search_results"] = {"error": f"Unexpected search result type: {type(result_or_exc)}"}
                 if "level1" not in results[vendor_name] or results[vendor_name]["level1"].get("classification_not_possible", True):
-                     results[vendor_name]["level1"] = { "classification_not_possible": True, "classification_not_possible_reason": "Internal search error", "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Error" }
-                for lvl in range(2, 6): results[vendor_name].pop(f"level{lvl}", None)
+                        results[vendor_name]["level1"] = { "classification_not_possible": True, "classification_not_possible_reason": "Internal search error", "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Error" }
+                # --- UPDATED: Loop up to target_level ---
+                for lvl in range(2, target_level + 1): results[vendor_name].pop(f"level{lvl}", None)
+                # --- END UPDATED ---
 
         stats["search_successful_classifications_l1"] = successful_l1_searches
         stats["search_successful_classifications_l5"] = successful_l5_searches # Updated stat
-        # Update total L5 success count
-        stats["successfully_classified_l5"] = initial_l5_success_count + successful_l5_searches
+        # Update total L5 success count (if target was >= 5)
+        if target_level >= 5:
+            stats["successfully_classified_l5"] = initial_l5_success_count + successful_l5_searches
 
         logger.info(f"===== Unknown Vendor Search & Recursive Classification Completed =====")
         logger.info(f"  Attempted search for {stats['search_attempts']} vendors.")
         logger.info(f"  Successfully classified {successful_l1_searches} at L1 via search.")
-        logger.info(f"  Successfully classified {successful_l5_searches} at L5 via search.") # Updated stat
-        logger.info(f"  Total vendors successfully classified at L5: {stats['successfully_classified_l5']}") # Updated stat
+        if target_level >= 5:
+            logger.info(f"  Successfully classified {successful_l5_searches} at L5 via search.")
+            logger.info(f"  Total vendors successfully classified at L5: {stats['successfully_classified_l5']}")
     else:
         logger.info("No unknown vendors required search.")
         job.progress = 0.95 # Set progress high if search wasn't needed

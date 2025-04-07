@@ -9,7 +9,10 @@ from schemas.user import UserCreate, UserUpdate, UserResponse
 from services import user_service
 from api.auth import get_current_active_user, get_current_active_superuser
 from models.user import User as UserModel # Import the model for type hinting
-from core.logging_config import get_logger, set_log_context
+# --- MODIFIED IMPORT: Import set_log_context from core.log_context ---
+from core.logging_config import get_logger
+from core.log_context import set_log_context
+# --- END MODIFIED IMPORT ---
 
 logger = get_logger("vendor_classification.api.users")
 
