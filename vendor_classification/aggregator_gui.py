@@ -1,3 +1,5 @@
+# --- COMPLETE UPDATED SCRIPT ---
+
 import sys
 import os
 from pathlib import Path
@@ -48,6 +50,7 @@ def get_potential_files_recursively(current_directory, original_root_dir, script
     potential_files = []
     current_directory_path = Path(current_directory).resolve()
 
+    # --- Root-level checks ---
     if current_directory_path == original_root_dir:
         compose_file = original_root_dir / 'compose.yaml'
         dockerfile = original_root_dir / 'Dockerfile'
@@ -62,6 +65,7 @@ def get_potential_files_recursively(current_directory, original_root_dir, script
                 if item.is_file() and item.parent == docs_dir:
                     potential_files.append(item.resolve().relative_to(original_root_dir))
 
+    # --- Recursive scan ---
     try:
         for item_entry in os.scandir(current_directory_path):
             item = Path(item_entry.path)
@@ -71,12 +75,13 @@ def get_potential_files_recursively(current_directory, original_root_dir, script
                 relative_path = item_abs_path.relative_to(original_root_dir)
                 relative_path_str = relative_path.as_posix()
             except ValueError:
-                print(f"Warning: Item {item} is outside the project root {original_root_dir}. Skipping.")
+                # print(f"Warning: Item {item} is outside the project root {original_root_dir}. Skipping.")
                 continue
             except Exception as e:
                 print(f"Warning: Error during relative path calculation for {item}: {e}. Skipping.")
                 continue
 
+            # --- Exclusions ---
             if item.name == script_name: continue
             if item.name.startswith('.') and item.name != '.scripts': continue
             if item.name in ['.venv', 'venv', 'env', '__pycache__', 'node_modules', 'dist', 'build'] or \
@@ -85,6 +90,7 @@ def get_potential_files_recursively(current_directory, original_root_dir, script
                item.name.startswith('planning_and_focus_window'): continue
             if item.is_dir() and item.name == 'docs' and 'scripts' not in relative_path_str.split('/'): continue
 
+            # --- File processing ---
             if item.is_file():
                 excluded_suffixes = [
                     '.log', '.xlsx', '.xls', '.csv', '.data', '.db', '.sqlite', '.sqlite3',
@@ -97,16 +103,20 @@ def get_potential_files_recursively(current_directory, original_root_dir, script
                     '.swp', '.swo', '.json'
                 ]
                 if item.suffix.lower() in excluded_suffixes: continue
+                # Add relative path (relative to original root)
                 if relative_path not in potential_files:
                     potential_files.append(relative_path)
 
+            # --- Directory processing ---
             elif item.is_dir():
+                # Recurse, passing original root dir
                 potential_files.extend(get_potential_files_recursively(item_abs_path, original_root_dir, script_name))
 
     except FileNotFoundError: print(f"Warning: Directory not found during scan: {current_directory_path}. Skipping.")
     except PermissionError: print(f"Warning: Permission denied for directory: {current_directory_path}. Skipping.")
     except Exception as e: print(f"Error scanning directory {current_directory_path}: {e}")
 
+    # Remove duplicates and sort
     return sorted(list(dict.fromkeys(potential_files)), key=lambda p: p.as_posix())
 
 
@@ -157,6 +167,7 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
         super().__init__() # Call parent constructor
         self.script_dir = Path(script_dir).resolve()
         self.script_name = script_name
+        # Get standard icons (works better across platforms than unicode chars sometimes)
         self.folder_icon = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DirIcon)
         self.file_icon = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileIcon)
         self.model = QStandardItemModel() # Model for the TreeView
@@ -164,8 +175,8 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
         self.status_label = QLabel("Ready. Scanning for files...")
         self.mode_buttons = {} # To store radio buttons {key: button_widget}
 
-        self.initUI()
-        self.populate_file_tree()
+        self.initUI() # Setup the UI
+        self.populate_file_tree() # Fill the tree model
         file_count = self.count_files_in_model()
         self.status_label.setText(f"Ready. Found {file_count} potential files.")
 
@@ -174,11 +185,11 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
         self.setWindowTitle("Script Aggregator")
         self.setGeometry(200, 200, 850, 700) # x, y, width, height
 
-        # --- Main Layout (Horizontal Split) ---
-        main_layout = QHBoxLayout(self) # Main layout for this widget
+        # --- Main Layout (Horizontal Split for Tree and Controls) ---
+        main_h_layout = QHBoxLayout()
 
         # --- Left Side: File Tree ---
-        left_layout = QVBoxLayout()
+        left_v_layout = QVBoxLayout()
         header_label = QLabel("Select files to include:")
         font = header_label.font()
         font.setBold(True)
@@ -186,15 +197,14 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
 
         self.tree_view.setModel(self.model)
         self.tree_view.setHeaderHidden(True) # Don't show column headers
-        self.tree_view.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection) # Don't highlight rows on click
-        # self.tree_view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers) # Prevent editing item text
+        self.tree_view.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
 
-        left_layout.addWidget(header_label)
-        left_layout.addWidget(self.tree_view)
+        left_v_layout.addWidget(header_label)
+        left_v_layout.addWidget(self.tree_view)
 
         # --- Right Side: Controls ---
-        right_layout = QVBoxLayout()
-        right_layout.setAlignment(Qt.AlignmentFlag.AlignTop) # Align controls to top
+        right_v_layout = QVBoxLayout()
+        right_v_layout.setAlignment(Qt.AlignmentFlag.AlignTop) # Align controls to top
 
         # Select Buttons
         select_buttons_layout = QHBoxLayout()
@@ -204,59 +214,61 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
         select_none_button.clicked.connect(self.select_none)
         select_buttons_layout.addWidget(select_all_button)
         select_buttons_layout.addWidget(select_none_button)
-        right_layout.addLayout(select_buttons_layout)
+        right_v_layout.addLayout(select_buttons_layout)
 
         # Mode Selection GroupBox
         mode_groupbox = QGroupBox("Select Mode:")
-        mode_layout = QVBoxLayout() # Layout inside the group box
+        mode_layout = QVBoxLayout()
         first_mode_key = list(MODES.keys())[0]
         for key, mode_info in MODES.items():
             rb = QRadioButton(mode_info["name"])
-            self.mode_buttons[key] = rb # Store button reference
+            self.mode_buttons[key] = rb
             if key == first_mode_key:
-                rb.setChecked(True) # Check the first one by default
+                rb.setChecked(True)
             mode_layout.addWidget(rb)
         mode_groupbox.setLayout(mode_layout)
-        right_layout.addWidget(mode_groupbox)
+        right_v_layout.addWidget(mode_groupbox)
 
-        right_layout.addStretch(1) # Add spacer to push generate button down
+        right_v_layout.addStretch(1) # Add spacer to keep controls pushed up
 
-        # --- Bottom Area (Below Tree and Controls) ---
-        bottom_layout = QVBoxLayout() # Use QVBoxLayout for generate button and status
+        # --- Assemble Main Horizontal Layout ---
+        left_widget = QWidget()
+        left_widget.setLayout(left_v_layout)
+        right_widget = QWidget()
+        right_widget.setLayout(right_v_layout)
 
-        # Generate Button
-        generate_button = QPushButton("Generate Concatenated File")
-        generate_button.clicked.connect(self.generate_file)
-        bottom_layout.addWidget(generate_button)
+        main_h_layout.addWidget(left_widget, 3) # Tree area takes more space
+        main_h_layout.addWidget(right_widget, 1) # Controls area takes less space
+
+        # --- Bottom Area (Generate Button and Status Bar) ---
+        # This layout will be placed *below* the main_h_layout
+        bottom_v_layout = QVBoxLayout()
+
+        # ****** THE CRITICAL EXECUTE BUTTON ******
+        self.generate_button = QPushButton("Generate Concatenated File") # Store as instance variable if needed later
+        self.generate_button.clicked.connect(self.generate_file)
+        bottom_v_layout.addWidget(self.generate_button) # Add button to the bottom layout
+        # *****************************************
 
         # Status Bar
         self.status_label.setFrameStyle(QFrame.Shape.Panel | QFrame.Shadow.Sunken)
         self.status_label.setLineWidth(1)
-        bottom_layout.addWidget(self.status_label)
+        bottom_v_layout.addWidget(self.status_label) # Add status bar below the button
 
 
-        # --- Assemble Main Layout ---
-        left_widget = QWidget() # Container for left side
-        left_widget.setLayout(left_layout)
-        right_widget = QWidget() # Container for right side
-        right_widget.setLayout(right_layout)
+        # --- Overall Layout (Vertical: Top Area + Bottom Area) ---
+        # This is the main layout for the entire window (self)
+        overall_layout = QVBoxLayout(self) # Set this as the layout for the main widget
+        overall_layout.addLayout(main_h_layout) # Add the top part (tree + controls)
+        overall_layout.addLayout(bottom_v_layout) # Add the bottom part (button + status)
 
-        main_layout.addWidget(left_widget, 3) # Tree takes 3/4 of width
-        main_layout.addWidget(right_widget, 1) # Controls take 1/4 of width
-
-        # --- Overall Layout ---
-        # Need a top-level layout to combine main_layout and bottom_layout
-        overall_layout = QVBoxLayout()
-        overall_layout.addLayout(main_layout) # Add the horizontal split layout
-        overall_layout.addLayout(bottom_layout) # Add the bottom elements below
-
-        self.setLayout(overall_layout) # Set the overall layout for the main window
+        # self.setLayout(overall_layout) # No longer needed - passed 'self' to QVBoxLayout constructor
 
 
     def populate_file_tree(self):
         self.model.clear()
-        invisible_root = self.model.invisibleRootItem() # Get the hidden root item
-        folder_items = {'': invisible_root} # Maps folder path string to QStandardItem
+        invisible_root = self.model.invisibleRootItem()
+        folder_items = {'': invisible_root}
 
         potential_files = get_potential_files_recursively(self.script_dir, self.script_dir, self.script_name)
 
@@ -266,7 +278,7 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
             parent_item = invisible_root
             current_path_part_cumulative = Path()
 
-            # 1. Create folder items if they don't exist
+            # Create folder items
             for part in rel_path.parts[:-1]:
                 current_path_part_cumulative = current_path_part_cumulative / part
                 current_path_part_str = current_path_part_cumulative.as_posix()
@@ -275,25 +287,21 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
                     folder_item = QStandardItem(part)
                     folder_item.setIcon(self.folder_icon)
                     folder_item.setEditable(False)
-                    # folder_item.setCheckable(True) # Option: allow checking folders to check children?
-                    # folder_item.setCheckState(Qt.CheckState.Unchecked)
                     parent_item.appendRow(folder_item)
                     folder_items[current_path_part_str] = folder_item
-                    parent_item = folder_item # Descend to the new folder item
+                    parent_item = folder_item
                 else:
-                    parent_item = folder_items[current_path_part_str] # Get existing folder item
+                    parent_item = folder_items[current_path_part_str]
 
-            # 2. Insert the file item
+            # Insert the file item
             file_name = rel_path.name
             file_item = QStandardItem(file_name)
             file_item.setIcon(self.file_icon)
             file_item.setCheckable(True)
-            file_item.setCheckState(Qt.CheckState.Checked) # Default to checked
+            file_item.setCheckState(Qt.CheckState.Checked) # Default checked
             file_item.setEditable(False)
             file_item.setData(rel_path, PathRole) # Store the relative Path object
             parent_item.appendRow(file_item)
-
-        # self.tree_view.expandAll() # Option: expand all folders initially
 
 
     def iterate_model_items(self, parent_item=None):
@@ -306,23 +314,23 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
             if item:
                 yield item
                 if item.hasChildren():
-                    yield from self.iterate_model_items(item) # Recurse
+                    yield from self.iterate_model_items(item)
 
 
     def count_files_in_model(self):
         """Counts items in the model that represent files (have PathRole data)."""
         count = 0
         for item in self.iterate_model_items():
+            # Check if it's a file item by seeing if it has path data stored
             if item.data(PathRole) is not None:
                 count += 1
         return count
 
-    @Slot() # Explicitly mark as a slot
+    @Slot()
     def select_all(self):
         """Checks all file items in the tree."""
         for item in self.iterate_model_items():
-             # Only check items that are checkable (i.e., files)
-            if item.isCheckable():
+            if item.isCheckable(): # Check only items that are meant to be checkable (files)
                 item.setCheckState(Qt.CheckState.Checked)
         self.status_label.setText("All files selected.")
 
@@ -339,9 +347,10 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
         """Gathers checked files and generates the output."""
         selected_relative_paths = []
         for item in self.iterate_model_items():
+            # Ensure item is checkable and checked, and retrieve path data
             if item.isCheckable() and item.checkState() == Qt.CheckState.Checked:
-                rel_path = item.data(PathRole) # Retrieve the stored Path object
-                if rel_path:
+                rel_path = item.data(PathRole)
+                if rel_path: # Ensure path data exists
                     selected_relative_paths.append(rel_path)
 
         if not selected_relative_paths:
@@ -356,7 +365,6 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
                 break
 
         if not selected_mode_key:
-            # Should not happen if one is checked by default, but good practice
              QMessageBox.critical(self, "Error", "No mode selected.")
              return
 
@@ -368,7 +376,7 @@ class ScriptAggregatorApp(QWidget): # Inherit from QWidget
         output_file = self.script_dir / output_file_name
 
         self.status_label.setText(f"Generating {output_file_name}...")
-        QApplication.processEvents() # Force UI update
+        QApplication.processEvents() # Update UI to show status message
 
         try:
             with open(output_file, 'w', encoding='utf-8') as f:
@@ -420,9 +428,9 @@ if __name__ == "__main__":
     script_dir_abs = application_path.resolve()
 
     # --- Qt Application Setup ---
-    app = QApplication(sys.argv) # Create application instance
+    app = QApplication(sys.argv)
 
     window = ScriptAggregatorApp(script_dir=script_dir_abs, script_name=script_name)
-    window.show() # Show the main window
+    window.show()
 
-    sys.exit(app.exec()) # Start the Qt event loop
+    sys.exit(app.exec())
