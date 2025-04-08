@@ -1,4 +1,4 @@
-// frontend/vue_frontend/src/services/api.ts
+// <file path='frontend/vue_frontend/src/services/api.ts'>
 import axios, {
     type AxiosInstance,
     type InternalAxiosRequestConfig,
@@ -79,23 +79,37 @@ export interface JobResponse {
     input_file_name: string;
     created_by: string;
     error_message?: string | null;
+    target_level: number; // Ensure target_level is included here
 }
 
-// Matches backend response for /api/v1/jobs/{job_id}/stats
+// --- UPDATED JobStatsData Interface ---
+// Matches backend models/classification.py -> ProcessingStats and console log
 export interface JobStatsData {
-    vendors_processed: number | null;
-    unique_vendors: number | null;
-    api_calls: number | null; // LLM API calls
-    tokens_used: number | null; // LLM tokens
-    tavily_searches: number | null; // Search API calls
-    processing_time: number | null; // In seconds
-    successfully_classified_l4: number | null; // Vendors reaching L4 (reference)
-    successfully_classified_l5: number | null; // NEW: Vendors reaching L5
-    search_assisted_l5: number | null; // NEW: Vendors reaching L5 via search
-    invalid_category_errors: number | null; // Count of invalid category IDs from LLM
-    // --- Deprecated/Optional ---
-    // search_successful_classifications?: number | null; // Old field name, API might still return it for compatibility
+    job_id: string;
+    company_name: string;
+    start_time: string | null; // Assuming ISO string
+    end_time: string | null; // Assuming ISO string
+    processing_duration_seconds: number | null; // Renamed from processing_time
+    total_vendors: number | null; // Added
+    unique_vendors: number | null; // Added (was present in console)
+    successfully_classified_l4: number | null; // Keep for reference
+    successfully_classified_l5: number | null; // Keep L5 count
+    classification_not_possible_initial: number | null; // Added
+    invalid_category_errors: number | null; // Added (was present in console)
+    search_attempts: number | null; // Added
+    search_successful_classifications_l1: number | null; // Added
+    search_successful_classifications_l5: number | null; // Renamed from search_assisted_l5
+    api_usage: { // Nested structure
+        openrouter_calls: number | null;
+        openrouter_prompt_tokens: number | null;
+        openrouter_completion_tokens: number | null;
+        openrouter_total_tokens: number | null;
+        tavily_search_calls: number | null;
+        cost_estimate_usd: number | null;
+    } | null; // Allow api_usage itself to be null if not populated
 }
+// --- END UPDATED JobStatsData Interface ---
+
 
 // Structure for download result helper
 interface DownloadResult {
@@ -130,21 +144,29 @@ axiosInstance.interceptors.request.use(
         const token = authStore.getToken();
         // No need for noAuthUrls here as login uses base axios
         if (token && config.url) {
+            // LOGGING: Log token presence and target URL
+            console.log(`[api.ts Request Interceptor] Adding token for URL: ${config.url}`);
             config.headers.Authorization = `Bearer ${token}`;
+        } else {
+            console.log(`[api.ts Request Interceptor] No token found or no URL for config: ${config.url}`);
         }
         return config;
     },
     (error: AxiosError) => {
-        console.error('Axios request interceptor error:', error);
+        console.error('[api.ts Request Interceptor] Error:', error);
         return Promise.reject(error);
     }
 );
 
 // --- Response Interceptor (Handle Errors) ---
 axiosInstance.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        // LOGGING: Log successful response status and URL
+        console.log(`[api.ts Response Interceptor] Success for URL: ${response.config.url} | Status: ${response.status}`);
+        return response;
+    },
     (error: AxiosError) => {
-        console.error('Axios response error:', error.config?.url, error.response?.status, error.message);
+        console.error('[api.ts Response Interceptor] Error:', error.config?.url, error.response?.status, error.message);
         const authStore = useAuthStore();
 
         if (error.response) {
@@ -153,7 +175,7 @@ axiosInstance.interceptors.response.use(
             // Handle 401 Unauthorized (except for login attempts)
             // Login uses base axios, so this interceptor won't catch its 401
             if (status === 401) {
-                console.warn('Interceptor: Received 401 Unauthorized. Logging out.');
+                console.warn('[api.ts Response Interceptor] Received 401 Unauthorized. Logging out.');
                 authStore.logout(); // Trigger logout action
                 // No reload here, let the component handle redirection or UI change
                 return Promise.reject(new Error('Session expired. Please log in again.'));
@@ -178,13 +200,14 @@ axiosInstance.interceptors.response.use(
             }
 
             const errorMessage = `Error ${status}: ${detailMessage}`;
+            console.error(`[api.ts Response Interceptor] Rejecting with error: ${errorMessage}`); // LOGGING
             return Promise.reject(new Error(errorMessage));
 
         } else if (error.request) {
-            console.error('Network error or no response received:', error.request);
+            console.error('[api.ts Response Interceptor] Network error or no response received:', error.request);
             return Promise.reject(new Error('Network error or server did not respond. Please check connection.'));
         } else {
-            console.error('Axios setup error:', error.message);
+            console.error('[api.ts Response Interceptor] Axios setup error:', error.message);
             return Promise.reject(new Error(`Request setup error: ${error.message}`));
         }
     }
@@ -201,13 +224,12 @@ const apiService = {
         const params = new URLSearchParams();
         params.append('username', usernameInput);
         params.append('password', passwordInput);
-        // --- MODIFIED: Use absolute path for /token ---
+        console.log(`[api.ts login] Attempting login for user: ${usernameInput}`); // LOGGING
         // Use base axios to avoid default JSON headers and ensure correct Content-Type
         const response = await axios.post<AuthResponse>('/token', params, {
-            // baseURL: '/', // REMOVED: Let Vite proxy handle the root path
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         });
-        // --- END MODIFIED ---
+        console.log(`[api.ts login] Login successful for user: ${usernameInput}`); // LOGGING
         return response.data;
     },
 
@@ -215,10 +237,12 @@ const apiService = {
         * Uploads the vendor file.
         */
     async uploadFile(formData: FormData): Promise<UploadResponse> {
+        console.log('[api.ts uploadFile] Attempting file upload...'); // LOGGING
         // This uses axiosInstance, so /api/v1 prefix is added automatically
         const response = await axiosInstance.post<UploadResponse>('/upload', formData, {
                 headers: { 'Content-Type': undefined } // Let browser set Content-Type for FormData
         });
+        console.log(`[api.ts uploadFile] Upload successful, job ID: ${response.data.job_id}`); // LOGGING
         return response.data;
     },
 
@@ -226,7 +250,9 @@ const apiService = {
         * Fetches the status and details of a specific job.
         */
     async getJobStatus(jobId: string): Promise<JobDetails> {
+        console.log(`[api.ts getJobStatus] Fetching status for job ID: ${jobId}`); // LOGGING
         const response = await axiosInstance.get<JobDetails>(`/jobs/${jobId}`);
+        console.log(`[api.ts getJobStatus] Received status for job ${jobId}:`, response.data.status); // LOGGING
         return response.data;
     },
 
@@ -234,7 +260,10 @@ const apiService = {
         * Fetches statistics for a specific job.
         */
     async getJobStats(jobId: string): Promise<JobStatsData> { // Use the updated interface here
+        console.log(`[api.ts getJobStats] Fetching stats for job ID: ${jobId}`); // LOGGING
         const response = await axiosInstance.get<JobStatsData>(`/jobs/${jobId}/stats`);
+        // LOGGING: Log the received stats structure
+        console.log(`[api.ts getJobStats] Received stats for job ${jobId}:`, JSON.parse(JSON.stringify(response.data)));
         return response.data;
     },
 
@@ -242,7 +271,9 @@ const apiService = {
         * Requests email notification for a job completion.
         */
     async requestNotification(jobId: string, email: string): Promise<NotifyResponse> {
+        console.log(`[api.ts requestNotification] Requesting notification for job ${jobId} to email ${email}`); // LOGGING
         const response = await axiosInstance.post<NotifyResponse>(`/jobs/${jobId}/notify`, { email });
+        console.log(`[api.ts requestNotification] Notification request response:`, response.data.success); // LOGGING
         return response.data;
     },
 
@@ -250,6 +281,7 @@ const apiService = {
         * Downloads the results file for a completed job.
         */
     async downloadResults(jobId: string): Promise<DownloadResult> {
+        console.log(`[api.ts downloadResults] Requesting download for job ID: ${jobId}`); // LOGGING
         const response = await axiosInstance.get(`/jobs/${jobId}/download`, {
             responseType: 'blob',
         });
@@ -264,7 +296,7 @@ const apiService = {
                     else { filename = filenameMatch[2]; }
             }
         }
-        console.log(`api.ts: Determined download filename: ${filename}`);
+        console.log(`[api.ts downloadResults] Determined download filename: ${filename}`); // LOGGING
         return { blob: response.data as Blob, filename };
     },
 
@@ -275,7 +307,9 @@ const apiService = {
         const cleanedParams = Object.fromEntries(
             Object.entries(params).filter(([, value]) => value !== undefined && value !== null)
         );
+        console.log('[api.ts getJobs] Fetching job list with params:', cleanedParams); // LOGGING
         const response = await axiosInstance.get<JobResponse[]>('/jobs/', { params: cleanedParams });
+        console.log(`[api.ts getJobs] Received ${response.data.length} jobs.`); // LOGGING
         return response.data;
     },
 
@@ -285,7 +319,9 @@ const apiService = {
         * Fetches the current logged-in user's details.
         */
     async getCurrentUser(): Promise<UserResponse> {
+        console.log('[api.ts getCurrentUser] Fetching current user details...'); // LOGGING
         const response = await axiosInstance.get<UserResponse>('/users/me');
+        console.log(`[api.ts getCurrentUser] Received user: ${response.data.username}`); // LOGGING
         return response.data;
     },
 
@@ -293,7 +329,9 @@ const apiService = {
         * Fetches a list of all users (admin only).
         */
     async getUsers(skip: number = 0, limit: number = 100): Promise<UserResponse[]> {
+        console.log(`[api.ts getUsers] Fetching user list (skip: ${skip}, limit: ${limit})...`); // LOGGING
         const response = await axiosInstance.get<UserResponse[]>('/users/', { params: { skip, limit } });
+         console.log(`[api.ts getUsers] Received ${response.data.length} users.`); // LOGGING
         return response.data;
     },
 
@@ -301,7 +339,9 @@ const apiService = {
         * Fetches a specific user by ID (admin or self).
         */
         async getUserById(userId: string): Promise<UserResponse> {
+        console.log(`[api.ts getUserById] Fetching user ID: ${userId}`); // LOGGING
         const response = await axiosInstance.get<UserResponse>(`/users/${userId}`);
+        console.log(`[api.ts getUserById] Received user: ${response.data.username}`); // LOGGING
         return response.data;
     },
 
@@ -309,7 +349,9 @@ const apiService = {
         * Creates a new user (admin only).
         */
     async createUser(userData: UserCreateData): Promise<UserResponse> {
+        console.log(`[api.ts createUser] Attempting to create user: ${userData.username}`); // LOGGING
         const response = await axiosInstance.post<UserResponse>('/users/', userData);
+        console.log(`[api.ts createUser] User created successfully: ${response.data.username}`); // LOGGING
         return response.data;
     },
 
@@ -317,7 +359,9 @@ const apiService = {
         * Updates a user (admin or self).
         */
     async updateUser(userId: string, userData: UserUpdateData): Promise<UserResponse> {
+        console.log(`[api.ts updateUser] Attempting to update user ID: ${userId}`); // LOGGING
         const response = await axiosInstance.put<UserResponse>(`/users/${userId}`, userData);
+        console.log(`[api.ts updateUser] User updated successfully: ${response.data.username}`); // LOGGING
         return response.data;
     },
 
@@ -325,7 +369,9 @@ const apiService = {
         * Deletes a user (admin only).
         */
     async deleteUser(userId: string): Promise<{ message: string }> {
+        console.log(`[api.ts deleteUser] Attempting to delete user ID: ${userId}`); // LOGGING
         const response = await axiosInstance.delete<{ message: string }>(`/users/${userId}`);
+        console.log(`[api.ts deleteUser] User delete response: ${response.data.message}`); // LOGGING
         return response.data;
     },
     // --- END User Management API Methods ---

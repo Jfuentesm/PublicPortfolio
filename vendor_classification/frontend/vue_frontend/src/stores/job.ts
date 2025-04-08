@@ -1,4 +1,4 @@
-// frontend/vue_frontend/src/stores/job.ts
+// <file path='frontend/vue_frontend/src/stores/job.ts'>
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import apiService, { type JobResponse } from '@/services/api'; // Import JobResponse type
@@ -14,6 +14,7 @@ export interface JobDetails {
     completed_at?: string | null; // Optional completion time
     estimated_completion?: string | null; // Added optional field (backend doesn't provide this explicitly yet)
     error_message: string | null;
+    target_level: number; // ADDED: Ensure target_level is part of the details
     // Add other fields returned by /api/v1/jobs/{job_id} if needed
     // Match JobResponse fields where applicable
     company_name?: string;
@@ -74,7 +75,8 @@ export const useJobStore = defineStore('job', () => {
     function updateJobDetails(details: JobDetails): void {
         // Only update if the details are for the currently tracked job
         if (details && details.id === currentJobId.value) { // Match 'id' field from JobResponse/JobDetails
-            console.log(`JobStore: Updating jobDetails for ${currentJobId.value} with status ${details.status}, progress ${details.progress}`); // LOGGING
+            // LOGGING: Include target_level in log
+            console.log(`JobStore: Updating jobDetails for ${currentJobId.value} with status ${details.status}, progress ${details.progress}, target_level ${details.target_level}`);
             jobDetails.value = { ...details }; // Create new object for reactivity
             error.value = null; // Clear error on successful update
         } else if (details) {

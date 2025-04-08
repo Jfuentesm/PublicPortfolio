@@ -1,8 +1,8 @@
 # <file path='app/api/jobs.py'>
 # app/api/jobs.py
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Path # Added Path
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict # <<< ADDED Dict HERE
+from typing import List, Optional, Dict
 from datetime import datetime
 import logging # Import logging
 
@@ -11,19 +11,13 @@ from api.auth import get_current_user
 from models.user import User
 from models.job import Job, JobStatus
 from schemas.job import JobResponse # Import the new schema
-# --- MODIFIED IMPORT: Import set_log_context from core.log_context ---
 from core.logging_config import get_logger
 from core.log_context import set_log_context
-# --- END MODIFIED IMPORT ---
-# --- ADDED: Logging confirmation ---
 from core.config import settings # Need settings for file path construction
-# --- END ADDED ---
 
 
 logger = get_logger("vendor_classification.api.jobs")
-# --- ADDED: Log confirmation after import ---
 logger.debug("Successfully imported Dict from typing for jobs API.")
-# --- END ADDED ---
 
 router = APIRouter()
 
@@ -79,10 +73,10 @@ async def list_jobs(
     # Pydantic v2 handles this automatically with from_attributes=True
     return jobs
 
-# --- ADDED: Route to get a single job by ID ---
 @router.get("/{job_id}", response_model=JobResponse)
 async def read_job(
-    job_id: str,
+    # Use Path to ensure job_id is correctly extracted from the URL path
+    job_id: str = Path(..., title="The ID of the job to get"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -107,16 +101,14 @@ async def read_job(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this job")
     # --- End Authorization Check ---
 
-    logger.info(f"Returning details for job ID: {job_id}")
+    # LOGGING: Log the job details being returned, especially target_level
+    logger.info(f"Returning details for job ID: {job_id}", extra={"job_status": job.status, "target_level": job.target_level})
     return job # Pydantic will validate against JobResponse
-# --- END ADDED ROUTE ---
 
-# --- ADDED: Route to get job stats ---
-# (Assuming you have a separate stats endpoint, if not, integrate into read_job)
-# --- MODIFIED: Using the imported Dict ---
-@router.get("/{job_id}/stats", response_model=Dict) # Use Dict for now, or create a specific StatsResponse schema
+# Use Dict for flexibility, or create a specific StatsResponse schema later if needed
+@router.get("/{job_id}/stats", response_model=Dict)
 async def read_job_stats(
-    job_id: str,
+    job_id: str = Path(..., title="The ID of the job to get stats for"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -137,16 +129,16 @@ async def read_job_stats(
         logger.warning(f"Authorization failed: User '{current_user.username}' attempted to access stats for job '{job_id}' owned by '{job.created_by}'")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access stats for this job")
 
+    # LOGGING: Log the raw stats being returned from the database
     logger.info(f"Returning statistics for job ID: {job_id}")
+    logger.debug(f"Raw stats from DB for job {job_id}: {job.stats}") # Log the actual stats dict
+
     # The stats are stored as JSON in the Job model
     return job.stats if job.stats else {}
-# --- END ADDED STATS ROUTE ---
 
-# --- ADDED: Route to download results ---
-# (Assuming you need a separate download endpoint)
 @router.get("/{job_id}/download")
 async def download_job_results(
-    job_id: str,
+    job_id: str = Path(..., title="The ID of the job to download results for"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -191,6 +183,3 @@ async def download_job_results(
         filename=job.output_file_name, # Suggest filename to browser
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-# --- END ADDED DOWNLOAD ROUTE ---
-
-# --- END of file path='app/api/jobs.py' ---
