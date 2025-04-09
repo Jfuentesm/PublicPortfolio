@@ -190,6 +190,36 @@ class Taxonomy(BaseModel):
             parts = parent_id.split('.')
             if len(parts) == 4:
                 level1_id, level2_id, level3_id, level4_id = parts[0], parts[1], parts[2], parts[3]
+            elif len(parts) == 3: # Handle case where parent_id is L2.L3.L4
+                l2_id_part, l3_id_part, l4_id_part = parts[0], parts[1], parts[2]
+                found = False
+                for l1k, l1n in self.categories.items():
+                    if l2_id_part in getattr(l1n, 'children', {}):
+                         level1_id = l1k
+                         level2_id = l2_id_part
+                         level3_id = l3_id_part
+                         level4_id = l4_id_part
+                         found = True
+                         break
+                if not found:
+                    logger.error(f"get_level5_categories: Could not find L1 parent for L2.L3.L4 format '{parent_id}'.")
+                    return []
+            elif len(parts) == 2: # Handle case where parent_id is L3.L4
+                l3_id_part, l4_id_part = parts[0], parts[1]
+                found = False
+                for l1k, l1n in self.categories.items():
+                    for l2k, l2n in getattr(l1n, 'children', {}).items():
+                         if l3_id_part in getattr(l2n, 'children', {}):
+                             level1_id = l1k
+                             level2_id = l2k
+                             level3_id = l3_id_part
+                             level4_id = l4_id_part
+                             found = True
+                             break
+                    if found: break
+                if not found:
+                    logger.error(f"get_level5_categories: Could not find L1/L2 parent for L3.L4 format '{parent_id}'.")
+                    return []
             else:
                  logger.error(f"get_level5_categories: Invalid parent ID format '{parent_id}'. Expected 'L1.L2.L3.L4' or 'L4'.")
                  return []

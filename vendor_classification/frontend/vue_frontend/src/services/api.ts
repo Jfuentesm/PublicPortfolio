@@ -48,15 +48,15 @@ interface AuthResponse {
     user: UserResponse; // Include the user details
 }
 
-// Matches backend response for /api/v1/upload
-interface UploadResponse {
-    job_id: string;
-    status: string;
-    message: string;
-    created_at: string;
-    progress: number;
-    current_stage: string;
-}
+// --- REMOVED UploadResponse - Use JobResponse instead ---
+// interface UploadResponse {
+//     job_id: string;
+//     status: string;
+//     message: string;
+//     created_at: string;
+//     progress: number;
+//     current_stage: string;
+// }
 
 // Matches backend response for /api/v1/jobs/{job_id}/notify
 interface NotifyResponse {
@@ -92,6 +92,7 @@ export interface JobStatsData {
     processing_duration_seconds: number | null; // Renamed from processing_time
     total_vendors: number | null; // Added
     unique_vendors: number | null; // Added (was present in console)
+    target_level: number | null; // Added target level to stats
     successfully_classified_l4: number | null; // Keep for reference
     successfully_classified_l5: number | null; // Keep L5 count
     classification_not_possible_initial: number | null; // Added
@@ -145,10 +146,10 @@ axiosInstance.interceptors.request.use(
         // No need for noAuthUrls here as login uses base axios
         if (token && config.url) {
             // LOGGING: Log token presence and target URL
-            console.log(`[api.ts Request Interceptor] Adding token for URL: ${config.url}`);
+            // console.log(`[api.ts Request Interceptor] Adding token for URL: ${config.url}`);
             config.headers.Authorization = `Bearer ${token}`;
         } else {
-            console.log(`[api.ts Request Interceptor] No token found or no URL for config: ${config.url}`);
+            // console.log(`[api.ts Request Interceptor] No token found or no URL for config: ${config.url}`);
         }
         return config;
     },
@@ -162,7 +163,7 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
     (response) => {
         // LOGGING: Log successful response status and URL
-        console.log(`[api.ts Response Interceptor] Success for URL: ${response.config.url} | Status: ${response.status}`);
+        // console.log(`[api.ts Response Interceptor] Success for URL: ${response.config.url} | Status: ${response.status}`);
         return response;
     },
     (error: AxiosError) => {
@@ -235,14 +236,15 @@ const apiService = {
 
     /**
         * Uploads the vendor file.
+        * Returns the full JobResponse object.
         */
-    async uploadFile(formData: FormData): Promise<UploadResponse> {
+    async uploadFile(formData: FormData): Promise<JobResponse> { // Return JobResponse
         console.log('[api.ts uploadFile] Attempting file upload...'); // LOGGING
         // This uses axiosInstance, so /api/v1 prefix is added automatically
-        const response = await axiosInstance.post<UploadResponse>('/upload', formData, {
+        const response = await axiosInstance.post<JobResponse>('/upload', formData, { // Expect JobResponse
                 headers: { 'Content-Type': undefined } // Let browser set Content-Type for FormData
         });
-        console.log(`[api.ts uploadFile] Upload successful, job ID: ${response.data.job_id}`); // LOGGING
+        console.log(`[api.ts uploadFile] Upload successful, job ID: ${response.data.id}, Target Level: ${response.data.target_level}`); // LOGGING
         return response.data;
     },
 
@@ -252,7 +254,7 @@ const apiService = {
     async getJobStatus(jobId: string): Promise<JobDetails> {
         console.log(`[api.ts getJobStatus] Fetching status for job ID: ${jobId}`); // LOGGING
         const response = await axiosInstance.get<JobDetails>(`/jobs/${jobId}`);
-        console.log(`[api.ts getJobStatus] Received status for job ${jobId}:`, response.data.status); // LOGGING
+        console.log(`[api.ts getJobStatus] Received status for job ${jobId}:`, response.data.status, `Target Level: ${response.data.target_level}`); // LOGGING
         return response.data;
     },
 

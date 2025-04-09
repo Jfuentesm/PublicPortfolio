@@ -1,4 +1,5 @@
 
+# <file path='app/tasks/classification_prompts.py'>
 # app/prompts/classification_prompts.py
 import json
 import logging
@@ -49,7 +50,7 @@ def generate_batch_prompt(
 
     # --- Build Search Context Section ---
     search_context_xml = ""
-    if search_context and level > 1:
+    if search_context and level > 1: # Only include search context for L2+ post-search attempts
         logger.debug(f"Including search context in prompt for Level {level}", extra={"batch_id": batch_id})
         search_context_xml += "<search_context>\n"
         summary = search_context.get("summary")
@@ -82,39 +83,65 @@ def generate_batch_prompt(
         if level == 1:
             categories = taxonomy.get_level1_categories()
         elif parent_category_id:
+            # --- UPDATED: Use taxonomy methods consistently ---
             if level == 2:
                 categories = taxonomy.get_level2_categories(parent_category_id)
                 parent_obj = taxonomy.categories.get(parent_category_id)
             elif level == 3:
                 categories = taxonomy.get_level3_categories(parent_category_id)
+                # Need to find the L2 object to get its name
                 l1_id, l2_id = parent_category_id.split('.') if '.' in parent_category_id else (None, parent_category_id)
                 if not l1_id:
-                    for l1_key, l1_node in taxonomy.categories.items():
-                        if l2_id in getattr(l1_node, 'children', {}): l1_id = l1_key; break
+                    for l1k, l1n in taxonomy.categories.items():
+                        if l2_id in getattr(l1n, 'children', {}): l1_id = l1k; break
                 if l1_id: parent_obj = taxonomy.categories.get(l1_id, {}).children.get(l2_id)
             elif level == 4:
                 categories = taxonomy.get_level4_categories(parent_category_id)
-                l1_id, l2_id, l3_id = parent_category_id.split('.') if parent_category_id.count('.') == 2 else (None, None, parent_category_id)
-                if not l1_id:
-                     found = False
-                     for l1k, l1n in taxonomy.categories.items():
-                         for l2k, l2n in getattr(l1n, 'children', {}).items():
-                             if l3_id in getattr(l2n, 'children', {}): l1_id = l1k; l2_id = l2k; found = True; break
-                         if found: break
-                if l1_id and l2_id: parent_obj = taxonomy.categories.get(l1_id, {}).children.get(l2_id, {}).children.get(l3_id)
+                # Need to find the L3 object to get its name
+                # Handle different possible parent_id formats (L1.L2.L3, L2.L3, L3)
+                parts = parent_category_id.split('.')
+                l1_id, l2_id, l3_id = None, None, None
+                if len(parts) == 3: l1_id, l2_id, l3_id = parts[0], parts[1], parts[2]
+                elif len(parts) == 2: # L2.L3 format
+                    l2_p, l3_p = parts[0], parts[1]
+                    for l1k, l1n in taxonomy.categories.items():
+                         if l2_p in getattr(l1n, 'children', {}): l1_id = l1k; l2_id = l2_p; l3_id = l3_p; break
+                elif len(parts) == 1: # L3 format
+                    l3_p = parts[0]
+                    for l1k, l1n in taxonomy.categories.items():
+                        for l2k, l2n in getattr(l1n, 'children', {}).items():
+                            if l3_p in getattr(l2n, 'children', {}): l1_id = l1k; l2_id = l2k; l3_id = l3_p; break
+                        if l1_id: break
+                if l1_id and l2_id and l3_id:
+                    parent_obj = taxonomy.categories.get(l1_id, {}).children.get(l2_id, {}).children.get(l3_id)
             elif level == 5:
                 categories = taxonomy.get_level5_categories(parent_category_id)
-                l1_id, l2_id, l3_id, l4_id = parent_category_id.split('.') if parent_category_id.count('.') == 3 else (None, None, None, parent_category_id)
-                if not l1_id:
-                    found = False
+                # Need to find the L4 object to get its name
+                # Handle different possible parent_id formats (L1.L2.L3.L4, L2.L3.L4, L3.L4, L4)
+                parts = parent_category_id.split('.')
+                l1_id, l2_id, l3_id, l4_id = None, None, None, None
+                if len(parts) == 4: l1_id, l2_id, l3_id, l4_id = parts[0], parts[1], parts[2], parts[3]
+                elif len(parts) == 3: # L2.L3.L4 format
+                    l2_p, l3_p, l4_p = parts[0], parts[1], parts[2]
+                    for l1k, l1n in taxonomy.categories.items():
+                        if l2_p in getattr(l1n, 'children', {}): l1_id = l1k; l2_id = l2_p; l3_id = l3_p; l4_id = l4_p; break
+                elif len(parts) == 2: # L3.L4 format
+                    l3_p, l4_p = parts[0], parts[1]
+                    for l1k, l1n in taxonomy.categories.items():
+                        for l2k, l2n in getattr(l1n, 'children', {}).items():
+                             if l3_p in getattr(l2n, 'children', {}): l1_id = l1k; l2_id = l2k; l3_id = l3_p; l4_id = l4_p; break
+                        if l1_id: break
+                elif len(parts) == 1: # L4 format
+                    l4_p = parts[0]
                     for l1k, l1n in taxonomy.categories.items():
                         for l2k, l2n in getattr(l1n, 'children', {}).items():
                             for l3k, l3n in getattr(l2n, 'children', {}).items():
-                                if l4_id in getattr(l3n, 'children', {}): l1_id = l1k; l2_id = l2k; l3_id = l3k; found = True; break
-                            if found: break
-                        if found: break
-                if l1_id and l2_id and l3_id:
+                                if l4_p in getattr(l3n, 'children', {}): l1_id = l1k; l2_id = l2k; l3_id = l3k; l4_id = l4_p; break
+                            if l1_id: break
+                        if l1_id: break
+                if l1_id and l2_id and l3_id and l4_id:
                     parent_obj = taxonomy.categories.get(l1_id, {}).children.get(l2_id, {}).children.get(l3_id, {}).children.get(l4_id)
+            # --- END UPDATED ---
 
             if parent_obj: parent_category_name = parent_obj.name
         else: # level > 1 and no parent_category_id
@@ -123,7 +150,8 @@ def generate_batch_prompt(
 
         if not categories and level > 1 and parent_category_id:
              logger.warning(f"No subcategories found for Level {level}, Parent '{parent_category_id}'.")
-             if level == 1: category_lookup_successful = False
+             # Don't mark as failure if parent exists but has no children (valid scenario)
+             # category_lookup_successful = False # Removed this line
         elif not categories and level == 1:
              logger.error(f"No Level 1 categories found in taxonomy!")
              category_lookup_successful = False
@@ -181,7 +209,7 @@ json
     prompt_base = f"""
 <role>You are a precise vendor classification expert using the NAICS taxonomy.</role>
 
-<task>Classify each vendor provided in `<vendor_data>` into **ONE** appropriate NAICS category from the `<category_options>` for Level {level}. {f"Consider that these vendors belong to the parent category '{parent_category_id}: {parent_category_name}'. " if level > 1 and parent_category_id else ""}</task>"""
+<task>Classify each vendor provided in `<vendor_data>` into **ONE** appropriate NAICS category from the `<category_options>` for Level {level}. {f"Consider that these vendors belong to the parent category '{parent_category_id}: {parent_category_name}'. " if level > 1 and parent_category_id and parent_category_name != 'N/A' else ""}</task>"""
 
     if search_context_xml:
         prompt_base += f"""
@@ -208,10 +236,11 @@ json
 """
     prompt = prompt_base
 
-    if not category_lookup_successful:
+    # Handle case where category lookup failed (e.g., bad parent ID for L2+)
+    if not category_lookup_successful and level > 1:
          prompt = f"""
 <role>You are a precise vendor classification expert using the NAICS taxonomy.</role>
-<task>Acknowledge that classification is not possible for the vendors in `<vendor_data>` at Level {level} because the necessary subcategories could not be provided.</task>
+<task>Acknowledge that classification is not possible for the vendors in `<vendor_data>` at Level {level} because the necessary subcategories could not be provided (likely due to an invalid or non-existent parent category ID: {parent_category_id}).</task>
 <instructions>
 1. For **every** vendor listed in `<vendor_data>`, create a classification entry in the final JSON output.
 2. In each entry, set `classification_not_possible` to `true`.
@@ -225,6 +254,25 @@ json
 {category_options_xml}
 {output_format_xml}
 """
+    # Handle case where L1 lookup failed (taxonomy load issue)
+    elif not category_lookup_successful and level == 1:
+         prompt = f"""
+<role>You are a precise vendor classification expert using the NAICS taxonomy.</role>
+<task>Acknowledge that classification is not possible for the vendors in `<vendor_data>` at Level 1 because the top-level categories could not be loaded or provided.</task>
+<instructions>
+1. For **every** vendor listed in `<vendor_data>`, create a classification entry in the final JSON output.
+2. In each entry, set `classification_not_possible` to `true`.
+3. Set `confidence` to `0.0`.
+4. Set `category_id` and `category_name` to "N/A".
+5. Set `classification_not_possible_reason` to "Level 1 categories could not be loaded or retrieved.".
+6. Ensure the `batch_id` in the final JSON output matches the `batch_id` specified in `<output_format>`.
+7. Respond *only* with the valid JSON object as specified in `<output_format>`.
+</instructions>
+{vendor_data_xml}
+{category_options_xml}
+{output_format_xml}
+"""
+
 
     return prompt
 

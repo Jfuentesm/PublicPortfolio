@@ -1,3 +1,4 @@
+<!-- <file path='frontend/vue_frontend/src/components/JobStats.vue'> -->
     <template>
         <div class="mt-6 bg-gray-50 rounded-lg p-6 border border-gray-200 shadow-inner">
           <h5 class="text-lg font-semibold text-gray-700 mb-5 border-b border-gray-200 pb-3">
@@ -26,18 +27,18 @@
                       <strong class="text-gray-600 font-medium">Unique Vendors:</strong>
                       <span class="text-gray-800 font-semibold">{{ stats.unique_vendors?.toLocaleString() ?? 'N/A' }}</span>
                   </p>
-                  <!-- UPDATED: Display L5 Success (Keep label static for now, but value is correct) -->
-                  <p class="flex justify-between">
+                  <!-- UPDATED: Display L5 Success -->
+                  <p v-if="jobTargetLevel && jobTargetLevel >= 5" class="flex justify-between">
                       <strong class="text-gray-600 font-medium">Successfully Classified (L5):</strong>
                       <span class="text-green-700 font-semibold">{{ stats.successfully_classified_l5?.toLocaleString() ?? 'N/A' }}</span>
                   </p>
                   <!-- UPDATED: Display L5 Search Success (Corrected field name) -->
-                  <p class="flex justify-between">
+                  <p v-if="jobTargetLevel && jobTargetLevel >= 5" class="flex justify-between">
                       <strong class="text-gray-600 font-medium">Search Assisted (L5):</strong>
                       <span class="text-gray-800 font-semibold">{{ stats.search_successful_classifications_l5?.toLocaleString() ?? 'N/A' }}</span>
                   </p>
-                  <!-- Keep L4 for reference if desired -->
-                   <p class="flex justify-between text-xs text-gray-500">
+                  <!-- Keep L4 for reference if target level was >= 4 -->
+                   <p v-if="jobTargetLevel && jobTargetLevel >= 4" class="flex justify-between text-xs text-gray-500">
                       <strong class="font-normal">Ref: Classified (L4):</strong>
                       <span class="font-normal">{{ stats.successfully_classified_l4?.toLocaleString() ?? 'N/A' }}</span>
                   </p>
@@ -94,8 +95,15 @@
     const isLoading = ref(false);
     const error = ref<string | null>(null);
     
-    // ADDED: Computed property to get target level from store
-    const jobTargetLevel = computed(() => jobStore.jobDetails?.target_level);
+    // ADDED: Computed property to get target level from store OR stats
+    const jobTargetLevel = computed(() => {
+        // Prefer the target level stored directly in the stats if available
+        if (stats.value?.target_level != null) {
+            return stats.value.target_level;
+        }
+        // Fallback to the job details from the store
+        return jobStore.jobDetails?.target_level;
+    });
     
     // Computed property to format processing time nicely
     const formattedTime = computed(() => {

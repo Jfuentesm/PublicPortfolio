@@ -1,4 +1,4 @@
-
+# <file path='app/api/main.py'>
 # app/api/main.py
 import socket
 import sqlalchemy
@@ -362,8 +362,12 @@ async def upload_vendor_file(
         logger.info(f"Celery task queued successfully for job {job_id}")
     except Exception as e:
         logger.error(f"Failed to queue Celery task for job {job_id}", exc_info=True)
-        job.fail(f"Failed to queue processing task: {str(e)}")
-        db.commit()
+        # Use the job object we created earlier
+        if job:
+            job.fail(f"Failed to queue processing task: {str(e)}")
+            db.commit()
+        else:
+             logger.error(f"Job object was None when trying to mark as failed due to Celery queue error.")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to queue job for processing.")
 
     logger.info(f"Upload request for job {job_id} processed successfully, returning 202 Accepted.")

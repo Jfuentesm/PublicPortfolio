@@ -1,3 +1,4 @@
+
 # <file path='app/models/classification.py'>
 # --- file path='app/models/classification.py' ---
 from pydantic import BaseModel, Field
@@ -44,6 +45,7 @@ class ProcessingStats(BaseModel):
     total_vendors: int = 0
     unique_vendors: int = 0
     # --- UPDATED/ADDED Fields ---
+    target_level: int # Store the requested target level
     successfully_classified_l4: int = 0 # Keep L4 count for reference/comparison
     successfully_classified_l5: int = 0 # NEW: Total vendors reaching L5 (initial or post-search)
     classification_not_possible_initial: int = 0 # Vendors needing search initially

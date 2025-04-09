@@ -92,9 +92,16 @@ def load_taxonomy(force_reload: bool = False) -> Taxonomy:
 
     # --- If both failed, raise error ---
     if taxonomy is None:
-        error_msg = f"Failed to load taxonomy. Neither JSON ({json_path}) nor Excel ({excel_path}) file could be loaded or found."
-        logger.critical(error_msg)
-        raise FileNotFoundError(error_msg)
+        # --- Fallback to Sample Taxonomy ---
+        logger.warning(f"Failed to load taxonomy from both JSON and Excel. Falling back to sample taxonomy.")
+        try:
+            taxonomy = create_sample_taxonomy()
+            _taxonomy_cache = taxonomy # Cache the sample
+            return taxonomy
+        except Exception as sample_err:
+            error_msg = f"Failed to load taxonomy from files and also failed to create sample taxonomy: {sample_err}"
+            logger.critical(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from sample_err
 
     # This part should theoretically not be reached if errors are raised correctly
     logger.critical("Reached unexpected end of load_taxonomy function.")
@@ -338,6 +345,13 @@ def create_sample_taxonomy() -> Taxonomy:
     # ... other sample L4 categories ...
     level4_categories_23 = { "236115": TaxonomyLevel4(id="236115", name="New Single-Family Housing Construction", description="...", children={}) }
     level4_categories_51 = { "513210": TaxonomyLevel4(id="513210", name="Software Publishers", description="...", children={}) }
+    # Sample L5 children for L4 111110
+    level5_categories_11111 = {
+        "111111": TaxonomyLevel5(id="111111", name="Sample L5 Soybeans"),
+        "111112": TaxonomyLevel5(id="111112", name="Sample L5 Other Soybeans"),
+    }
+    level4_categories_11["111110"].children = level5_categories_11111
+
 
     # Create level 3 categories
     level3_categories_11 = {
@@ -416,6 +430,17 @@ if __name__ == "__main__":
                  print("L5 '311111' NOT FOUND (or parent missing).")
          except Exception as e:
              print(f"Error during L5 verification: {e}")
+
+         # Test get_level5_categories
+         print("\n--- Test get_level5_categories('31111') ---")
+         l5_children = tax.get_level5_categories('31111')
+         if l5_children:
+             print(f"Found {len(l5_children)} L5 children for '31111':")
+             for child in l5_children[:5]:
+                 print(f"  - {child.id}: {child.name}")
+         else:
+             print("No L5 children found for '31111'.")
+
 
      except Exception as e:
          print(f"\nError during testing: {e}")

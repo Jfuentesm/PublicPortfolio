@@ -1,4 +1,4 @@
-
+# <file path='app/tasks/classification_tasks.py'>
 # app/tasks/classification_tasks.py
 import os
 import asyncio
@@ -75,6 +75,7 @@ def process_vendor_file(self, job_id: str, file_path: str, target_level: int):
             db_fail.rollback()
         finally:
             db_fail.close()
+        clear_all_context() # Clear context before returning
         return # Stop task execution
 
     # Initialize loop within the task context
@@ -105,6 +106,7 @@ def process_vendor_file(self, job_id: str, file_path: str, target_level: int):
             logger.error("Job not found in database at start of task!", extra={"job_id": job_id})
             loop.close() # Close loop if job not found
             db.close() # Close db session
+            clear_all_context() # Clear context before returning
             return # Exit task if job doesn't exist
 
         logger.info(f"About to run async processing for job {job_id}")
@@ -286,7 +288,9 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
         try:
                 logger.info(f"Generating output file")
                 with log_duration(logger, "Generating output file"):
-                    output_file_name = generate_output_file(normalized_vendors_data, results, job_id) # Can raise IOError
+                    # --- FIX: Removed the extra 'target_level' argument ---
+                    output_file_name = generate_output_file(normalized_vendors_data, results, job_id)
+                    # --- END FIX ---
                 logger.info(f"Output file generated", extra={"output_file": output_file_name})
         except Exception as gen_err:
                 logger.error("Failed during output file generation", exc_info=True)
@@ -331,12 +335,19 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
             logger.error("CRITICAL: Failed to commit final job completion status!", exc_info=True)
             db.rollback()
             try:
-                err_msg = f"Failed during final commit: {type(final_commit_err).__name__}: {str(final_commit_err)}"
-                job.fail(err_msg[:2000])
-                db.commit()
+                # Re-fetch job in new session to attempt marking as failed
+                db_fail_final = SessionLocal()
+                job_fail_final = db_fail_final.query(Job).filter(Job.id == job_id).first()
+                if job_fail_final:
+                    err_msg = f"Failed during final commit: {type(final_commit_err).__name__}: {str(final_commit_err)}"
+                    job_fail_final.fail(err_msg[:2000])
+                    db_fail_final.commit()
+                else:
+                    logger.error("Job not found when trying to mark as failed after final commit error.")
+                db_fail_final.close()
             except Exception as fail_err:
                 logger.error("CRITICAL: Also failed to mark job as failed after final commit error.", exc_info=fail_err)
-                db.rollback()
+                # db.rollback() # Already rolled back original session
         # --- End Final Commit Block ---
 
     except (ValueError, FileNotFoundError, IOError) as file_err:
@@ -351,28 +362,42 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
     except SQLAlchemyError as db_err:
         logger.error(f"[_process_vendor_file_async] Database error during processing", exc_info=True,
                     extra={"error": str(db_err)})
+        db.rollback() # Rollback on DB error
         if job:
-            if job.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
+            # Re-fetch job in new session to attempt marking as failed
+            db_fail_db = SessionLocal()
+            job_fail_db = db_fail_db.query(Job).filter(Job.id == job_id).first()
+            if job_fail_db and job_fail_db.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
                     err_msg = f"Database error: {type(db_err).__name__}: {str(db_err)}"
-                    job.fail(err_msg[:2000])
-                    db.commit()
+                    job_fail_db.fail(err_msg[:2000])
+                    db_fail_db.commit()
+            elif job_fail_db:
+                    logger.warning(f"Database error occurred but job status was already {job_fail_db.status}. Error: {db_err}")
             else:
-                    logger.warning(f"Database error occurred but job status was already {job.status}. Error: {db_err}")
-                    db.rollback()
+                logger.error("Job not found when trying to mark as failed after database error.")
+            db_fail_db.close()
         else:
             logger.error("Job object was None during database error handling.")
     except Exception as async_err:
         logger.error(f"[_process_vendor_file_async] Unexpected error during async processing", exc_info=True,
                     extra={"error": str(async_err)})
+        db.rollback() # Rollback on unexpected error
         if job:
-            if job.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
+            # Re-fetch job in new session to attempt marking as failed
+            db_fail_unexpected = SessionLocal()
+            job_fail_unexpected = db_fail_unexpected.query(Job).filter(Job.id == job_id).first()
+            if job_fail_unexpected and job_fail_unexpected.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
                 err_msg = f"Unexpected error: {type(async_err).__name__}: {str(async_err)}"
-                job.fail(err_msg[:2000])
-                db.commit()
+                job_fail_unexpected.fail(err_msg[:2000])
+                db_fail_unexpected.commit()
+            elif job_fail_unexpected:
+                logger.warning(f"Unexpected error occurred but job status was already {job_fail_unexpected.status}. Error: {async_err}")
             else:
-                logger.warning(f"Unexpected error occurred but job status was already {job.status}. Error: {async_err}")
-                db.rollback()
+                logger.error("Job not found when trying to mark as failed after unexpected error.")
+            db_fail_unexpected.close()
         else:
             logger.error("Job object was None during unexpected error handling.")
     finally:
         logger.info(f"[_process_vendor_file_async] Finished async processing for job {job_id}")
+
+# </file>

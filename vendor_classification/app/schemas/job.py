@@ -1,4 +1,4 @@
-
+# <file path='app/schemas/job.py'>
 # app/schemas/job.py
 from pydantic import BaseModel, Field # <<< ADDED Field
 from datetime import datetime

@@ -1,4 +1,3 @@
-
 # <file path='app/models/job.py'>
 # --- file path='app/models/job.py' ---
 from sqlalchemy import Column, String, Float, DateTime, Enum as SQLEnum, JSON, Text, Integer # <<< ADDED Integer
@@ -25,7 +24,7 @@ class ProcessingStage(str, PyEnum):
     CLASSIFICATION_L2 = "classification_level_2"
     CLASSIFICATION_L3 = "classification_level_3"
     CLASSIFICATION_L4 = "classification_level_4"
-    CLASSIFICATION_L5 = "classification_level_5"
+    CLASSIFICATION_L5 = "classification_level_5" # ADDED L5 Stage
     SEARCH = "search_unknown_vendors" # This stage now covers search AND recursive post-search classification
     RESULT_GENERATION = "result_generation"
 
