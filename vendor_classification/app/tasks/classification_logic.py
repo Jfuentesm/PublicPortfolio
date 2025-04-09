@@ -22,6 +22,8 @@ logger = get_logger("vendor_classification.classification_logic")
 
 # --- Constants ---
 MAX_CONCURRENT_SEARCHES = 10 # Limit concurrent search/LLM processing for unknown vendors
+BATCH_PROCESSING_TIMEOUT = 300.0 # Max time (seconds) per classification batch
+SEARCH_CLASSIFY_TIMEOUT = 600.0 # Max time (seconds) per vendor search + recursive classification
 
 # --- Helper Functions (Moved from classification_tasks.py) ---
 
@@ -161,6 +163,7 @@ async def process_batch(
     try:
         logger.info(f"process_batch: Calling LLM for Level {level}, Parent '{parent_category_id or 'None'}', Context: {context_type}")
         with LogTimer(logger, f"LLM classification - Level {level}, Parent '{parent_category_id or 'None'}' ({context_type})", include_in_stats=True):
+            # Note: The actual HTTP call and retries happen inside classify_batch
             llm_response_data = await llm_service.classify_batch(
                 batch_data=batch_data,
                 level=level,
@@ -282,9 +285,12 @@ async def process_batch(
                     "classification_source": "Search" if search_context else "Initial" # Add source info
                 }
 
+    # This broad exception catch handles errors from llm_service.classify_batch (like RetryError)
+    # or errors during the result processing/validation within this function.
     except Exception as e:
         logger.error(f"Failed to process batch at Level {level} ({context_type})", exc_info=True,
                         extra={"batch_names": batch_names, "error": str(e)})
+        # Mark all vendors in the batch as failed
         for vendor_name in batch_names:
             results[vendor_name] = {
                 "category_id": "ERROR", "category_name": "ERROR", "confidence": 0.0,
@@ -452,6 +458,8 @@ async def search_and_classify_recursively(
                 try:
                     logger.debug(f"search_and_classify_recursively: Calling process_batch (Level {level}) for '{vendor_name}' with search context.")
                     # Use process_batch for consistency in validation and structure
+                    # Note: process_batch itself doesn't have an external timeout,
+                    # but the overall search_and_classify_recursively task does (added in process_vendors)
                     batch_result_dict = await process_batch(
                         batch_data=[vendor_data], # Batch of one
                         level=level,
@@ -592,8 +600,13 @@ async def process_vendors(
                 logger.info(f"Processing Level {level} batch {i+1}/{len(level_batches_data)} for parent '{parent_category_id or 'None'}'",
                             extra={"batch_size": len(batch_data), "first_vendor": batch_names[0] if batch_names else 'N/A', "batch_num": batch_counter_for_level, "total_batches": total_batches_for_level})
                 try:
-                    # Process batch WITHOUT search context initially
-                    batch_results = await process_batch(batch_data, level, parent_category_id, taxonomy, llm_service, stats, search_context=None)
+                    # --- MODIFICATION: Added asyncio.wait_for ---
+                    logger.debug(f"Calling process_batch with timeout {BATCH_PROCESSING_TIMEOUT}s")
+                    batch_results = await asyncio.wait_for(
+                        process_batch(batch_data, level, parent_category_id, taxonomy, llm_service, stats, search_context=None),
+                        timeout=BATCH_PROCESSING_TIMEOUT
+                    )
+                    # --- END MODIFICATION ---
                     logger.debug(f"Level {level} batch {i+1} results received. Count: {len(batch_results)}.")
 
                     for vendor_name, classification in batch_results.items():
@@ -617,6 +630,27 @@ async def process_vendors(
                                 # logger.debug(f"Vendor '{vendor_name}' not successfully classified at Level {level}. Reason: {classification.get('classification_not_possible_reason', 'Unknown')}. Will not proceed.")
                         else:
                                 logger.warning(f"Vendor '{vendor_name}' from batch result not found in main results dictionary.", extra={"level": level})
+
+                # --- MODIFICATION: Catch asyncio.TimeoutError specifically ---
+                except asyncio.TimeoutError:
+                    logger.error(f"Timeout processing Level {level} batch {i+1} for parent '{parent_category_id or 'None'}' after {BATCH_PROCESSING_TIMEOUT}s.",
+                                 extra={"batch_vendors": batch_names})
+                    # Mark all vendors in this batch as failed due to timeout
+                    for vendor_name in batch_names:
+                        if vendor_name in results:
+                            # Only add error if not already processed (shouldn't happen with timeout, but defensive)
+                            if f"level{level}" not in results[vendor_name]:
+                                results[vendor_name][f"level{level}"] = {
+                                    "category_id": "ERROR", "category_name": "ERROR", "confidence": 0.0,
+                                    "classification_not_possible": True,
+                                    "classification_not_possible_reason": f"Batch processing timed out after {BATCH_PROCESSING_TIMEOUT}s",
+                                    "vendor_name": vendor_name,
+                                    "classification_source": "Initial"
+                                }
+                                processed_in_level_count += 1 # Count as processed (though failed)
+                        else:
+                            logger.warning(f"Vendor '{vendor_name}' from timed-out batch not found in main results dictionary.", extra={"level": level})
+                # --- END MODIFICATION ---
 
                 except Exception as batch_error:
                     logger.error(f"Error during initial batch processing logic (Level {level}, parent '{parent_category_id or 'None'}')", exc_info=True,
@@ -704,17 +738,55 @@ async def process_vendors(
         search_semaphore = asyncio.Semaphore(MAX_CONCURRENT_SEARCHES)
         logger.info(f"Created search semaphore with concurrency limit: {MAX_CONCURRENT_SEARCHES}")
 
+        # --- MODIFICATION: Added wrapper for search task timeout ---
         for vendor_data in unknown_vendors_data_to_search:
-            task = asyncio.create_task(
-                search_and_classify_recursively(
-                    vendor_data, taxonomy, llm_service, search_service, stats, search_semaphore, target_level # Pass target_level
-                )
-            )
+            # Define the coroutine to run with a timeout
+            async def timed_search_classify_task(vd):
+                vn = vd.get('vendor_name', 'UnknownVendor') # Get name early for logging
+                try:
+                    logger.debug(f"Calling search_and_classify_recursively for '{vn}' with timeout {SEARCH_CLASSIFY_TIMEOUT}s")
+                    return await asyncio.wait_for(
+                        search_and_classify_recursively(
+                            vd, taxonomy, llm_service, search_service, stats, search_semaphore, target_level
+                        ),
+                        timeout=SEARCH_CLASSIFY_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f"Timeout (> {SEARCH_CLASSIFY_TIMEOUT}s) during search_and_classify_recursively for vendor: {vn}")
+                    # Return an error structure consistent with other failures in search_and_classify_recursively
+                    return {
+                        "vendor": vn, "search_query": f"{vn} company business type industry", "sources": [], "summary": None,
+                        "error": f"Task timed out after {SEARCH_CLASSIFY_TIMEOUT} seconds.",
+                        "classification_l1": {
+                            "classification_not_possible": True, "classification_not_possible_reason": f"Search/classify task timed out (> {SEARCH_CLASSIFY_TIMEOUT}s)",
+                            "confidence": 0.0, "vendor_name": vn, "notes": "Timeout", "classification_source": "Search"
+                        },
+                        # Ensure other levels are None
+                        "classification_l2": None, "classification_l3": None, "classification_l4": None, "classification_l5": None
+                    }
+                except Exception as task_exc:
+                    # Catch other exceptions within the task execution itself
+                    logger.error(f"Exception during search_and_classify_recursively task for vendor {vn}", exc_info=task_exc)
+                    return {
+                         "vendor": vn, "search_query": f"{vn} company business type industry", "sources": [], "summary": None,
+                         "error": f"Task execution error: {str(task_exc)}",
+                         "classification_l1": {
+                             "classification_not_possible": True, "classification_not_possible_reason": f"Search/classify task error: {str(task_exc)[:100]}",
+                             "confidence": 0.0, "vendor_name": vn, "notes": "Task Error", "classification_source": "Search"
+                         },
+                         "classification_l2": None, "classification_l3": None, "classification_l4": None, "classification_l5": None
+                    }
+
+            # Create the task using the wrapper coroutine
+            task = asyncio.create_task(timed_search_classify_task(vendor_data))
             search_tasks.append(task)
+        # --- END MODIFICATION ---
 
         logger.info(f"Gathering results for {len(search_tasks)} search & recursive classification tasks...")
         logger.debug(f"Starting asyncio.gather for {len(search_tasks)} tasks.")
         gather_start_time = time.monotonic()
+        # asyncio.gather will now return the result from timed_search_classify_task or any exception raised *by asyncio.create_task itself* (rare)
+        # Keep return_exceptions=True for gather errors (e.g., task cancellation)
         search_and_recursive_results = await asyncio.gather(*search_tasks, return_exceptions=True)
         gather_duration = time.monotonic() - gather_start_time
         logger.info(f"Search & recursive classification tasks completed (asyncio.gather finished). Duration: {gather_duration:.3f}s")
@@ -732,6 +804,7 @@ async def process_vendors(
         processed_search_count = 0
 
         logger.info(f"Processing {len(search_and_recursive_results)} results from search/recursive tasks.")
+        # --- MODIFICATION: Updated result processing loop to handle timeout/error dicts ---
         for i, result_or_exc in enumerate(search_and_recursive_results):
             processed_search_count += 1
             if i >= len(unknown_vendors_data_to_search):
@@ -747,79 +820,90 @@ async def process_vendors(
             results[vendor_name]["search_attempted"] = True # Add flag
 
             if isinstance(result_or_exc, Exception):
-                logger.error(f"Error during search_and_classify_recursively for vendor {vendor_name}", exc_info=result_or_exc)
-                results[vendor_name]["search_results"] = {"error": f"Search/Recursive task error: {str(result_or_exc)}"}
-                # Mark L1 as failed if not already marked or if it was successful initially
-                logger.info(f"OVERWRITE_LOG: Search task failed for '{vendor_name}'. Marking L1 as failed due to search error.")
+                # This catches errors from asyncio.gather itself (e.g., cancellation)
+                logger.error(f"Error returned by asyncio.gather for vendor {vendor_name}", exc_info=result_or_exc)
+                results[vendor_name]["search_results"] = {"error": f"Search task gather error: {str(result_or_exc)}"}
+                # Mark L1 as failed
+                logger.info(f"OVERWRITE_LOG: Search task gather failed for '{vendor_name}'. Marking L1 as failed.")
                 results[vendor_name]["level1"] = {
                     "classification_not_possible": True,
-                    "classification_not_possible_reason": f"Search task error: {str(result_or_exc)[:100]}",
-                    "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Failed", "classification_source": "Search"
+                    "classification_not_possible_reason": f"Search task gather error: {str(result_or_exc)[:100]}",
+                    "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Gather Error", "classification_source": "Search"
                 }
-                # Clear higher levels as search failed
-                for lvl in range(2, target_level + 1):
-                    if f"level{lvl}" in results[vendor_name]:
-                        logger.info(f"OVERWRITE_LOG: Clearing L{lvl} for '{vendor_name}' due to search task error.")
-                        results[vendor_name].pop(f"level{lvl}", None)
+                # Clear higher levels
+                for lvl in range(2, target_level + 1): results[vendor_name].pop(f"level{lvl}", None)
 
             elif isinstance(result_or_exc, dict):
-                search_data = result_or_exc
-                results[vendor_name]["search_results"] = search_data # Store raw search info
+                 # This is the normal case OR the error dict returned by timed_search_classify_task
+                 search_data = result_or_exc
+                 results[vendor_name]["search_results"] = search_data # Store raw search info (including potential timeout/task error)
 
-                l1_classification = search_data.get("classification_l1")
+                 # Check if the dict indicates an error (timeout or task exception captured by the wrapper)
+                 if search_data.get("error"):
+                     logger.warning(f"Search/classify task for {vendor_name} failed or timed out. Error: {search_data['error']}")
+                     # Ensure L1 reflects the failure (using the L1 data from the error dict)
+                     l1_error_classification = search_data.get("classification_l1", {
+                         "classification_not_possible": True, "classification_not_possible_reason": search_data['error'],
+                         "confidence": 0.0, "vendor_name": vendor_name, "notes": "Task Failed/Timeout", "classification_source": "Search"
+                     })
+                     logger.info(f"OVERWRITE_LOG: Search task failed/timed out for '{vendor_name}'. Marking L1 as failed.")
+                     results[vendor_name]["level1"] = l1_error_classification
+                     # Clear higher levels
+                     for lvl in range(2, target_level + 1):
+                         if f"level{lvl}" in results[vendor_name]:
+                             logger.info(f"OVERWRITE_LOG: Clearing L{lvl} for '{vendor_name}' due to search task failure/timeout.")
+                             results[vendor_name].pop(f"level{lvl}", None)
+                 else:
+                     # Process successful result (original logic)
+                     l1_classification = search_data.get("classification_l1")
+                     if l1_classification:
+                         logger.info(f"OVERWRITE_LOG: Processing successful search results for '{vendor_name}'. Target Level: {target_level}.")
+                         results[vendor_name]["classified_via_search"] = True # Add flag
 
-                if l1_classification: # Check if L1 result exists from search path
-                    # --- START OVERWRITE LOGIC ---
-                    logger.info(f"OVERWRITE_LOG: Processing search results for '{vendor_name}'. Target Level: {target_level}.")
-                    results[vendor_name]["classified_via_search"] = True # Add flag
+                         # Overwrite Level 1 unconditionally with the search result
+                         logger.info(f"OVERWRITE_LOG: Overwriting L1 for '{vendor_name}' with search result. Possible: {not l1_classification.get('classification_not_possible', True)}")
+                         results[vendor_name]["level1"] = l1_classification # This is the L1 overwrite
 
-                    # Overwrite Level 1 unconditionally with the search result
-                    logger.info(f"OVERWRITE_LOG: Overwriting L1 for '{vendor_name}' with search result. Possible: {not l1_classification.get('classification_not_possible', True)}")
-                    results[vendor_name]["level1"] = l1_classification # This is the L1 overwrite
+                         if not l1_classification.get("classification_not_possible", True):
+                             successful_l1_searches += 1
+                             logger.debug(f"Vendor '{vendor_name}' successfully classified at L1 via search (ID: {l1_classification.get('category_id')}).")
 
-                    if not l1_classification.get("classification_not_possible", True):
-                        successful_l1_searches += 1
-                        logger.debug(f"Vendor '{vendor_name}' successfully classified at L1 via search (ID: {l1_classification.get('category_id')}).")
+                             # Overwrite or clear higher levels based on recursive search results
+                             for lvl in range(2, target_level + 1):
+                                 search_lvl_key = f"classification_l{lvl}"
+                                 main_lvl_key = f"level{lvl}"
 
-                        # Overwrite or clear higher levels based on recursive search results
-                        for lvl in range(2, target_level + 1):
-                            search_lvl_key = f"classification_l{lvl}"
-                            main_lvl_key = f"level{lvl}"
+                                 if search_lvl_key in search_data and search_data[search_lvl_key]:
+                                     # Overwrite with the result from the recursive search
+                                     lvl_result_data = search_data[search_lvl_key]
+                                     logger.info(f"OVERWRITE_LOG: Overwriting L{lvl} for '{vendor_name}' with search result. Possible: {not lvl_result_data.get('classification_not_possible', True)}")
+                                     results[vendor_name][main_lvl_key] = lvl_result_data
 
-                            if search_lvl_key in search_data and search_data[search_lvl_key]:
-                                # Overwrite with the result from the recursive search
-                                lvl_result_data = search_data[search_lvl_key]
-                                logger.info(f"OVERWRITE_LOG: Overwriting L{lvl} for '{vendor_name}' with search result. Possible: {not lvl_result_data.get('classification_not_possible', True)}")
-                                results[vendor_name][main_lvl_key] = lvl_result_data
+                                     # Track L5 success specifically if reached via search
+                                     if lvl == 5 and not lvl_result_data.get("classification_not_possible", True):
+                                         successful_l5_searches += 1
+                                         logger.info(f"Vendor '{vendor_name}' reached L5 classification via search.")
+                                 else:
+                                     # If search path didn't yield a result for this level (stopped early/failed), remove any initial result
+                                     if main_lvl_key in results[vendor_name]:
+                                         logger.info(f"OVERWRITE_LOG: Clearing L{lvl} for '{vendor_name}' as search path did not provide a result for this level.")
+                                         results[vendor_name].pop(main_lvl_key, None)
+                                     else:
+                                         logger.debug(f"OVERWRITE_LOG: No initial L{lvl} result to clear for '{vendor_name}' and no search result provided.")
 
-                                # Track L5 success specifically if reached via search
-                                if lvl == 5 and not lvl_result_data.get("classification_not_possible", True):
-                                    successful_l5_searches += 1
-                                    logger.info(f"Vendor '{vendor_name}' reached L5 classification via search.")
-                            else:
-                                # If search path didn't yield a result for this level (stopped early/failed), remove any initial result
-                                if main_lvl_key in results[vendor_name]:
-                                    logger.info(f"OVERWRITE_LOG: Clearing L{lvl} for '{vendor_name}' as search path did not provide a result for this level.")
-                                    results[vendor_name].pop(main_lvl_key, None)
-                                else:
-                                    logger.debug(f"OVERWRITE_LOG: No initial L{lvl} result to clear for '{vendor_name}' and no search result provided.")
-
-                    else: # L1 classification via search failed or wasn't possible
-                        reason = l1_classification.get("classification_not_possible_reason", "Search did not yield L1 classification")
-                        logger.info(f"Vendor '{vendor_name}' could not be classified via search at L1. Reason: {reason}. Clearing higher levels.")
-                        # Clear higher levels as L1 failed post-search
-                        for lvl in range(2, target_level + 1):
-                            if f"level{lvl}" in results[vendor_name]:
-                                logger.info(f"OVERWRITE_LOG: Clearing L{lvl} for '{vendor_name}' due to L1 failure post-search.")
-                                results[vendor_name].pop(f"level{lvl}", None)
-                    # --- END OVERWRITE LOGIC ---
-                else:
-                     # This case should ideally not happen if search_and_classify returns correctly, but handle defensively
-                     logger.error(f"Search task for '{vendor_name}' returned dict but missing 'classification_l1'. Marking L1 as failed.")
-                     results[vendor_name]["level1"] = { "classification_not_possible": True, "classification_not_possible_reason": "Internal search error (missing L1 result)", "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Error", "classification_source": "Search" }
-                     for lvl in range(2, target_level + 1): results[vendor_name].pop(f"level{lvl}", None)
-
-
+                         else: # L1 classification via search failed or wasn't possible
+                             reason = l1_classification.get("classification_not_possible_reason", "Search did not yield L1 classification")
+                             logger.info(f"Vendor '{vendor_name}' could not be classified via search at L1. Reason: {reason}. Clearing higher levels.")
+                             # Clear higher levels as L1 failed post-search
+                             for lvl in range(2, target_level + 1):
+                                 if f"level{lvl}" in results[vendor_name]:
+                                     logger.info(f"OVERWRITE_LOG: Clearing L{lvl} for '{vendor_name}' due to L1 failure post-search.")
+                                     results[vendor_name].pop(f"level{lvl}", None)
+                     else:
+                         # This case should ideally not happen if search_and_classify returns correctly, but handle defensively
+                         logger.error(f"Search task for '{vendor_name}' returned dict but missing 'classification_l1'. Marking L1 as failed.")
+                         results[vendor_name]["level1"] = { "classification_not_possible": True, "classification_not_possible_reason": "Internal search error (missing L1 result)", "confidence": 0.0, "vendor_name": vendor_name, "notes": "Search Error", "classification_source": "Search" }
+                         for lvl in range(2, target_level + 1): results[vendor_name].pop(f"level{lvl}", None)
             else: # Handle unexpected return type from gather
                 logger.error(f"Unexpected result type for vendor {vendor_name} search task: {type(result_or_exc)}")
                 results[vendor_name]["search_results"] = {"error": f"Unexpected search result type: {type(result_or_exc)}"}
@@ -831,6 +915,8 @@ async def process_vendors(
                     if f"level{lvl}" in results[vendor_name]:
                         logger.info(f"OVERWRITE_LOG: Clearing L{lvl} for '{vendor_name}' due to unexpected search result type.")
                         results[vendor_name].pop(f"level{lvl}", None)
+        # --- END MODIFICATION ---
+
 
         stats["search_successful_classifications_l1"] = successful_l1_searches
         stats["search_successful_classifications_l5"] = successful_l5_searches # Updated stat
@@ -863,3 +949,5 @@ async def process_vendors(
             logger.error("Failed to commit status update when skipping search", exc_info=True)
             db.rollback()
     logger.info("process_vendors function is returning.")
+
+# </file>
