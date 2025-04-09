@@ -137,35 +137,28 @@ def get_potential_files_recursively(current_directory, original_root_dir, script
 MODES = {
     "debug": {
         "name": "Debug Mode",
-        "issue_placeholder": "<Describe the bug or unexpected behavior observed>\n\n\n",
+        "issue_placeholder": "<Describe the bug or unexpected behavior observed>\n\n\n", # Kept for planning, action uses goal_input
         "output_instruction": (
-            "1) Reflect on 5-7 different possible sources of the problem based on the code provided.\n"
+            "1) Reflect on 5-7 different possible sources of the problem based on the code provided and the goal/issue description.\n"
             "2) Distill those down to the most likely root cause.\n"
             "3) Provide the COMPLETE UPDATED VERSION of *only* the files that need changes to fix the likely root cause.\n"
-            "4) Add logging or print statements within the changed code to help verify the fix and understand the flow.\n"
-            "5) Explain the reasoning behind the fix and the added logging.\n"
         )
     },
     "add_feature": {
         "name": "Add New Feature",
-        "issue_placeholder": "<Describe the new feature or enhancement required>\n\n\n",
+        "issue_placeholder": "<Describe the new feature or enhancement required>\n\n\n", # Kept for planning, action uses goal_input
         "output_instruction": (
-            "1) Understand the new feature request based on the description and existing code.\n"
-            "2) Identify which files need to be created or modified.\n"
-            "3) Provide the COMPLETE code for any NEW files needed.\n"
-            "4) Provide the COMPLETE UPDATED VERSION of any EXISTING files that need changes.\n"
-            "5) Explain how the new code implements the feature and integrates with the existing structure.\n"
+            "1) Explain if this is already complete, or what is missing\n"
+            "2) Provide the COMPLETE code for any NEW files needed.\n"
+            "3) Provide the COMPLETE UPDATED VERSION of any EXISTING files that need changes.\n"
         )
     },
     "explain": {
         "name": "Explain / Brainstorm",
-        "issue_placeholder": "<Ask a question about the code, request an explanation, or describe a concept to brainstorm>\n\n\n",
+        "issue_placeholder": "<Ask a question about the code, request an explanation, or describe a concept to brainstorm>\n\n\n", # Kept for planning, action uses goal_input
         "output_instruction": (
-            "1) Carefully read the question or brainstorming topic.\n"
-            "2) Analyze the provided code in the context of the request.\n"
-            "3) Provide a clear explanation, answer the question, or offer brainstorming ideas/approaches.\n"
-            "4) If suggesting code changes or approaches, illustrate with concise examples where appropriate (no need for full file rewrites unless specifically asked).\n"
-            "5) Structure the response logically for easy understanding.\n"
+            "Provide a clear explanation, answer the question, or offer brainstorming ideas/approaches.\n"
+            "If suggesting code changes or approaches, illustrate with concise examples where appropriate (no need for full file rewrites unless specifically asked).\n"
         )
     }
 }
@@ -186,7 +179,7 @@ class ScriptAggregatorApp(QWidget):
         self.tree_view = QTreeView()
         self.status_label = QLabel("Ready. Scanning for files...")
         self.mode_buttons = {}
-        self.goal_input = QTextEdit()
+        self.goal_input = QTextEdit() # User's main goal/task description
         self.suggestion_input = QLineEdit()
         self.item_path_map = {} # Map path string -> QStandardItem
 
@@ -361,7 +354,7 @@ class ScriptAggregatorApp(QWidget):
         """Generates the Step 0 request file including goal and ALL project code."""
         goal = self.goal_input.toPlainText().strip()
         if not goal:
-            QMessageBox.warning(self, "Input Missing", "Please describe your goal for Step 0.")
+            QMessageBox.warning(self, "Input Missing", "Please describe your overall goal for Step 0.")
             return
 
         self.status_label.setText("Gathering all project files for planning request...")
@@ -375,7 +368,6 @@ class ScriptAggregatorApp(QWidget):
              return
 
         timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-        # *** Use new output directory ***
         output_dir = self.planning_output_dir
         output_filename = f"planning_request_{timestamp_str}.txt"
         output_file = output_dir / output_filename
@@ -384,7 +376,6 @@ class ScriptAggregatorApp(QWidget):
         QApplication.processEvents()
 
         try:
-            # *** Create directory if it doesn't exist ***
             output_dir.mkdir(parents=True, exist_ok=True)
 
             with open(output_file, 'w', encoding='utf-8') as f:
@@ -425,7 +416,6 @@ class ScriptAggregatorApp(QWidget):
                 f.write("--- Identified Files (Provide comma-separated list below) ---\n\n\n")
 
 
-            # *** Update message with new path ***
             relative_output_path = output_file.relative_to(self.script_dir)
             self.status_label.setText(f"Planning request file generated: {relative_output_path}")
             QMessageBox.information(self, "Step 0 Success",
@@ -482,6 +472,12 @@ class ScriptAggregatorApp(QWidget):
     @Slot()
     def generate_final_output_file(self):
         """Gathers currently checked files and generates the final output for LLM action."""
+        # --- Get the original goal text ---
+        goal_text = self.goal_input.toPlainText().strip()
+        if not goal_text:
+            QMessageBox.warning(self, "Input Missing", "Please ensure the overall goal/task is described in the 'Step 0' box before generating the final action file.")
+            return
+
         selected_relative_paths = []
         for item in self.item_path_map.values():
             if item.isCheckable() and item.checkState() == Qt.CheckState.Checked:
@@ -501,9 +497,7 @@ class ScriptAggregatorApp(QWidget):
         selected_mode = MODES[selected_mode_key]
 
         timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-        # *** Use new output directory ***
         output_dir = self.action_output_dir
-        # Use project folder name in filename for context if multiple projects use this tool
         project_folder_name = self.script_dir.name
         output_filename = f"action_{project_folder_name}_{selected_mode_key}_{timestamp_str}.txt"
         output_file = output_dir / output_filename
@@ -512,26 +506,27 @@ class ScriptAggregatorApp(QWidget):
         QApplication.processEvents()
 
         try:
-            # *** Create directory if it doesn't exist ***
             output_dir.mkdir(parents=True, exist_ok=True)
 
             with open(output_file, 'w', encoding='utf-8') as f:
-                # Preamble based on final action mode
-                f.write('<issue to address>\n')
-                f.write(selected_mode["issue_placeholder"])
-                f.write('</issue to address>\n\n\n')
+                # --- Write the Goal/Issue using the text from goal_input ---
+                f.write('<goal or issue to address>\n')
+                f.write(goal_text) # Use the actual goal text here
+                f.write('\n</goal or issue to address>\n\n\n')
+
+                # --- Write the Output Instruction for the selected mode ---
                 f.write('<output instruction>\n')
                 f.write(selected_mode["output_instruction"])
                 f.write('\n</output instruction>\n\n\n')
 
-                # File Tree (of selected files for this step)
+                # --- Write the File Tree (of selected files for this step) ---
                 f.write("<Tree of Included Files>\n")
                 sorted_rel_paths = sorted(selected_relative_paths, key=lambda p: p.as_posix())
                 for rel_path in sorted_rel_paths:
                     f.write(f"- {rel_path.as_posix()}\n")
                 f.write("</Tree of Included Files>\n\n\n")
 
-                # Concatenated Code (of selected files for this step)
+                # --- Write the Concatenated Code (of selected files for this step) ---
                 f.write("<Concatenated Source Code>\n\n")
                 for rel_path in sorted_rel_paths:
                     abs_path = self.script_dir / rel_path
@@ -542,7 +537,6 @@ class ScriptAggregatorApp(QWidget):
                     f.write("\n</file>\n\n")
                 f.write("</Concatenated Source Code>")
 
-            # *** Update message with new path ***
             relative_output_path = output_file.relative_to(self.script_dir)
             self.status_label.setText(f"Successfully generated final action file: {relative_output_path}")
             QMessageBox.information(self, "Step 1b Success", f"Final concatenated file for LLM action created:\n{relative_output_path}")
