@@ -1,5 +1,6 @@
+# <file path='app/schemas/job.py'>
 # app/schemas/job.py
-from pydantic import BaseModel
+from pydantic import BaseModel, Field # <<< ADDED Field
 from datetime import datetime
 from typing import Optional, Dict, Any
 
@@ -19,6 +20,9 @@ class JobResponse(BaseModel):
     input_file_name: str
     created_by: str
     error_message: Optional[str] = None
+    # --- ADDED: Target Level ---
+    target_level: int = Field(..., ge=1, le=5) # Include target level in response
+    # --- END ADDED ---
     # stats: Optional[Dict[str, Any]] = None # Optionally include stats summary
 
     class Config:

@@ -1,21 +1,21 @@
-// frontend/vue_frontend/src/stores/job.ts
+// <file path='frontend/vue_frontend/src/stores/job.ts'>
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import apiService, { type JobResponse } from '@/services/api'; // Import JobResponse type
 
 // Define the structure of the job details object based on your API response
+// Should align with app/schemas/job.py -> JobResponse
 export interface JobDetails {
     id: string; // Changed from job_id to match JobResponse schema
     status: 'pending' | 'processing' | 'completed' | 'failed';
     progress: number;
     current_stage: string; // Consider using specific stage literals if known
-    created_at: string | null;
-    updated_at: string | null;
+    created_at: string | null; // Use string for ISO date
+    updated_at: string | null; // Use string for ISO date
     completed_at?: string | null; // Optional completion time
     estimated_completion?: string | null; // Added optional field (backend doesn't provide this explicitly yet)
     error_message: string | null;
-    // Add other fields returned by /api/v1/jobs/{job_id} if needed
-    // Match JobResponse fields where applicable
+    target_level: number; // ADDED: Ensure target_level is part of the details
     company_name?: string;
     input_file_name?: string;
     output_file_name?: string | null;
@@ -74,7 +74,8 @@ export const useJobStore = defineStore('job', () => {
     function updateJobDetails(details: JobDetails): void {
         // Only update if the details are for the currently tracked job
         if (details && details.id === currentJobId.value) { // Match 'id' field from JobResponse/JobDetails
-            console.log(`JobStore: Updating jobDetails for ${currentJobId.value} with status ${details.status}, progress ${details.progress}`); // LOGGING
+            // LOGGING: Include target_level in log
+            console.log(`JobStore: Updating jobDetails for ${currentJobId.value} with status ${details.status}, progress ${details.progress}, target_level ${details.target_level}`);
             jobDetails.value = { ...details }; // Create new object for reactivity
             error.value = null; // Clear error on successful update
         } else if (details) {

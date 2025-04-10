@@ -1,42 +1,34 @@
 
-# file path='app/tasks/celery_app.py'
 # app/tasks/celery_app.py
-
 from celery import Celery
 import logging
 import sys
 import os
 
-# --- MODIFIED: Call setup_logging early ---
-# Attempt to setup logging as soon as possible, although task-specific might be better
-# Note: This might run *before* settings are fully loaded depending on import order,
-# but it ensures *some* logging is configured for the worker process itself.
-# A more robust approach is within the task or using worker_process_init signal.
+# Attempt initial logging setup
 try:
     from core.logging_config import setup_logging
-    # Use defaults suitable for worker, force synchronous for debugging
-    log_dir_worker = "/data/logs" if os.path.exists("/data") else "./logs_worker" # Use different dir to isolate
-    os.makedirs(log_dir_worker, exist_ok=True) # Ensure it exists
+    log_dir_worker = "/data/logs" if os.path.exists("/data") else "./logs_worker"
+    os.makedirs(log_dir_worker, exist_ok=True)
     print(f"WORKER: Attempting initial logging setup to {log_dir_worker}")
-    setup_logging(log_to_file=True, log_dir=log_dir_worker, async_logging=False, llm_trace_log_file="llm_api_trace_worker.log") # Force sync, maybe separate file
+    setup_logging(log_to_file=True, log_dir=log_dir_worker, async_logging=False, llm_trace_log_file="llm_api_trace_worker.log")
     print("WORKER: Initial logging setup attempted.")
 except Exception as setup_err:
     print(f"WORKER: CRITICAL ERROR during initial logging setup: {setup_err}")
-    # Fallback to basic config if setup fails
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-from core.logging_config import get_logger # Now get logger *after* potential setup
+# Import logger *after* setup attempt
+from core.logging_config import get_logger
+# Import context functions from the new module
+from core.log_context import set_correlation_id, set_job_id, clear_all_context
 
 # Use direct signal imports from celery.signals
 from celery.signals import task_prerun, task_postrun, task_failure
 
-# --- Ensure get_logger is called *after* setup_logging attempt ---
 logger = get_logger("vendor_classification.celery")
-# --- END MODIFICATION ---
 
-
-# Log diagnostic information to help debug import issues
-logger.info( # Changed to info for visibility
+# Log diagnostic information
+logger.info(
     f"Initializing Celery app",
     extra={
         "python_executable": sys.executable,
@@ -48,20 +40,20 @@ logger.info( # Changed to info for visibility
 
 try:
     from core.config import settings
-    logger.info("Successfully imported settings") # Changed to info
+    logger.info("Successfully imported settings")
 except Exception as e:
     logger.error("Error importing settings", exc_info=True)
     raise
 
-# Create Celery app with detailed logging
-logger.info("Creating Celery app") # Changed to info
+# Create Celery app
+logger.info("Creating Celery app")
 try:
     celery_app = Celery(
         "vendor_classification",
         broker=settings.REDIS_URL,
         backend=settings.REDIS_URL
     )
-    logger.info("Celery app created", extra={"broker": settings.REDIS_URL}) # Changed to info
+    logger.info("Celery app created", extra={"broker": settings.REDIS_URL})
 
     # Configure Celery
     celery_app.conf.update(
@@ -73,21 +65,18 @@ try:
         task_track_started=True,
         task_send_sent_event=True,
     )
-    logger.info("Celery configuration updated") # Changed to info
+    logger.info("Celery configuration updated")
 
-    # -----------------------------------------------------------------------
-    # Signal Handlers (using direct imports)
-    # -----------------------------------------------------------------------
-    logger.info("Connecting Celery signal handlers...") # Added log
+    # Signal Handlers
+    logger.info("Connecting Celery signal handlers...")
 
     @task_prerun.connect
-    def handle_task_prerun(task_id, task, args, kwargs, **extra_options): # Added args/kwargs
+    def handle_task_prerun(task_id, task, args, kwargs, **extra_options):
         """Signal handler before task runs."""
-        from core.logging_config import set_correlation_id, set_job_id
-        # Assume job_id is the first argument for process_vendor_file
-        job_id_from_args = args[0] if args else task_id
-        set_correlation_id(job_id_from_args)
-        set_job_id(job_id_from_args)
+        clear_all_context() # Clear any lingering context
+        job_id = kwargs.get('job_id') or (args[0] if args else None) or task_id
+        set_correlation_id(job_id) # Use job_id as correlation_id
+        set_job_id(job_id)
         logger.info(
             "Task about to run",
             extra={
@@ -100,72 +89,63 @@ try:
         )
 
     @task_postrun.connect
-    def handle_task_postrun(task_id, task, args, kwargs, retval, state, **extra_options): # Added args/kwargs/retval/state
+    def handle_task_postrun(task_id, task, args, kwargs, retval, state, **extra_options):
         """Signal handler after task completes."""
-        from core.logging_config import clear_all_context
         logger.info(
             "Task finished running",
             extra={
                 "signal": "task_postrun",
                 "task_id": task_id,
                 "task_name": task.name,
-                "retval": repr(retval)[:200], # Log return value snippet
+                "retval": repr(retval)[:200],
                 "final_state": state
             }
         )
         clear_all_context() # Clean up context
 
     @task_failure.connect
-    def handle_task_failure(task_id, exception, args, kwargs, traceback, einfo, **extra_options): # Added args/kwargs/etc.
+    def handle_task_failure(task_id, exception, args, kwargs, traceback, einfo, **extra_options):
         """Signal handler if task fails."""
-        from core.logging_config import clear_all_context
+        task_name = getattr(kwargs.get('task'), 'name', None) or getattr(einfo, 'task', {}).get('name', 'UnknownTask')
         logger.error(
             "Task failed",
             exc_info=(type(exception), exception, traceback),
             extra={
                 "signal": "task_failure",
                 "task_id": task_id,
-                "task_name": kwargs.get('task').name if 'task' in kwargs else 'UnknownTask', # Get task name safely
+                "task_name": task_name,
                 "args": args,
                 "kwargs": kwargs,
                 "exception_type": type(exception).__name__,
                 "error": str(exception),
+                "einfo": str(einfo)[:1000] if einfo else None
             }
         )
         clear_all_context() # Clean up context
 
-    logger.info("Celery signal handlers connected.") # Added log
-    # -----------------------------------------------------------------------
+    logger.info("Celery signal handlers connected.")
 
 except Exception as e:
     logger.error("Error creating or configuring Celery app", exc_info=True)
     raise
 
-# Import tasks to register them - with error handling
-logger.info("Attempting to import tasks for registration...") # Changed to info
+# Import tasks to register them
+logger.info("Attempting to import tasks for registration...")
 try:
-    # Import relative to the /app directory which is in PYTHONPATH
     from tasks.classification_tasks import process_vendor_file
-    logger.info("Successfully imported 'tasks.classification_tasks.process_vendor_file'") # Changed to info
+    logger.info("Successfully imported 'tasks.classification_tasks.process_vendor_file'")
 except ImportError as e:
     logger.error("ImportError when importing tasks", exc_info=True)
-    # Log sys.path again specifically here if import fails
     logger.error(f"sys.path during task import: {sys.path}")
     raise
 except Exception as e:
     logger.error("Unexpected error importing tasks", exc_info=True)
     raise
 
-# Autodiscover tasks from installed apps (if using Django structure, otherwise less relevant)
-# celery_app.autodiscover_tasks()
-# logger.info("Celery autodiscover_tasks called (may not find tasks unless using specific structure)")
-
-# Log discovered tasks explicitly
+# Log discovered tasks
 logger.info(f"Tasks registered in Celery app: {list(celery_app.tasks.keys())}")
 
-logger.info("Celery app initialization finished.") # Changed to info
+logger.info("Celery app initialization finished.")
 
-# Ensure the logger works even if run standalone
 if __name__ == "__main__":
-    # setup_logging() # Call the potentially modified setup
     logger.warning("celery_app.py run directly (likely for testing/debugging)")

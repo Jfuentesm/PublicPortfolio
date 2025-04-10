@@ -6,26 +6,32 @@ services:
     ports:
       - "${WEB_PORT:-8001}:8000"
     volumes:
-      # - ./app:/app          # <-- REMOVE OR COMMENT OUT THIS LINE
+      # - ./app:/app          # <-- REMOVE OR COMMENT OUT THIS LINE FOR PRODUCTION/STAGING
+                              # Keep it if you need hot-reloading of backend code during dev
       - ./data:/data        # Keep this for persistent data
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/vendor_classification
       - REDIS_URL=redis://redis:6379/0
-      # API keys are hardcoded in config.py
+      # API keys are hardcoded in config.py - consider moving to env vars
+      - PYTHONUNBUFFERED=1 # Ensure logs appear immediately
+      - LOG_LEVEL=DEBUG    # Set log level explicitly
     depends_on:
       db:
-        condition: service_healthy # Wait for DB to be healthy (requires HEALTHCHECK in db service)
+        condition: service_healthy # Wait for DB to be healthy before initializing
       redis:
         condition: service_started # Wait for Redis to start
     networks:
       - app-network
-    # Add healthcheck for web service itself
+    # --- MODIFIED COMMAND ---
+    # Run initialization script THEN start Uvicorn
+    command: sh -c "echo '>>> [Web CMD Start] Waiting briefly for DB...' && sleep 5 && echo '>>> [Web CMD Start] Running DB Initialization...' && python core/initialize_db.py && echo '>>> [Web CMD Start] Starting Uvicorn...' && uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug"
+    # --- END MODIFIED COMMAND ---
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 45s # Increase start period slightly to allow for init
 
   worker:
     build:
@@ -38,6 +44,8 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/vendor_classification
       - REDIS_URL=redis://redis:6379/0
       # API keys are hardcoded in config.py
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
     depends_on:
       db:
         condition: service_healthy # Wait for DB
@@ -72,7 +80,6 @@ services:
       - "6379:6379"
     networks:
       - app-network
-    # Add healthcheck for Redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
