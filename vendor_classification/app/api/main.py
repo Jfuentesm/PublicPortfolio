@@ -1,3 +1,4 @@
+
 # <file path='app/api/main.py'>
 # app/api/main.py
 import socket
@@ -11,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel # Added for response model
 from typing import Dict, Any, Optional, List
 import uuid
 import os
@@ -34,7 +36,9 @@ from core.database import get_db, SessionLocal, engine
 from core.initialize_db import initialize_database
 
 # --- Service Imports ---
-from services.file_service import save_upload_file
+# --- UPDATED: Import validate_file_header ---
+from services.file_service import save_upload_file, validate_file_header
+# --- END UPDATED ---
 
 # --- Task Imports ---
 from tasks.celery_app import celery_app
@@ -164,22 +168,33 @@ async def health_check():
     tavily_status = "unknown"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-                or_url = f"{settings.OPENROUTER_API_BASE}/models"
-                or_headers = {"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"}
-                or_resp = await client.get(or_url, headers=or_headers)
-                openrouter_status = "connected" if or_resp.status_code == 200 else f"error: {or_resp.status_code}"
+                # Check if settings attributes exist before using them
+                or_url = f"{settings.OPENROUTER_API_BASE}/models" if hasattr(settings, 'OPENROUTER_API_BASE') else None
+                or_headers = {"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"} if hasattr(settings, 'OPENROUTER_API_KEY') else None
+                if or_url and or_headers:
+                    or_resp = await client.get(or_url, headers=or_headers)
+                    openrouter_status = "connected" if or_resp.status_code == 200 else f"error: {or_resp.status_code}"
+                else:
+                    openrouter_status = "config_missing"
+                    logger.warning("OpenRouter API base or key missing in settings for health check.")
+
 
                 tv_url = "https://api.tavily.com/search"
-                tv_payload = {"api_key": settings.TAVILY_API_KEY, "query": "test", "max_results": 1}
-                tv_resp = await client.post(tv_url, json=tv_payload)
-                tavily_status = "connected" if tv_resp.status_code == 200 else f"error: {tv_resp.status_code}"
+                tv_payload = {"api_key": settings.TAVILY_API_KEY, "query": "test", "max_results": 1} if hasattr(settings, 'TAVILY_API_KEY') else None
+                if tv_payload:
+                    tv_resp = await client.post(tv_url, json=tv_payload)
+                    tavily_status = "connected" if tv_resp.status_code == 200 else f"error: {tv_resp.status_code}"
+                else:
+                    tavily_status = "config_missing"
+                    logger.warning("Tavily API key missing in settings for health check.")
+
 
     except httpx.RequestError as http_err:
             logger.warning(f"HTTPX RequestError during external API health check: {http_err}")
             openrouter_status = openrouter_status if openrouter_status != "unknown" else "connection_error"
             tavily_status = tavily_status if tavily_status != "unknown" else "connection_error"
     except Exception as api_err:
-            logger.error(f"Error checking external APIs during health check: {api_err}")
+            logger.error(f"Error checking external APIs during health check: {api_err}", exc_info=True) # Log full traceback
             openrouter_status = openrouter_status if openrouter_status != "unknown" else "check_error"
             tavily_status = tavily_status if tavily_status != "unknown" else "check_error"
 
@@ -282,14 +297,97 @@ async def login_for_access_token(
             detail="An error occurred during the login process."
         )
 
-# --- UPLOAD ROUTE (Updated) ---
+# --- ADDED: File Validation Endpoint ---
+class FileValidationResponse(BaseModel):
+    is_valid: bool
+    message: str
+    detected_columns: List[str] = []
+    missing_mandatory_columns: List[str] = []
+
+@app.post("/api/v1/validate-upload", response_model=FileValidationResponse, status_code=status.HTTP_200_OK)
+async def validate_uploaded_file_header(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user) # Ensure user is logged in
+):
+    """
+    Quickly validates the header of an uploaded Excel file.
+    Checks for the mandatory 'vendor_name' column (case-insensitive).
+    Returns validation status and detected columns.
+    """
+    set_user(current_user) # Set context for logging
+    validation_uuid = str(uuid.uuid4())[:8] # Short ID for this validation attempt
+
+    log_extra = {
+        "validation_id": validation_uuid,
+        "uploaded_filename": file.filename, # Renamed from 'filename'
+        "username": current_user.username
+    }
+    logger.info("File validation request received", extra=log_extra)
+
+    if not file.filename:
+        logger.warning("Validation attempt with no filename.", extra=log_extra)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No filename provided.")
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        logger.warning(f"Invalid file type for validation: {file.filename}", extra=log_extra)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type. Please upload an Excel file (.xlsx or .xls).")
+
+    try:
+        validation_result = validate_file_header(file)
+
+        # --- FIX: Avoid merging 'message' key into log extra ---
+        # Create a log-safe version of the validation result by renaming the 'message' key
+        log_safe_validation_result = {
+            "validation_is_valid": validation_result.get("is_valid"),
+            "validation_message": validation_result.get("message"), # Rename 'message' key for logging
+            "validation_detected_columns": validation_result.get("detected_columns"),
+            "validation_missing_columns": validation_result.get("missing_mandatory_columns")
+        }
+        # Merge the base log_extra with the log-safe validation results
+        current_log_extra = {**log_extra, **log_safe_validation_result}
+        # --- END FIX ---
+
+        # Now log using the safe dictionary that doesn't have a 'message' key
+        logger.info(f"File header validation completed", extra=current_log_extra)
+
+        status_code = status.HTTP_200_OK
+        if not validation_result["is_valid"]:
+            # You could use 422 here, but 200 is also fine as the *request* was processed,
+            # and the validation *result* indicates failure. Let's stick with 200 for simplicity
+            # and let the frontend interpret the `is_valid` flag.
+            # status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+            pass
+
+        return JSONResponse(
+            status_code=status_code,
+            content=validation_result # Return the original validation_result to the frontend
+        )
+
+    except ValueError as ve:
+        logger.warning(f"Validation failed due to parsing error: {ve}", extra=log_extra)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except Exception as e:
+        # Log the error with the original log_extra, avoiding the problematic merge
+        logger.error(f"Unexpected error during file header validation", exc_info=True, extra=log_extra)
+        # Return a 500 error to the frontend
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error validating file: {e}")
+    finally:
+        # Ensure the file stream is closed, even though we only read the header
+        if hasattr(file, 'close') and callable(file.close):
+            try:
+                # For async UploadFile, use await file.close() if needed
+                # For standard sync SpooledTemporaryFile, just call close()
+                 file.close()
+            except Exception:
+                logger.warning("Error closing file stream after validation", extra=log_extra, exc_info=False)
+# --- END ADDED: File Validation Endpoint ---
+
+
+# --- UPLOAD ROUTE (No changes needed here for validation, but keep previous updates) ---
 @app.post("/api/v1/upload", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def upload_vendor_file(
     background_tasks: BackgroundTasks,
     company_name: str = Form(...),
-    # --- ADDED: target_level parameter ---
     target_level: int = Form(..., ge=1, le=5, description="Target classification level (1-5)"),
-    # --- END ADDED ---
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -297,6 +395,7 @@ async def upload_vendor_file(
     """
     Accepts vendor file upload, creates a job, and queues it for processing.
     Allows specifying the target classification level.
+    **Assumes frontend performs pre-validation using /validate-upload.**
     """
     job_id = str(uuid.uuid4())
     set_job_id(job_id)
@@ -305,12 +404,13 @@ async def upload_vendor_file(
     logger.info(f"Upload request received", extra={
         "job_id": job_id,
         "company_name": company_name,
-        "target_level": target_level, # Log the target level
-        "uploaded_filename": file.filename,
+        "target_level": target_level,
+        "uploaded_filename": file.filename, # Use consistent naming
         "content_type": file.content_type,
         "username": current_user.username
     })
 
+    # Basic checks still useful as a fallback, though frontend should prevent this
     if not file.filename:
         logger.warning("Upload attempt with no filename.", extra={"job_id": job_id})
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No filename provided.")
@@ -318,10 +418,28 @@ async def upload_vendor_file(
         logger.warning(f"Invalid file type uploaded: {file.filename}", extra={"job_id": job_id})
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type. Please upload an Excel file (.xlsx or .xls).")
 
+    # --- Pre-validation Check (Optional but recommended server-side redundancy) ---
+    # You *could* re-run the validation here before saving, but it adds overhead.
+    # Relying on the frontend pre-validation is the primary goal.
+    # try:
+    #     # Need to reset stream position if reading again
+    #     await file.seek(0)
+    #     validation_result = validate_file_header(file)
+    #     if not validation_result["is_valid"]:
+    #         logger.warning(f"Server-side validation failed for upload job {job_id}", extra=validation_result)
+    #         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=validation_result["message"])
+    #     # Reset stream position again for saving
+    #     await file.seek(0)
+    # except Exception as e:
+    #      logger.error(f"Error during server-side pre-validation for job {job_id}", exc_info=True)
+    #      raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed during server-side file pre-check.")
+    # --- End Pre-validation Check ---
+
+
     saved_file_path = None
     try:
         logger.debug(f"Attempting to save uploaded file for job {job_id}")
-        saved_file_path = save_upload_file(file=file, job_id=job_id)
+        saved_file_path = save_upload_file(file=file, job_id=job_id) # file object might be used here
         logger.info(f"File saved successfully for job {job_id}", extra={"saved_path": saved_file_path})
     except IOError as e:
         logger.error(f"Failed to save uploaded file for job {job_id}", exc_info=True)
@@ -329,6 +447,9 @@ async def upload_vendor_file(
     except Exception as e:
         logger.error(f"Unexpected error during file upload/saving for job {job_id}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error processing upload: {e}")
+    # finally: # file is closed by save_upload_file now
+    #     if hasattr(file, 'close') and callable(file.close):
+    #         file.close()
 
     job = None
     try:
@@ -356,13 +477,10 @@ async def upload_vendor_file(
 
     try:
         logger.info(f"Adding Celery task 'process_vendor_file' to background tasks for job {job_id}")
-        # --- UPDATED: Pass target_level to Celery task ---
         background_tasks.add_task(process_vendor_file.delay, job_id=job_id, file_path=saved_file_path, target_level=target_level)
-        # --- END UPDATED ---
         logger.info(f"Celery task queued successfully for job {job_id}")
     except Exception as e:
         logger.error(f"Failed to queue Celery task for job {job_id}", exc_info=True)
-        # Use the job object we created earlier
         if job:
             job.fail(f"Failed to queue processing task: {str(e)}")
             db.commit()
@@ -371,7 +489,6 @@ async def upload_vendor_file(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to queue job for processing.")
 
     logger.info(f"Upload request for job {job_id} processed successfully, returning 202 Accepted.")
-    # Use model_validate for Pydantic v2
     return JobResponse.model_validate(job)
 # --- END UPLOAD ROUTE ---
 

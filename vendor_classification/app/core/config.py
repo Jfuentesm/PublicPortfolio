@@ -1,3 +1,5 @@
+
+
 # app/core/config.py
 import os
 import logging
@@ -15,13 +17,23 @@ logger.info("Initializing application settings")
 
 # --- Define Key Lists ---
 # It's better to load these from environment variables in production
-# Example ENV format: TAVILY_API_KEYS="key1,key2,key3"
+# Example ENV format: OPENROUTER_API_KEYS="key1,key2,key3"
 # For this exercise, we'll define them directly as defaults.
+
+# !!! IMPORTANT: YOU MUST REPLACE THESE PLACEHOLDER KEYS WITH YOUR ACTUAL, VALID KEYS !!!
+# !!! FAILURE TO DO SO WILL CAUSE API ERRORS (LIKE HTTPStatusError) !!!
+
+# --- BEGIN USER ACTION REQUIRED ---
+
+# Replace these placeholder keys with your actual, valid OpenRouter API keys
+# Obtain keys from https://openrouter.ai/keys
 DEFAULT_OPENROUTER_KEYS = [
-    "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",
-    "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"
+    "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",
+    "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"
 ]
 
+# Replace these placeholder keys with your actual, valid Tavily API keys
+# Obtain keys from https://app.tavily.com/home
 DEFAULT_TAVILY_KEYS = [
     "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",
     "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",
@@ -33,6 +45,9 @@ DEFAULT_TAVILY_KEYS = [
     "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"
 ]
 
+# --- END USER ACTION REQUIRED ---
+
+
 def _parse_comma_separated_list(env_var_name: str, default_list: List[str]) -> List[str]:
     """Parses a comma-separated string from env var or returns default."""
     value = os.getenv(env_var_name)
@@ -40,10 +55,18 @@ def _parse_comma_separated_list(env_var_name: str, default_list: List[str]) -> L
         keys = [k.strip() for k in value.split(',') if k.strip()]
         if keys:
             logger.info(f"Loaded {len(keys)} keys from environment variable {env_var_name}")
+            # Basic check to warn if default placeholders might still be in use via ENV VAR
+            if any("REPLACE_WITH_YOUR_VALID" in k for k in keys):
+                 logger.warning(f"Environment variable {env_var_name} seems to contain placeholder keys. Ensure actual keys are set.")
             return keys
         else:
             logger.warning(f"Environment variable {env_var_name} found but contained no valid keys after splitting. Using defaults.")
-    logger.info(f"Environment variable {env_var_name} not found or empty. Using {len(default_list)} default keys.")
+    # Check if default list contains placeholders before using it
+    if any("REPLACE_WITH_YOUR_VALID" in k for k in default_list):
+         # This is the critical error path if defaults are placeholders and ENV is not set
+         logger.error(f"CRITICAL: Environment variable {env_var_name} not found or empty, AND default keys are placeholders. API calls WILL fail. Please provide valid keys either via the environment variable or by editing the defaults in config.py.")
+    else:
+        logger.info(f"Environment variable {env_var_name} not found or empty. Using {len(default_list)} default keys.")
     return default_list
 
 
@@ -71,12 +94,14 @@ class Settings(BaseSettings):
     TAXONOMY_DATA_DIR: str = "/data/taxonomy"
 
     # --- UPDATED: Use lists for API Keys ---
+    # Load keys, potentially logging errors if defaults are placeholders
     OPENROUTER_API_KEYS: List[str] = _parse_comma_separated_list("OPENROUTER_API_KEYS", DEFAULT_OPENROUTER_KEYS)
     TAVILY_API_KEYS: List[str] = _parse_comma_separated_list("TAVILY_API_KEYS", DEFAULT_TAVILY_KEYS)
     # --- END UPDATED ---
 
     OPENROUTER_API_BASE: str = os.getenv("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
-    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat-v3-0324:free")
+    # Consider making the model configurable or checking its availability
+    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat-v3-0324:free") # Check if this model is still valid/available
 
     # Processing Configuration
     BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", 5))
@@ -96,11 +121,16 @@ class Settings(BaseSettings):
         logger.info(f"OPENROUTER_API_BASE present: {bool(self.OPENROUTER_API_BASE)}")
         logger.info(f"Number of Tavily API keys loaded: {len(self.TAVILY_API_KEYS)}")
 
-        if not self.OPENROUTER_API_KEYS:
-            logger.error("CRITICAL: No OpenRouter API keys loaded. LLM functionality will fail.")
-        if not self.TAVILY_API_KEYS:
-            logger.error("CRITICAL: No Tavily API keys loaded. Search functionality will fail.")
+        # Enhanced check for placeholder keys after initialization
+        # This provides a second layer of warning/error if the parsing function didn't catch it
+        # or if placeholders were somehow loaded via environment variables.
+        if not self.OPENROUTER_API_KEYS or any("REPLACE_WITH_YOUR_VALID" in k for k in self.OPENROUTER_API_KEYS):
+            logger.error("CRITICAL: No valid OpenRouter API keys loaded (either empty list or placeholders detected after initialization). LLM functionality WILL fail. Please provide valid keys via OPENROUTER_API_KEYS environment variable or update defaults in config.py.")
+        if not self.TAVILY_API_KEYS or any("REPLACE_WITH_YOUR_VALID" in k for k in self.TAVILY_API_KEYS):
+            logger.error("CRITICAL: No valid Tavily API keys loaded (either empty list or placeholders detected after initialization). Search functionality WILL fail. Please provide valid keys via TAVILY_API_KEYS environment variable or update defaults in config.py.")
 
 
 settings = Settings()
 logger.info("Application settings loaded successfully")
+
+# 

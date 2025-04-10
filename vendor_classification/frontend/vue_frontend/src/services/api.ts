@@ -1,3 +1,4 @@
+
 // <file path='frontend/vue_frontend/src/services/api.ts'>
 import axios, {
     type AxiosInstance,
@@ -48,15 +49,15 @@ interface AuthResponse {
     user: UserResponse; // Include the user details
 }
 
-// --- REMOVED UploadResponse - Use JobResponse instead ---
-// interface UploadResponse {
-//     job_id: string;
-//     status: string;
-//     message: string;
-//     created_at: string;
-//     progress: number;
-//     current_stage: string;
-// }
+// --- ADDED: File Validation Response Interface ---
+// Matches backend api/main.py -> FileValidationResponse
+export interface FileValidationResponse {
+    is_valid: boolean;
+    message: string;
+    detected_columns: string[];
+    missing_mandatory_columns: string[];
+}
+// --- END ADDED ---
 
 // Matches backend response for /api/v1/jobs/{job_id}/notify
 interface NotifyResponse {
@@ -82,7 +83,6 @@ export interface JobResponse {
     target_level: number; // Ensure target_level is included here
 }
 
-// --- UPDATED JobStatsData Interface ---
 // Matches backend models/classification.py -> ProcessingStats and console log
 export interface JobStatsData {
     job_id: string;
@@ -109,7 +109,6 @@ export interface JobStatsData {
         cost_estimate_usd: number | null;
     } | null; // Allow api_usage itself to be null if not populated
 }
-// --- END UPDATED JobStatsData Interface ---
 
 
 // Structure for download result helper
@@ -175,7 +174,7 @@ axiosInstance.interceptors.response.use(
 
             // Handle 401 Unauthorized (except for login attempts)
             // Login uses base axios, so this interceptor won't catch its 401
-            if (status === 401) {
+            if (status === 401 && error.config?.url !== '/token') { // Check it's not the login endpoint itself
                 console.warn('[api.ts Response Interceptor] Received 401 Unauthorized. Logging out.');
                 authStore.logout(); // Trigger logout action
                 // No reload here, let the component handle redirection or UI change
@@ -186,21 +185,25 @@ axiosInstance.interceptors.response.use(
             let detailMessage = 'An error occurred.';
             const responseData = data as any;
 
-            if (responseData?.detail) {
-                    if (Array.isArray(responseData.detail)) {
-                        detailMessage = `Validation Error: ${responseData.detail.map((err: any) => `${err.loc?.join('.') ?? 'field'}: ${err.msg}`).join('; ')}`;
-                    } else if (typeof responseData.detail === 'string') {
-                        detailMessage = responseData.detail;
-                    } else {
-                        try { detailMessage = JSON.stringify(responseData.detail); } catch { /* ignore */ }
-                    }
-            } else if (typeof data === 'string' && data.length > 0 && data.length < 300) {
+            // Handle FastAPI validation errors (detail is an array)
+            if (responseData?.detail && Array.isArray(responseData.detail)) {
+                 detailMessage = `Validation Error: ${responseData.detail.map((err: any) => `${err.loc?.join('.') ?? 'field'}: ${err.msg}`).join('; ')}`;
+            }
+            // Handle other FastAPI errors (detail is a string) or custom errors
+            else if (responseData?.detail && typeof responseData.detail === 'string') {
+                detailMessage = responseData.detail;
+            }
+            // Handle cases where the error might be directly in the data object (less common)
+            else if (typeof data === 'string' && data.length > 0 && data.length < 300) {
                 detailMessage = data;
-            } else if (error.message) {
+            }
+            // Fallback to Axios error message
+            else if (error.message) {
                 detailMessage = error.message;
             }
 
-            const errorMessage = `Error ${status}: ${detailMessage}`;
+            // Prepend status code for clarity, unless it's a 422 validation error where the message is usually sufficient
+            const errorMessage = status === 422 ? detailMessage : `Error ${status}: ${detailMessage}`;
             console.error(`[api.ts Response Interceptor] Rejecting with error: ${errorMessage}`); // LOGGING
             return Promise.reject(new Error(errorMessage));
 
@@ -235,7 +238,21 @@ const apiService = {
     },
 
     /**
-        * Uploads the vendor file.
+        * Validates the header of an uploaded file.
+        */
+    async validateUpload(formData: FormData): Promise<FileValidationResponse> {
+        console.log('[api.ts validateUpload] Attempting file header validation...'); // LOGGING
+        // Uses axiosInstance, includes auth token
+        const response = await axiosInstance.post<FileValidationResponse>('/validate-upload', formData, {
+             headers: { 'Content-Type': undefined } // Let browser set Content-Type for FormData
+        });
+        console.log(`[api.ts validateUpload] Validation response received: isValid=${response.data.is_valid}`); // LOGGING
+        return response.data;
+    },
+
+
+    /**
+        * Uploads the vendor file (after validation).
         * Returns the full JobResponse object.
         */
     async uploadFile(formData: FormData): Promise<JobResponse> { // Return JobResponse
@@ -307,7 +324,7 @@ const apiService = {
         */
     async getJobs(params: GetJobsParams = {}): Promise<JobResponse[]> {
         const cleanedParams = Object.fromEntries(
-            Object.entries(params).filter(([, value]) => value !== undefined && value !== null)
+            Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
         );
         console.log('[api.ts getJobs] Fetching job list with params:', cleanedParams); // LOGGING
         const response = await axiosInstance.get<JobResponse[]>('/jobs/', { params: cleanedParams });
