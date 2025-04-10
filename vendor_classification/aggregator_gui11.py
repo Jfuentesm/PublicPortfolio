@@ -428,6 +428,33 @@ class ScriptAggregatorApp(QWidget):
         """Counts file items using the item_path_map."""
         return len(self.item_path_map)
 
+    def _clean_llm_content(self, raw_content):
+        """
+        Removes common leading/trailing markdown code fences (```)
+        and surrounding whitespace from content extracted from LLM responses.
+        Handles optional language identifiers on the opening fence.
+        """
+        # First, strip leading/trailing whitespace from the whole block
+        content = raw_content.strip()
+
+        # Check for the most common fence pattern (```)
+        if content.startswith("```") and content.endswith("```"):
+            lines = content.splitlines()
+            # Check if there's more than just the fences themselves
+            if len(lines) > 1:
+                # Remove the first line (opening fence + optional lang identifier)
+                # Remove the last line (closing fence)
+                cleaned_lines = lines[1:-1]
+                # Join the remaining lines and strip any potential whitespace
+                # introduced by the split/join or originally present
+                return "\n".join(cleaned_lines).strip()
+            else:
+                # Only fences found, return empty string
+                return ""
+        # If fences aren't found (or pattern doesn't match exactly),
+        # return the initially stripped content
+        return content
+
     @Slot()
     def select_all(self):
         """Checks all file items (leaves) in the tree view."""
@@ -690,7 +717,7 @@ class ScriptAggregatorApp(QWidget):
 
     @Slot()
     def apply_llm_changes(self):
-        """Parses LLM response, creates backups, applies changes, and enables Undo."""
+        """Parses LLM response, cleans content, creates backups, applies changes, and enables Undo."""
         llm_response = self.llm_response_input.toPlainText().strip()
         if not llm_response:
             QMessageBox.warning(self, "Input Missing", "Please paste the LLM response into the 'Step 2' input box.")
@@ -708,7 +735,6 @@ class ScriptAggregatorApp(QWidget):
             # Use the pre-compiled regex to find all file blocks
             file_blocks = FILE_BLOCK_REGEX.findall(llm_response)
         except Exception as e:
-            # Regex errors are unlikely but possible with complex patterns
             self.status_label.setText("Error parsing LLM response.")
             QMessageBox.critical(self, "Parsing Error", f"Could not parse response using regex.\nError: {e}")
             return
@@ -725,7 +751,8 @@ class ScriptAggregatorApp(QWidget):
         skipped_files = []
         project_root_resolved = self.script_dir.resolve()
 
-        for path_str, content in file_blocks:
+        # --- Validation Loop ---
+        for path_str, raw_content in file_blocks: # Renamed content -> raw_content
             # Normalize path extracted from regex group 1
             relative_path_str = path_str.strip().replace("\\", "/").strip('/')
             if not relative_path_str:
@@ -737,36 +764,28 @@ class ScriptAggregatorApp(QWidget):
                 abs_path = (project_root_resolved / relative_path_str).resolve()
 
                 # --- Security/Validation Checks ---
-                # 1. Ensure path stays within the project directory
                 if not abs_path.is_relative_to(project_root_resolved):
                     skipped_files.append(f"{relative_path_str} (Path is outside project directory)")
                     print(f"Security Warning: Skipping path outside project root: {abs_path}")
                     continue
-
-                # 2. Check if parent directory exists and is actually a directory
                 parent_dir = abs_path.parent
-                # Allow creation of parent dirs later, but check if *existing* parent is a file
                 if parent_dir.exists() and not parent_dir.is_dir():
                      skipped_files.append(f"{relative_path_str} (Parent path exists but is a file)")
                      print(f"Error: Cannot write file {relative_path_str}, parent path {parent_dir} is a file.")
                      continue
-
-                # 3. Check if the target path itself is an existing directory
                 if abs_path.is_dir():
                     skipped_files.append(f"{relative_path_str} (Path points to an existing directory)")
                     print(f"Error: Cannot overwrite directory with file: {relative_path_str}")
                     continue
 
-                # If all checks pass, add to list for confirmation
-                # Content comes directly from regex group 2
+                # --- Store raw content for now, clean just before writing ---
                 valid_changes_to_confirm.append({
                     "abs_path": abs_path,
-                    "content": content, # Use content directly as captured by regex
+                    "raw_content": raw_content, # Store the raw content
                     "rel_path_str": relative_path_str
                 })
 
             except Exception as e:
-                # Catch potential errors during path resolution or checks
                 skipped_files.append(f"{relative_path_str} (Validation Error: {e})")
                 print(f"Error validating path {relative_path_str}: {e}")
                 continue
@@ -779,8 +798,9 @@ class ScriptAggregatorApp(QWidget):
             QMessageBox.warning(self, "No Valid Changes", msg)
             return
 
-        # --- Confirmation Dialog ---
+        # --- Confirmation Dialog (remains the same) ---
         confirmation_message = f"Found {len(valid_changes_to_confirm)} valid file change(s) to apply:\n\n"
+        # ... (rest of confirmation dialog logic is unchanged) ...
         for change in valid_changes_to_confirm:
             rel_path_display = change['rel_path_str']
             status = " (Will be created)" if not change['abs_path'].exists() else " (Will be overwritten)"
@@ -789,7 +809,6 @@ class ScriptAggregatorApp(QWidget):
         confirmation_message += "\nBackups will be created in a temporary directory for overwritten files.\n\nProceed with applying these changes?"
 
         if skipped_files:
-             # Show skipped files in a scrollable text box within the message box if there are many
              if len(skipped_files) > 5:
                   detailed_skipped = "\n\nSkipped paths:\n" + "\n".join(f"- {s}" for s in skipped_files)
                   msg_box = QMessageBox(self)
@@ -810,20 +829,18 @@ class ScriptAggregatorApp(QWidget):
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                      QMessageBox.StandardButton.No)
 
-
-        if reply != QMessageBox.StandardButton.Yes: # Check for explicit Yes
+        if reply != QMessageBox.StandardButton.Yes:
             self.status_label.setText("Changes cancelled by user.")
             return
 
-        # --- Create Backup Directory ---
+        # --- Create Backup Directory (remains the same) ---
         try:
-            # Create a unique temporary directory for this operation's backups
             self.temp_backup_dir = Path(tempfile.mkdtemp(prefix="script_aggregator_undo_"))
             print(f"Created temporary backup directory: {self.temp_backup_dir}")
         except Exception as e:
             self.status_label.setText("Error creating backup directory.")
             QMessageBox.critical(self, "Backup Error", f"Could not create temporary backup directory.\nError: {e}")
-            self.temp_backup_dir = None # Ensure it's None if creation failed
+            self.temp_backup_dir = None
             return
 
         # --- Apply Changes & Create Backups ---
@@ -834,42 +851,40 @@ class ScriptAggregatorApp(QWidget):
         failed_files = []
         self.last_applied_changes = [] # Reset just before applying
 
+        # --- Apply Loop ---
         for change in valid_changes_to_confirm:
             abs_path = change["abs_path"]
-            content = change["content"] # Use the raw captured content
+            raw_content = change["raw_content"] # Get the raw content
             rel_path_str = change["rel_path_str"]
             backup_path = None
             was_created = False
 
             try:
-                # --- Backup Logic ---
+                # --- Backup Logic (remains the same) ---
                 if abs_path.exists():
-                    # File exists, create backup before overwriting
-                    # Sanitize rel_path_str for use in filename (replace slashes)
                     safe_filename_part = rel_path_str.replace('/', '_').replace('\\', '_')
                     backup_filename = f"{safe_filename_part}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.bak"
                     backup_path = self.temp_backup_dir / backup_filename
-                    shutil.copy2(abs_path, backup_path) # copy2 preserves metadata
+                    shutil.copy2(abs_path, backup_path)
                     print(f"Backed up '{rel_path_str}' to '{backup_path.name}' in temp dir")
                     was_created = False
                 else:
-                    # File doesn't exist, will be created
                     was_created = True
-                    backup_path = None # No backup needed for created files
+                    backup_path = None
 
-                # --- Write File ---
-                # Ensure parent directory exists before writing
+                # --- Clean the Content ---
+                cleaned_content = self._clean_llm_content(raw_content) # Call the cleaner
+
+                # --- Write Cleaned File ---
                 abs_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(abs_path, 'w', encoding='utf-8') as f:
-                    # Write the content exactly as captured by the regex
-                    # This includes any leading/trailing whitespace or code fences (```)
-                    # that were between the <file> tags in the LLM response.
-                    f.write(content)
+                    # Write the CLEANED content
+                    f.write(cleaned_content)
 
-                # --- Record Change for Undo ---
+                # --- Record Change for Undo (remains the same) ---
                 self.last_applied_changes.append({
                     "original_path": abs_path,
-                    "backup_path": backup_path, # Will be None if created
+                    "backup_path": backup_path,
                     "was_created": was_created
                 })
                 success_count += 1
@@ -879,42 +894,35 @@ class ScriptAggregatorApp(QWidget):
             except (IOError, OSError, shutil.Error) as e:
                 failed_files.append(f"{rel_path_str} (Write/Backup Error: {e})")
                 print(f"Error processing file {rel_path_str}: {e}")
-                # Attempt to rollback this specific file if backup exists? (Could get complex, skip for now)
             except Exception as e:
-                # Catch any other unexpected errors during file processing
                 failed_files.append(f"{rel_path_str} (Unexpected Error: {e})")
                 print(f"Unexpected error processing file {rel_path_str}: {e}")
 
-        # --- Final Report ---
+        # --- Final Report (remains the same) ---
         final_message = f"Apply complete. {success_count} file(s) updated/created."
+        # ... (rest of final report logic is unchanged) ...
         if failed_files:
             final_message += f"\nFailed to apply changes to {len(failed_files)} file(s):\n- " + "\n- ".join(failed_files)
             QMessageBox.warning(self, "Apply Partially Failed", final_message)
-        elif success_count > 0: # Only show success message if something actually happened
+        elif success_count > 0:
              QMessageBox.information(self, "Apply Successful", final_message + "\nUndo is now available.")
-        elif not failed_files and success_count == 0: # Should not happen if confirmation passed, but handle defensively
+        elif not failed_files and success_count == 0:
              final_message = "No changes were applied (though some were expected)."
              QMessageBox.information(self, "No Changes Applied", final_message)
 
-
         if skipped_files and success_count == 0 and not failed_files:
-             # If only skipped files occurred, mention that specifically
              final_message = f"No changes applied. {len(skipped_files)} path(s) were skipped during validation."
         elif skipped_files:
-             # Append skipped info if other actions occurred
              final_message += f"\n({len(skipped_files)} initial path(s) skipped during validation)"
 
         self.status_label.setText(final_message)
 
-        # --- Enable Undo Button if successful changes were made and recorded ---
-        if self.last_applied_changes: # Check if any changes were successfully recorded for undo
+        # --- Enable Undo Button (remains the same) ---
+        if self.last_applied_changes:
             self.undo_button.setEnabled(True)
         else:
-            # If all failed or were skipped, cleanup the (likely empty) backup dir
              self._cleanup_backup_dir()
              self.undo_button.setEnabled(False)
-
-
     # --- NEW SLOT ---
     @Slot()
     def undo_last_apply(self):
