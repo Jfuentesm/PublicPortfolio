@@ -1,4 +1,3 @@
-
 # app/services/search_service.py
 
 import httpx
@@ -18,8 +17,8 @@ llm_trace_logger = logging.getLogger("llm_api_trace")
 logger = get_logger("vendor_classification.search_service")
 
 # --- Status codes that trigger key rotation ---
-# UPDATED: Added 400 (Bad Request) to the set
-TAVILY_ROTATION_STATUS_CODES = {400, 401, 403, 429, 500, 502, 503, 504}
+# UPDATED: Added 432 (Tavily specific usage limit code) to the set
+TAVILY_ROTATION_STATUS_CODES = {400, 401, 403, 429, 432, 500, 502, 503, 504}
 
 class SearchService:
     """Service for interacting with Tavily Search API, with key rotation."""
@@ -39,14 +38,17 @@ class SearchService:
         logger.debug("Search service initialized",
                    extra={"api_endpoint": self.base_url,
                           "key_count": len(self.api_keys),
-                          "rotation_codes": list(TAVILY_ROTATION_STATUS_CODES)}) # Log rotation codes
+                          "rotation_codes": sorted(list(TAVILY_ROTATION_STATUS_CODES))}) # Log rotation codes sorted
 
     def _get_current_key(self) -> Optional[str]:
         """Gets the current API key based on the index."""
         if not self.api_keys:
+            logger.warning("Attempted to get Tavily key, but key list is empty.")
             return None
         # Ensure index is always valid, even if list shrinks dynamically (though unlikely here)
-        self.current_key_index = self.current_key_index % len(self.api_keys)
+        if self.current_key_index >= len(self.api_keys):
+            logger.warning(f"Tavily key index {self.current_key_index} out of bounds ({len(self.api_keys)} keys). Resetting to 0.")
+            self.current_key_index = 0
         return self.api_keys[self.current_key_index]
 
     def _rotate_key(self):
@@ -162,7 +164,7 @@ class SearchService:
 
              # --- Key Rotation Logic ---
              if status_code in TAVILY_ROTATION_STATUS_CODES:
-                 self._rotate_key()
+                 self._rotate_key() # Rotate if the status code matches
              else:
                  logger.warning(f"HTTP Status Code {status_code} not in TAVILY_ROTATION_STATUS_CODES. Key will not be rotated for this error.", extra={"vendor": vendor_name})
              # --- END Key Rotation Logic ---
@@ -196,3 +198,5 @@ class SearchService:
             # Optionally rotate on unexpected errors? Could hide other issues.
             # self._rotate_key()
             raise # Re-raise for tenacity
+
+
