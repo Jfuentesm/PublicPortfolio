@@ -7,26 +7,66 @@ import uuid
 from core.database import get_db
 from schemas.user import UserCreate, UserUpdate, UserResponse
 from services import user_service
-from api.auth import get_current_active_user, get_current_active_superuser
+# --- MODIFIED: Import only necessary auth dependencies ---
+from api.auth import get_current_active_user, get_current_active_superuser # Keep these for protected routes
+# --- END MODIFIED ---
 from models.user import User as UserModel # Import the model for type hinting
-# --- MODIFIED IMPORT: Import set_log_context from core.log_context ---
 from core.logging_config import get_logger
 from core.log_context import set_log_context
-# --- END MODIFIED IMPORT ---
 
 logger = get_logger("vendor_classification.api.users")
 
 router = APIRouter()
 
+# --- NEW: Public User Registration Endpoint ---
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def register_user(
+    *,
+    db: Session = Depends(get_db),
+    user_in: UserCreate,
+    # NO AUTH DEPENDENCY HERE - This is public
+):
+    """
+    Public endpoint to create a new user (register).
+    """
+    logger.info(f"Public registration attempt for username '{user_in.username}'")
+    # Check if username or email already exists (service layer handles this via HTTPException)
+    existing_user_by_username = user_service.get_user_by_username(db, username=user_in.username)
+    if existing_user_by_username:
+        logger.warning(f"Registration failed: Username '{user_in.username}' already taken.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered",
+        )
+    existing_user_by_email = user_service.get_user_by_email(db, email=user_in.email)
+    if existing_user_by_email:
+        logger.warning(f"Registration failed: Email '{user_in.email}' already registered.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
+        )
+
+    # Set default is_active=True, is_superuser=False for public registration
+    user_in.is_active = True
+    user_in.is_superuser = False
+
+    # Service layer handles password hashing and potential integrity errors
+    user = user_service.create_user(db=db, user_in=user_in)
+    logger.info(f"User '{user.username}' registered successfully (Public).")
+    # TODO: Consider sending a verification email here in a real application
+    return user
+# --- END NEW Endpoint ---
+
+
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def create_user(
+def create_user_admin( # Renamed function slightly for clarity
     *,
     db: Session = Depends(get_db),
     user_in: UserCreate,
     current_user: UserModel = Depends(get_current_active_superuser) # Require admin
 ):
     """
-    Create new user. Requires superuser privileges.
+    Create new user. Requires superuser privileges. (Admin Endpoint)
     """
     set_log_context({"admin_user": current_user.username})
     logger.info(f"Admin '{current_user.username}' attempting to create user '{user_in.username}'")

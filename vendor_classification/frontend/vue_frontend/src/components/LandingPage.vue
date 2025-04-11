@@ -203,19 +203,25 @@
         </section>
 
 
-        <!-- Login / Forgot Password Card Section -->
+        <!-- Login / Forgot Password / Register Card Section -->
         <section id="loginCardAnchor" class="py-16">
             <div class="max-w-lg mx-auto px-4">
-                <!-- Conditionally render Login or ForgotPassword -->
+                <!-- Conditionally render Login, ForgotPassword, or Register -->
                 <Login
-                v-if="!showForgotPassword"
-                @login-successful="handleLogin"
-                @show-forgot-password="showForgotPasswordForm"
+                    v-if="!showForgotPassword && !showRegisterForm"
+                    @login-successful="handleLogin"
+                    @show-forgot-password="showForgotPasswordFormFunc"
+                    @show-register="showRegisterFormFunc"
                 />
                 <ForgotPassword
-                v-else
-                @close="hideForgotPasswordForm"
-                @show-login="hideForgotPasswordForm"
+                    v-else-if="showForgotPassword"
+                    @close="hideForgotPasswordFormFunc"
+                    @show-login="hideForgotPasswordFormFunc"
+                />
+                 <Register
+                    v-else-if="showRegisterForm"
+                    @registration-successful="handleRegistrationSuccess"
+                    @show-login="hideRegisterFormFunc"
                 />
             </div>
         </section>
@@ -225,7 +231,8 @@
     <script setup lang="ts">
     import { ref } from 'vue';
     import Login from './Login.vue';
-    import ForgotPassword from './ForgotPassword.vue'; // Import ForgotPassword
+    import ForgotPassword from './ForgotPassword.vue';
+    import Register from './Register.vue'; // Import Register component
     // Import necessary icons from Heroicons (ensure @heroicons/vue is installed)
     import {
         CheckCircleIcon,
@@ -240,20 +247,40 @@
 
     const emit = defineEmits(['login-successful']);
 
-    // --- State for showing Login vs Forgot Password ---
+    // --- State for showing Login vs Forgot Password vs Register ---
     const showForgotPassword = ref(false);
+    const showRegisterForm = ref(false); // Added state for registration form
 
-    const showForgotPasswordForm = () => {
-    showForgotPassword.value = true;
+    const showForgotPasswordFormFunc = () => {
+        showRegisterForm.value = false; // Ensure register form is hidden
+        showForgotPassword.value = true;
     };
 
-    const hideForgotPasswordForm = () => {
-    showForgotPassword.value = false;
+    const hideForgotPasswordFormFunc = () => {
+        showForgotPassword.value = false;
+    };
+
+    const showRegisterFormFunc = () => {
+        showForgotPassword.value = false; // Ensure forgot password form is hidden
+        showRegisterForm.value = true;
+    };
+
+    const hideRegisterFormFunc = () => {
+        showRegisterForm.value = false;
+    };
+
+    const handleRegistrationSuccess = () => {
+        // After successful registration, switch back to the login form
+        // You might want to show a success message here or rely on the Register component's message
+        console.log("LandingPage: Registration successful, showing login form.");
+        hideRegisterFormFunc();
+        // Optionally scroll back to the login card
+        smoothScrollTo('loginCardAnchor');
     };
     // --- End State ---
 
     const handleLogin = () => {
-    emit('login-successful');
+        emit('login-successful');
     };
 
     // Helper for scrolling smoothly to sections
@@ -270,8 +297,9 @@
     const scrollToLogin = (event: Event) => {
         event.preventDefault();
         smoothScrollTo('loginCardAnchor');
-        // Ensure login form is shown if user clicks "Get Started" while forgot password form is open
-        hideForgotPasswordForm();
+        // Ensure login form is shown if user clicks "Get Started"
+        hideForgotPasswordFormFunc();
+        hideRegisterFormFunc();
     }
 
     // Optional: Scroll to features

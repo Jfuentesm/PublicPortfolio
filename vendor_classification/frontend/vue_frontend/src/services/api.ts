@@ -149,7 +149,9 @@ axiosInstance.interceptors.request.use(
         const authStore = useAuthStore();
         const token = authStore.getToken();
         // Define URLs that should NOT receive the auth token
-        const noAuthUrls = ['/auth/password-recovery', '/auth/reset-password']; // Use the correct paths
+        // --- UPDATED: Added /users/register ---
+        const noAuthUrls = ['/auth/password-recovery', '/auth/reset-password', '/users/register'];
+        // --- END UPDATED ---
 
         // Check if the request URL matches any of the no-auth URLs
         const requiresAuth = token && config.url && !noAuthUrls.some(url => config.url?.startsWith(url));
@@ -185,9 +187,13 @@ axiosInstance.interceptors.response.use(
 
             // Handle 401 Unauthorized (except for login attempts and password reset)
             const isLoginAttempt = error.config?.url === '/token'; // Base URL for login
-            const isPasswordReset = error.config?.url?.startsWith('/auth/password-recovery') || error.config?.url?.startsWith('/auth/reset-password');
+            // --- UPDATED: Check register url ---
+            const isPublicAuthOperation = error.config?.url?.startsWith('/auth/') || error.config?.url?.startsWith('/users/register');
+            // --- END UPDATED ---
 
-            if (status === 401 && !isLoginAttempt && !isPasswordReset) {
+            // --- UPDATED: Check isPublicAuthOperation ---
+            if (status === 401 && !isLoginAttempt && !isPublicAuthOperation) {
+            // --- END UPDATED ---
                 console.warn('[api.ts Response Interceptor] Received 401 Unauthorized on protected route. Logging out.');
                 authStore.logout(); // Trigger logout action
                 // No reload here, let the component handle redirection or UI change
@@ -383,9 +389,9 @@ const apiService = {
         * Creates a new user (admin only).
         */
     async createUser(userData: UserCreateData): Promise<UserResponse> {
-        console.log(`[api.ts createUser] Attempting to create user: ${userData.username}`); // LOGGING
+        console.log(`[api.ts createUser] Attempting to create user (admin): ${userData.username}`); // LOGGING
         const response = await axiosInstance.post<UserResponse>('/users/', userData);
-        console.log(`[api.ts createUser] User created successfully: ${response.data.username}`); // LOGGING
+        console.log(`[api.ts createUser] User created successfully (admin): ${response.data.username}`); // LOGGING
         return response.data;
     },
 
@@ -409,6 +415,20 @@ const apiService = {
         return response.data;
     },
     // --- END User Management API Methods ---
+
+    // --- ADDED: Public Registration API Method ---
+    /**
+     * Registers a new user publicly.
+     */
+    async registerUser(userData: UserCreateData): Promise<UserResponse> {
+        console.log(`[api.ts registerUser] Attempting public registration for user: ${userData.username}`);
+        // Uses axiosInstance, interceptor skips auth token for this URL
+        const response = await axiosInstance.post<UserResponse>('/users/register', userData);
+        console.log(`[api.ts registerUser] Public registration successful: ${response.data.username}`);
+        return response.data;
+    },
+    // --- END Public Registration API Method ---
+
 
     // --- ADDED: Password Reset API Methods ---
     /**

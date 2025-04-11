@@ -53,6 +53,22 @@
          <!-- Tailwind Alert -->
         <div v-if="errorMessage" class="mt-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-md text-center text-sm">{{ errorMessage }}</div>
       </form>
+
+       <!-- ADDED: Register Link -->
+       <div class="mt-4 text-center">
+        <p class="text-sm text-gray-600">
+          Don't have an account?
+          <button
+            @click="$emit('show-register')"
+            class="font-medium text-primary hover:text-primary-hover focus:outline-none"
+            :disabled="isLoading"
+          >
+            Create one now
+          </button>
+        </p>
+      </div>
+      <!-- END ADDED: Register Link -->
+
     </div>
   </div>
 </template>
@@ -68,7 +84,7 @@
 
    const authStore = useAuthStore();
    // Define emits including the new one
-   const emit = defineEmits(['login-successful', 'show-forgot-password']);
+   const emit = defineEmits(['login-successful', 'show-forgot-password', 'show-register']); // Added 'show-register'
 
    const handleLogin = async () => {
      isLoading.value = true;
