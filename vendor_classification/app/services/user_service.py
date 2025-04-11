@@ -1,9 +1,11 @@
+# <file path='app/services/user_service.py'>
 # app/services/user_service.py
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 from typing import List, Optional
 import uuid
+from datetime import datetime, timezone # Added timezone
 
 from models.user import User
 from schemas.user import UserCreate, UserUpdate
@@ -102,13 +104,18 @@ def update_user(db: Session, user_id: str, user_in: UserUpdate) -> Optional[User
     # update_data = user_in.dict(exclude_unset=True) # Pydantic v1
 
     if "password" in update_data and update_data["password"]:
-        logger.info(f"Updating password for user", extra={"user_id": user_id})
+        logger.info(f"Updating password for user via standard update endpoint", extra={"user_id": user_id})
         hashed_password = get_password_hash(update_data["password"])
         db_user.hashed_password = hashed_password
         del update_data["password"] # Remove plain password from update dict
+        # Consider adding a timestamp for when the password was last changed via this method
+        # db_user.password_last_changed_at = datetime.now(timezone.utc)
 
     for field, value in update_data.items():
         setattr(db_user, field, value)
+
+    # Ensure updated_at is set
+    db_user.updated_at = datetime.now(timezone.utc)
 
     try:
         db.commit()
@@ -129,6 +136,38 @@ def update_user(db: Session, user_id: str, user_in: UserUpdate) -> Optional[User
         db.rollback()
         logger.error(f"Unexpected error updating user", exc_info=True, extra={"user_id": user_id})
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not update user.")
+
+# --- ADDED: Password Reset Function ---
+def reset_password(db: Session, user_id: str, new_password: str) -> bool:
+    """
+    Updates a user's password after successful reset token verification.
+    Returns True if successful, False otherwise.
+    """
+    logger.info("Attempting to reset password for user", extra={"user_id": user_id})
+    db_user = get_user(db, user_id)
+    if not db_user:
+        logger.warning("User not found for password reset", extra={"user_id": user_id})
+        return False
+
+    try:
+        hashed_password = get_password_hash(new_password)
+        db_user.hashed_password = hashed_password
+        db_user.updated_at = datetime.now(timezone.utc) # Update timestamp
+        # Optional: Clear any password reset token fields if they exist on the model
+        # if hasattr(db_user, 'password_reset_token'):
+        #     db_user.password_reset_token = None
+        # if hasattr(db_user, 'password_reset_token_expires'):
+        #      db_user.password_reset_token_expires = None
+
+        db.commit()
+        logger.info("Password reset successful in database", extra={"user_id": user_id})
+        return True
+    except Exception as e:
+        db.rollback()
+        logger.error("Error updating password in database during reset", exc_info=True, extra={"user_id": user_id})
+        # Raise a specific exception or return False depending on desired handling in the endpoint
+        # raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not update password.")
+        return False
 
 
 def delete_user(db: Session, user_id: str) -> bool:
@@ -153,3 +192,5 @@ def delete_user(db: Session, user_id: str) -> bool:
         db.rollback()
         logger.error(f"Error deleting user", exc_info=True, extra={"user_id": user_id})
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not delete user.")
+
+#</file>

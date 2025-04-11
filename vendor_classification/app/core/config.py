@@ -1,3 +1,4 @@
+# <file path='app/core/config.py'>
 
 
 # app/core/config.py
@@ -76,11 +77,14 @@ class Settings(BaseSettings):
     # API Configuration
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "NAICS Vendor Classification"
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:8080") # Added for password reset links
 
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "supersecretkey")  # Change in production
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # --- ADDED: Password Reset Token Expiry ---
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES", 15)) # e.g., 15 minutes
 
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/vendor_classification")
@@ -108,6 +112,15 @@ class Settings(BaseSettings):
     MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", 3))
     RETRY_DELAY: int = int(os.getenv("RETRY_DELAY", 1))  # seconds
 
+    # --- ADDED: Email Configuration (Optional) ---
+    # Set these in your .env file for actual email sending
+    SMTP_HOST: Optional[str] = os.getenv("SMTP_HOST", None)
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", 587))
+    SMTP_USER: Optional[str] = os.getenv("SMTP_USER", None)
+    SMTP_PASSWORD: Optional[str] = os.getenv("SMTP_PASSWORD", None)
+    SMTP_TLS: bool = os.getenv("SMTP_TLS", "true").lower() == "true"
+    EMAIL_FROM: Optional[str] = os.getenv("EMAIL_FROM", None) # Sender email
+
     class Config:
         env_file = ".env"
         case_sensitive = True
@@ -120,6 +133,10 @@ class Settings(BaseSettings):
         logger.info(f"Number of OpenRouter API keys loaded: {len(self.OPENROUTER_API_KEYS)}")
         logger.info(f"OPENROUTER_API_BASE present: {bool(self.OPENROUTER_API_BASE)}")
         logger.info(f"Number of Tavily API keys loaded: {len(self.TAVILY_API_KEYS)}")
+        logger.info(f"Password reset token expiry: {self.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES} minutes")
+        logger.info(f"Frontend URL for links: {self.FRONTEND_URL}")
+        logger.info(f"SMTP Configured: Host={self.SMTP_HOST is not None}, User={self.SMTP_USER is not None}, From={self.EMAIL_FROM is not None}")
+
 
         # Enhanced check for placeholder keys after initialization
         # This provides a second layer of warning/error if the parsing function didn't catch it
@@ -133,4 +150,4 @@ class Settings(BaseSettings):
 settings = Settings()
 logger.info("Application settings loaded successfully")
 
-# 
+# </file>

@@ -1,11 +1,12 @@
+# <file path='app/api/auth.py'>
 
 # app/api/auth.py
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone # Added timezone
+from typing import Optional, Dict, Any # Added Dict, Any
 import uuid
 
 from core.config import settings
@@ -23,6 +24,10 @@ logger = get_logger("vendor_classification.auth")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# --- Constants ---
+PASSWORD_RESET_TOKEN_TYPE = "password_reset"
+ACCESS_TOKEN_TYPE = "access"
 
 @log_function_call(logger, include_args=False) # Don't log passwords
 def verify_password(plain_password, hashed_password):
@@ -70,25 +75,135 @@ def authenticate_user(db, username: str, password: str):
         logger.error(f"Authentication error", exc_info=True, extra={"username": username})
         return None
 
+# --- UPDATED: Generic Token Creation ---
 @log_function_call(logger)
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token."""
+def _create_jwt_token(
+    subject: str,
+    expires_delta: timedelta,
+    token_type: str,
+    additional_claims: Optional[Dict[str, Any]] = None
+) -> str:
+    """Internal function to create a JWT token with specific type and claims."""
     try:
-        with LogTimer(logger, "JWT token creation", include_in_stats=True):
-            subject = data.get("sub")
-            logger.debug("Creating access token", extra={"subject": subject})
-            to_encode = data.copy()
-            if expires_delta:
-                expire = datetime.utcnow() + expires_delta
-            else:
-                expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-            to_encode.update({"exp": expire})
+        with LogTimer(logger, f"{token_type} token creation", include_in_stats=True):
+            logger.debug(f"Creating {token_type} token", extra={"subject": subject, "expires_in_seconds": expires_delta.total_seconds()})
+            expire = datetime.now(timezone.utc) + expires_delta
+            to_encode: Dict[str, Any] = {
+                "sub": str(subject), # Ensure subject is string (e.g., user ID)
+                "exp": expire,
+                "iat": datetime.now(timezone.utc),
+                "type": token_type, # Add token type claim
+                "jti": str(uuid.uuid4()) # Add unique token identifier
+            }
+            if additional_claims:
+                to_encode.update(additional_claims)
+
             encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-            logger.debug(f"Access token created", extra={"subject": subject, "expires_at": expire.isoformat()})
+            logger.debug(f"{token_type} token created successfully", extra={"subject": subject, "expires_at": expire.isoformat(), "jti": to_encode["jti"]})
             return encoded_jwt
     except Exception as e:
-        logger.error(f"Token creation error", exc_info=True)
-        raise
+        logger.error(f"{token_type} token creation error", exc_info=True, extra={"subject": subject})
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Could not create {token_type} token")
+
+# --- Access Token Creation (uses generic function) ---
+@log_function_call(logger)
+def create_access_token(subject: str) -> str:
+    """Creates a standard JWT access token."""
+    expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    return _create_jwt_token(
+        subject=subject,
+        expires_delta=expires_delta,
+        token_type=ACCESS_TOKEN_TYPE
+        # Add roles or other claims if needed: additional_claims={"roles": ["user"]}
+    )
+
+# --- ADDED: Password Reset Token Creation ---
+@log_function_call(logger)
+def create_password_reset_token(subject: str) -> str:
+    """Creates a JWT token specifically for password reset."""
+    expires_delta = timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES)
+    return _create_jwt_token(
+        subject=subject,
+        expires_delta=expires_delta,
+        token_type=PASSWORD_RESET_TOKEN_TYPE
+    )
+
+# --- ADDED: Generic Token Verification ---
+def _verify_jwt_token(token: str, expected_token_type: str) -> Optional[str]:
+    """
+    Internal function to verify a JWT token, check its type, and return the subject.
+    Raises HTTPException on validation errors.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    token_preview = token[:10] + "..." if token else "None"
+
+    try:
+        logger.debug(f"Attempting JWT decode for {expected_token_type} token", extra={"token_preview": token_preview})
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+        subject: Optional[str] = payload.get("sub")
+        token_type: Optional[str] = payload.get("type")
+        jti: Optional[str] = payload.get("jti") # Get unique identifier
+
+        log_extra = {"subject": subject, "token_type": token_type, "jti": jti, "payload_keys": list(payload.keys()) if payload else []}
+
+        if subject is None:
+            logger.warning("JWT token missing 'sub' (subject) claim", extra=log_extra)
+            credentials_exception.detail = "Invalid token: Missing subject."
+            raise credentials_exception
+        if token_type != expected_token_type:
+            logger.warning(f"JWT token type mismatch. Expected '{expected_token_type}', got '{token_type}'", extra=log_extra)
+            credentials_exception.detail = f"Invalid token type. Expected {expected_token_type}."
+            raise credentials_exception
+
+        # Optional: Check against a token blacklist (e.g., in Redis) using jti if implementing revocation
+        # if is_token_revoked(jti):
+        #    logger.warning(f"{expected_token_type} token has been revoked", extra=log_extra)
+        #    credentials_exception.detail = "Token has been revoked."
+        #    raise credentials_exception
+
+        logger.debug(f"{expected_token_type} token decoded successfully", extra=log_extra)
+        return subject
+
+    except jwt.ExpiredSignatureError:
+        logger.warning(f"{expected_token_type} token has expired", extra={"token_preview": token_preview})
+        credentials_exception.detail = f"{expected_token_type.replace('_', ' ').title()} token has expired."
+        raise credentials_exception
+    except jwt.JWTClaimsError as claims_err:
+        logger.error(f"JWT claims error during {expected_token_type} token decode: {str(claims_err)}", exc_info=False, extra={"error_details": str(claims_err), "token_preview": token_preview})
+        credentials_exception.detail = f"Invalid token claims: {str(claims_err)}"
+        raise credentials_exception
+    except JWTError as jwt_err:
+        logger.error(f"JWT decode error (JWTError) for {expected_token_type} token: {str(jwt_err)}", exc_info=False, extra={"error_details": str(jwt_err), "token_preview": token_preview})
+        credentials_exception.detail = "Could not validate token credentials."
+        if "invalid signature" in str(jwt_err).lower():
+            credentials_exception.detail = "Invalid token signature."
+        raise credentials_exception
+    except Exception as decode_err:
+        logger.error(f"Unexpected error during {expected_token_type} token JWT decode", exc_info=True, extra={"error_details": str(decode_err)})
+        credentials_exception.detail = "An unexpected error occurred during token validation."
+        raise credentials_exception
+
+
+# --- ADDED: Password Reset Token Verification ---
+def verify_password_reset_token(token: str) -> Optional[str]:
+    """
+    Verifies a password reset token and returns the user ID (subject).
+    Raises HTTPException on errors.
+    """
+    logger.info("Verifying password reset token.")
+    # Use the generic verification function, expecting the specific type
+    # Note: We are returning the subject (user_id) directly here.
+    # The calling function (/reset-password endpoint) will handle user lookup.
+    return _verify_jwt_token(token, expected_token_type=PASSWORD_RESET_TOKEN_TYPE)
+
 
 async def get_current_user(request: Request, db = Depends(get_db)):
     """Get current user from the JWT token by manually reading header."""
@@ -132,36 +247,26 @@ async def get_current_user(request: Request, db = Depends(get_db)):
         logger.error(f"Error manually extracting token from header", exc_info=True, extra={"error_details": str(header_err)})
         raise credentials_exception
 
-    payload = None
-    username = None
-    try:
-        logger.debug("Attempting JWT decode...")
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        username: Optional[str] = payload.get("sub")
-        logger.debug(f"Token decoded successfully", extra={"username": username, "payload_keys": list(payload.keys()) if payload else []})
-        if username is None:
-            logger.warning("JWT token missing 'sub' (username) claim after decode")
-            raise credentials_exception
-    except JWTError as jwt_err:
-        logger.error(f"JWT decode error (JWTError): {str(jwt_err)}", exc_info=False, extra={"error_details": str(jwt_err), "token_preview": token_preview})
-        detail = "Could not validate credentials"
-        if "expired" in str(jwt_err).lower():
-            detail = "Token has expired"
-        elif "invalid signature" in str(jwt_err).lower():
-            detail = "Invalid token signature"
-        credentials_exception.detail = detail
-        raise credentials_exception
-    except Exception as decode_err:
-        logger.error(f"Unexpected error during JWT decode", exc_info=True, extra={"error_details": str(decode_err)})
-        raise credentials_exception
+    # --- Use generic verification for access token ---
+    username = _verify_jwt_token(token, expected_token_type=ACCESS_TOKEN_TYPE)
+    # _verify_jwt_token raises HTTPException on failure, so no need to check username is None here
+    # --- End generic verification ---
 
     user = None
     try:
         logger.debug(f"Looking up user in database", extra={"username": username})
+        # --- MODIFIED: Fetch user by username from token ---
         user = db.query(User).filter(User.username == username).first()
+        # --- END MODIFIED ---
         if user is None:
             logger.warning(f"User '{username}' not found in database after token decode")
-            raise credentials_exception
+            # Reuse the credentials exception from _verify_jwt_token if possible, or create new
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User associated with token not found.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
 
         # --- Set user context HERE after successful validation ---
         set_user(user) # Store the full user object in context
@@ -193,3 +298,4 @@ async def get_current_active_superuser(current_user: User = Depends(get_current_
         )
     logger.debug(f"User '{current_user.username}' is an active superuser.")
     return current_user
+#</file>

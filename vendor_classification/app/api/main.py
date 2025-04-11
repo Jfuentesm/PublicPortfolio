@@ -1,4 +1,3 @@
-
 # <file path='app/api/main.py'>
 # app/api/main.py
 import socket
@@ -9,14 +8,14 @@ from fastapi import (
     BackgroundTasks, status, Request
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse # Added FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel # Added for response model
 from typing import Dict, Any, Optional, List
 import uuid
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone # Added timezone
 import logging
 import time
 from sqlalchemy.orm import Session
@@ -59,6 +58,7 @@ from api.auth import (
 # --- Router Imports ---
 from api import jobs as jobs_router
 from api import users as users_router
+from api import password_reset as password_reset_router # ADDED: Password Reset Router
 
 # --- Schema Imports ---
 from schemas.job import JobResponse
@@ -81,7 +81,8 @@ app = FastAPI(
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all origins for now, restrict in production
+    # Allow specific origins in production
+    allow_origins=[settings.FRONTEND_URL, "http://localhost:8080", "http://127.0.0.1:8080", f"http://localhost:{settings.FRONTEND_URL.split(':')[-1]}"], # Allow dev frontend dynamically
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,7 +94,7 @@ app.include_router(
     jobs_router.router,
     prefix="/api/v1/jobs",
     tags=["Jobs"],
-    dependencies=[Depends(get_current_user)]
+    dependencies=[Depends(get_current_user)] # Secure job routes
 )
 logger.info("Included jobs router with prefix /api/v1/jobs")
 
@@ -101,8 +102,20 @@ app.include_router(
     users_router.router,
     prefix="/api/v1/users",
     tags=["Users"],
+    # Dependencies applied per-route in users.py
 )
 logger.info("Included users router with prefix /api/v1/users")
+
+# --- ADDED: Include Password Reset Router ---
+app.include_router(
+    password_reset_router.router,
+    prefix="/api/v1/auth", # Group under auth path
+    tags=["Password Reset"],
+    # No global dependency, endpoints handle auth/no auth as needed
+)
+logger.info("Included password reset router with prefix /api/v1/auth")
+# --- END ADDED ---
+
 # --- End Include Routers ---
 
 # --- Vue.js Frontend Serving Setup ---
@@ -170,23 +183,23 @@ async def health_check():
         async with httpx.AsyncClient(timeout=5.0) as client:
                 # Check if settings attributes exist before using them
                 or_url = f"{settings.OPENROUTER_API_BASE}/models" if hasattr(settings, 'OPENROUTER_API_BASE') else None
-                or_headers = {"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"} if hasattr(settings, 'OPENROUTER_API_KEY') else None
+                or_headers = {"Authorization": f"Bearer {settings.OPENROUTER_API_KEYS[0]}"} if hasattr(settings, 'OPENROUTER_API_KEYS') and settings.OPENROUTER_API_KEYS else None # Use first key for check
                 if or_url and or_headers:
                     or_resp = await client.get(or_url, headers=or_headers)
                     openrouter_status = "connected" if or_resp.status_code == 200 else f"error: {or_resp.status_code}"
                 else:
-                    openrouter_status = "config_missing"
-                    logger.warning("OpenRouter API base or key missing in settings for health check.")
+                    openrouter_status = "config_missing_or_empty"
+                    logger.warning("OpenRouter API base or key missing/empty in settings for health check.")
 
 
                 tv_url = "https://api.tavily.com/search"
-                tv_payload = {"api_key": settings.TAVILY_API_KEY, "query": "test", "max_results": 1} if hasattr(settings, 'TAVILY_API_KEY') else None
+                tv_payload = {"api_key": settings.TAVILY_API_KEYS[0], "query": "test", "max_results": 1} if hasattr(settings, 'TAVILY_API_KEYS') and settings.TAVILY_API_KEYS else None # Use first key for check
                 if tv_payload:
                     tv_resp = await client.post(tv_url, json=tv_payload)
                     tavily_status = "connected" if tv_resp.status_code == 200 else f"error: {tv_resp.status_code}"
                 else:
-                    tavily_status = "config_missing"
-                    logger.warning("Tavily API key missing in settings for health check.")
+                    tavily_status = "config_missing_or_empty"
+                    logger.warning("Tavily API key missing/empty in settings for health check.")
 
 
     except httpx.RequestError as http_err:
@@ -198,6 +211,8 @@ async def health_check():
             openrouter_status = openrouter_status if openrouter_status != "unknown" else "check_error"
             tavily_status = tavily_status if tavily_status != "unknown" else "check_error"
 
+    email_status = "configured" if settings.SMTP_HOST and settings.SMTP_USER and settings.EMAIL_FROM else "not_configured"
+
     return {
         "status": "healthy",
         "hostname": hostname,
@@ -205,9 +220,10 @@ async def health_check():
         "database": db_status,
         "celery_broker": celery_broker_status,
         "vue_frontend_index": vue_frontend_status,
+        "email_service": email_status, # Added email status
         "external_api_openrouter": openrouter_status,
         "external_api_tavily": tavily_status,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat() # Use timezone aware
     }
 
 
@@ -228,6 +244,31 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         headers={"X-Correlation-ID": correlation_id}
     )
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    correlation_id = get_correlation_id() or str(uuid.uuid4())
+    # Log HTTP exceptions (like 401, 403, 404, 422 from manual raises)
+    # Avoid logging stack traces for common HTTP errors unless it's a 500
+    log_level = logging.ERROR if exc.status_code >= 500 else logging.WARNING
+    logger.log(log_level, f"HTTP Exception: {exc.status_code} - {exc.detail}", extra={
+        "correlation_id": correlation_id,
+        "request_headers": dict(request.headers),
+        "path": request.url.path,
+        "method": request.method,
+        "status_code": exc.status_code,
+        "detail": exc.detail,
+    }, exc_info=(exc.status_code >= 500)) # Include stack trace only for 5xx errors
+
+    headers = getattr(exc, "headers", {})
+    headers["X-Correlation-ID"] = correlation_id # Ensure correlation ID is in response
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers,
+    )
+
+
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     correlation_id = get_correlation_id() or str(uuid.uuid4())
@@ -243,7 +284,8 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 # --- Authentication Endpoint ---
-@app.post("/token", response_model=Dict[str, Any])
+# Note: This is the endpoint for exchanging username/password for a token
+@app.post("/token", response_model=Dict[str, Any], tags=["Authentication"])
 async def login_for_access_token(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -273,23 +315,23 @@ async def login_for_access_token(
                 )
 
         set_user(user) # Set context for logging
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user.username}, expires_delta=access_token_expires
-        )
+        # Use the updated function, passing username (or user.id if preferred for subject)
+        access_token = create_access_token(subject=user.username)
 
         logger.info(f"Login successful, token generated", extra={ "username": user.username, "ip": client_host, "token_expires_in_minutes": settings.ACCESS_TOKEN_EXPIRE_MINUTES})
 
+        # Return user details along with the token
         return {
             "access_token": access_token,
             "token_type": "bearer",
-            "user": UserResponseSchema.model_validate(user)
+            "user": UserResponseSchema.model_validate(user) # Use Pydantic v2 method
         }
 
     except HTTPException as http_exc:
+        # Log only unexpected HTTP exceptions during login
         if http_exc.status_code not in [status.HTTP_401_UNAUTHORIZED, status.HTTP_400_BAD_REQUEST]:
-                logger.error(f"HTTP exception during login", exc_info=True)
-        raise
+                logger.error(f"Unexpected HTTP exception during login for {form_data.username}", exc_info=True)
+        raise # Re-raise the exception to be handled by the exception handler
     except Exception as e:
         logger.error(f"Unexpected login error", exc_info=True, extra={"error": str(e), "username": form_data.username})
         raise HTTPException(
@@ -304,7 +346,7 @@ class FileValidationResponse(BaseModel):
     detected_columns: List[str] = []
     missing_mandatory_columns: List[str] = []
 
-@app.post("/api/v1/validate-upload", response_model=FileValidationResponse, status_code=status.HTTP_200_OK)
+@app.post("/api/v1/validate-upload", response_model=FileValidationResponse, status_code=status.HTTP_200_OK, tags=["File Operations"])
 async def validate_uploaded_file_header(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user) # Ensure user is logged in
@@ -383,7 +425,7 @@ async def validate_uploaded_file_header(
 
 
 # --- UPLOAD ROUTE (No changes needed here for validation, but keep previous updates) ---
-@app.post("/api/v1/upload", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+@app.post("/api/v1/upload", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED, tags=["File Operations"])
 async def upload_vendor_file(
     background_tasks: BackgroundTasks,
     company_name: str = Form(...),
@@ -496,13 +538,64 @@ async def upload_vendor_file(
 # --- Mount Static Files (Vue App) ---
 if os.path.exists(VUE_BUILD_DIR) and os.path.exists(VUE_INDEX_FILE):
     logger.info(f"Mounting Vue app from directory: {VUE_BUILD_DIR}")
-    app.mount("/", StaticFiles(directory=VUE_BUILD_DIR, html=True), name="app")
+    # Serve static files from 'assets', etc.
+    app.mount("/assets", StaticFiles(directory=os.path.join(VUE_BUILD_DIR, "assets")), name="assets")
+
+    # --- REMOVED FAVICONS MOUNT ---
+    # Check if the favicons directory *actually* exists in the build output before mounting
+    # favicons_dir_path = os.path.join(VUE_BUILD_DIR, "favicons")
+    # if os.path.isdir(favicons_dir_path):
+    #     logger.info(f"Mounting /favicons from {favicons_dir_path}")
+    #     app.mount("/favicons", StaticFiles(directory=favicons_dir_path), name="favicons")
+    # else:
+    #     logger.warning(f"Directory {favicons_dir_path} not found. Skipping /favicons mount.")
+    # --- END REMOVED FAVICONS MOUNT ---
+
+    # Serve index.html for all other routes (SPA handling)
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_vue_app(request: Request, full_path: str):
+        # Check if the path looks like a file request that wasn't caught by static mounts
+        # This is a basic check, might need refinement
+        potential_file_path = os.path.join(VUE_BUILD_DIR, full_path.lstrip('/'))
+
+        # If it's not an API route and the path doesn't correspond to an existing file in dist
+        # (other than index.html itself), serve index.html
+        if not full_path.startswith("api"):
+            if os.path.isfile(potential_file_path) and os.path.basename(potential_file_path) != 'index.html':
+                 # It's likely a static file request that should be served directly
+                 # (e.g., /favicon.ico if it exists in dist root)
+                 logger.debug(f"Serving static file directly: {full_path}")
+                 return FileResponse(potential_file_path)
+            else:
+                # Serve index.html for SPA routing or if file not found
+                logger.debug(f"Serving index.html for SPA route or missing file: {full_path}")
+                return FileResponse(VUE_INDEX_FILE)
+        else:
+            # This case should ideally be handled by FastAPI routing before getting here
+            logger.error(f"Request starting with 'api' reached fallback route: {full_path}")
+            return JSONResponse(status_code=404, content={"detail": "API route not found"})
+
 else:
     logger.error(f"Cannot mount Vue app: Directory {VUE_BUILD_DIR} or index file {VUE_INDEX_FILE} not found.")
-    @app.get("/")
+    @app.get("/", include_in_schema=False)
     async def missing_frontend():
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"detail": f"Frontend not found. Expected build files in {VUE_BUILD_DIR}"}
         )
 # --- END VUE.JS FRONTEND SERVING SETUP ---
+
+# --- Initialize Database on Startup (Optional) ---
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Application startup: Initializing database...")
+    try:
+        initialize_database()
+        logger.info("Database initialization check complete.")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}", exc_info=True)
+        # Depending on severity, you might want to prevent startup
+
+# --- END Initialize Database ---
+
+#</file>

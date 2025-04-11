@@ -1,5 +1,3 @@
-
-// <file path='frontend/vue_frontend/src/services/api.ts'>
 import axios, {
     type AxiosInstance,
     type InternalAxiosRequestConfig,
@@ -126,6 +124,14 @@ interface GetJobsParams {
     limit?: number;
 }
 
+// --- ADDED: Password Reset Interfaces ---
+// Matches backend schemas/password_reset.py -> MessageResponse
+interface MessageResponse {
+    message: string;
+}
+// --- END ADDED ---
+
+
 // --- Axios Instance Setup ---
 
 const axiosInstance: AxiosInstance = axios.create({
@@ -142,13 +148,18 @@ axiosInstance.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
         const authStore = useAuthStore();
         const token = authStore.getToken();
-        // No need for noAuthUrls here as login uses base axios
-        if (token && config.url) {
+        // Define URLs that should NOT receive the auth token
+        const noAuthUrls = ['/auth/password-recovery', '/auth/reset-password']; // Use the correct paths
+
+        // Check if the request URL matches any of the no-auth URLs
+        const requiresAuth = token && config.url && !noAuthUrls.some(url => config.url?.startsWith(url));
+
+        if (requiresAuth) {
             // LOGGING: Log token presence and target URL
             // console.log(`[api.ts Request Interceptor] Adding token for URL: ${config.url}`);
             config.headers.Authorization = `Bearer ${token}`;
         } else {
-            // console.log(`[api.ts Request Interceptor] No token found or no URL for config: ${config.url}`);
+            // console.log(`[api.ts Request Interceptor] No token added for URL: ${config.url} (Token: ${token ? 'present' : 'missing'}, No-Auth Match: ${!requiresAuth && !!token})`);
         }
         return config;
     },
@@ -172,10 +183,12 @@ axiosInstance.interceptors.response.use(
         if (error.response) {
             const { status, data } = error.response;
 
-            // Handle 401 Unauthorized (except for login attempts)
-            // Login uses base axios, so this interceptor won't catch its 401
-            if (status === 401 && error.config?.url !== '/token') { // Check it's not the login endpoint itself
-                console.warn('[api.ts Response Interceptor] Received 401 Unauthorized. Logging out.');
+            // Handle 401 Unauthorized (except for login attempts and password reset)
+            const isLoginAttempt = error.config?.url === '/token'; // Base URL for login
+            const isPasswordReset = error.config?.url?.startsWith('/auth/password-recovery') || error.config?.url?.startsWith('/auth/reset-password');
+
+            if (status === 401 && !isLoginAttempt && !isPasswordReset) {
+                console.warn('[api.ts Response Interceptor] Received 401 Unauthorized on protected route. Logging out.');
                 authStore.logout(); // Trigger logout action
                 // No reload here, let the component handle redirection or UI change
                 return Promise.reject(new Error('Session expired. Please log in again.'));
@@ -230,7 +243,9 @@ const apiService = {
         params.append('password', passwordInput);
         console.log(`[api.ts login] Attempting login for user: ${usernameInput}`); // LOGGING
         // Use base axios to avoid default JSON headers and ensure correct Content-Type
+        // Also avoids the interceptor adding an Authorization header if a previous token exists
         const response = await axios.post<AuthResponse>('/token', params, {
+            baseURL: '/', // Use root base URL since '/token' is not under /api/v1
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         });
         console.log(`[api.ts login] Login successful for user: ${usernameInput}`); // LOGGING
@@ -242,7 +257,7 @@ const apiService = {
         */
     async validateUpload(formData: FormData): Promise<FileValidationResponse> {
         console.log('[api.ts validateUpload] Attempting file header validation...'); // LOGGING
-        // Uses axiosInstance, includes auth token
+        // Uses axiosInstance, includes auth token if available and URL requires it
         const response = await axiosInstance.post<FileValidationResponse>('/validate-upload', formData, {
              headers: { 'Content-Type': undefined } // Let browser set Content-Type for FormData
         });
@@ -394,6 +409,33 @@ const apiService = {
         return response.data;
     },
     // --- END User Management API Methods ---
+
+    // --- ADDED: Password Reset API Methods ---
+    /**
+     * Requests a password reset email to be sent.
+     */
+    async requestPasswordRecovery(email: string): Promise<MessageResponse> {
+        console.log(`[api.ts requestPasswordRecovery] Requesting password reset for email: ${email}`);
+        // This uses axiosInstance, but the interceptor should skip adding auth token for this URL
+        const response = await axiosInstance.post<MessageResponse>('/auth/password-recovery', { email });
+        console.log(`[api.ts requestPasswordRecovery] Request response: ${response.data.message}`);
+        return response.data;
+    },
+
+    /**
+     * Resets the password using the provided token and new password.
+     */
+    async resetPassword(token: string, newPassword: string): Promise<MessageResponse> {
+        console.log(`[api.ts resetPassword] Attempting password reset with token: ${token.substring(0, 10)}...`);
+        // This uses axiosInstance, but the interceptor should skip adding auth token for this URL
+        const response = await axiosInstance.post<MessageResponse>('/auth/reset-password', {
+            token: token,
+            new_password: newPassword
+        });
+        console.log(`[api.ts resetPassword] Reset response: ${response.data.message}`);
+        return response.data;
+    }
+    // --- END Password Reset API Methods ---
 };
 
 export default apiService;
