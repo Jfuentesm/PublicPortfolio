@@ -4,7 +4,7 @@ import axios, {
     type AxiosError // Import AxiosError type
 } from 'axios';
 import { useAuthStore } from '@/stores/auth'; // Adjust path as needed
-import type { JobDetails } from '@/stores/job'; // Adjust path as needed
+import type { JobDetails, JobResultItem } from '@/stores/job'; // Adjust path as needed
 
 // --- Define API Response Interfaces ---
 
@@ -304,6 +304,16 @@ const apiService = {
         const response = await axiosInstance.get<JobStatsData>(`/jobs/${jobId}/stats`);
         // LOGGING: Log the received stats structure
         console.log(`[api.ts getJobStats] Received stats for job ${jobId}:`, JSON.parse(JSON.stringify(response.data)));
+        return response.data;
+    },
+
+    /**
+     * Fetches the detailed classification results for a specific job.
+     */
+    async getJobResults(jobId: string): Promise<JobResultItem[]> {
+        console.log(`[api.ts getJobResults] Fetching detailed results for job ID: ${jobId}`); // LOGGING
+        const response = await axiosInstance.get<JobResultItem[]>(`/jobs/${jobId}/results`);
+        console.log(`[api.ts getJobResults] Received ${response.data.length} detailed result items for job ${jobId}.`); // LOGGING
         return response.data;
     },
 

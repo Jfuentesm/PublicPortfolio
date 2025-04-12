@@ -7,7 +7,7 @@ from datetime import datetime
 from celery import shared_task
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from typing import Dict, Any # <<< ADDED IMPORTS
+from typing import Dict, Any, List, Optional # <<< ADDED List, Optional
 
 from core.database import SessionLocal
 from core.config import settings
@@ -31,6 +31,92 @@ logger = get_logger("vendor_classification.tasks")
 # --- ADDED: Log confirmation ---
 logger.debug("Successfully imported Dict and Any from typing for classification tasks.")
 # --- END ADDED ---
+
+
+# --- ADDED: Helper function to process results for DB storage ---
+def _prepare_detailed_results_for_storage(
+    results_dict: Dict[str, Dict],
+    target_level: int
+) -> List[Dict[str, Any]]:
+    """
+    Processes the complex results dictionary into a flat list suitable for JSON storage
+    and frontend display. Extracts the classification details from the deepest successful level achieved.
+    """
+    processed_list = []
+    logger.info(f"Preparing detailed results for storage (target level: {target_level}). Processing {len(results_dict)} vendors.")
+
+    for vendor_name, vendor_results in results_dict.items():
+        final_result = {
+            "vendor_name": vendor_name,
+            "naics_code": None,
+            "naics_name": None,
+            "confidence": None,
+            "source": "Initial", # Default source
+            "notes": None,
+            "reason": None, # Failure reason
+        }
+
+        # Find the result from the deepest successfully classified level up to target_level
+        deepest_level_found = 0
+        best_level_data = None
+
+        for level in range(target_level, 0, -1): # Check from target down to 1
+            level_key = f"level{level}"
+            level_data = vendor_results.get(level_key)
+
+            if level_data and isinstance(level_data, dict) and not level_data.get("classification_not_possible", True):
+                # Found a successful classification at this level
+                deepest_level_found = level
+                best_level_data = level_data
+                break # Stop searching once the deepest successful level is found
+
+        if best_level_data:
+            # Populate from the best level found
+            final_result["naics_code"] = best_level_data.get("category_id")
+            final_result["naics_name"] = best_level_data.get("category_name")
+            final_result["confidence"] = best_level_data.get("confidence")
+            final_result["source"] = best_level_data.get("classification_source", "Initial") # Get source from level data
+            final_result["notes"] = best_level_data.get("notes")
+            # logger.debug(f"Vendor '{vendor_name}': Found best result at Level {deepest_level_found} (Source: {final_result['source']})")
+        else:
+            # No successful classification found up to target_level.
+            # Try to find the reason from L1 or search failure.
+            l1_data = vendor_results.get("level1")
+            reason = "Classification not possible or failed." # Default reason
+            source = "Initial" # Default
+
+            if l1_data and isinstance(l1_data, dict):
+                reason = l1_data.get("classification_not_possible_reason") or reason
+                source = l1_data.get("classification_source", source) # Get source even if failed
+                final_result["notes"] = l1_data.get("notes") # Get notes if available
+
+            # Check if search was attempted and failed (search results might contain more info)
+            search_results = vendor_results.get("search_results")
+            if search_results and isinstance(search_results, dict):
+                search_error = search_results.get("error")
+                if search_error:
+                    reason = f"Search Error: {search_error}"
+                # Check if L1 classification from search failed
+                search_l1_class = search_results.get("classification_l1")
+                if search_l1_class and isinstance(search_l1_class, dict) and search_l1_class.get("classification_not_possible"):
+                    reason = search_l1_class.get("classification_not_possible_reason") or reason
+                    final_result["notes"] = search_l1_class.get("notes") or final_result["notes"]
+                source = "Search" # If search was involved, mark source as Search
+
+            final_result["reason"] = reason
+            final_result["source"] = source
+            final_result["naics_code"] = l1_data.get("category_id") if l1_data else "N/A" # Show L1 ID if available, even if failed later
+            final_result["naics_name"] = l1_data.get("category_name") if l1_data else "N/A"
+            final_result["confidence"] = 0.0 # Confidence is 0 if failed
+            # logger.debug(f"Vendor '{vendor_name}': No successful classification found. Reason: {reason} (Source: {source})")
+
+
+        processed_list.append(final_result)
+
+    logger.info(f"Finished preparing {len(processed_list)} detailed result items.")
+    return processed_list
+# --- END ADDED ---
+
 
 @shared_task(bind=True)
 # --- UPDATED: Added target_level parameter ---
@@ -207,6 +293,13 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
     # --- END MODIFIED ---
     # --- End Initialize stats ---
 
+    # --- Initialize results dictionary ---
+    # This will be populated by process_vendors
+    results_dict: Dict[str, Dict] = {}
+    # This will hold the processed results for DB storage
+    detailed_results_for_db: Optional[List[Dict[str, Any]]] = None
+    # --- End Initialize results dictionary ---
+
     try:
         job.status = JobStatus.PROCESSING.value
         job.current_stage = ProcessingStage.INGESTION.value
@@ -255,16 +348,16 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
         logger.info(f"Taxonomy loaded",
                     extra={"taxonomy_version": taxonomy.version})
 
-        # --- MODIFIED: Type hints added ---
-        results: Dict[str, Dict] = {vendor_name: {} for vendor_name in unique_vendors_map.keys()}
-        # --- END MODIFIED ---
+        # Initialize the results dict structure before passing to process_vendors
+        results_dict = {vendor_name: {} for vendor_name in unique_vendors_map.keys()}
 
         logger.info(f"Starting vendor classification process by calling classification_logic.process_vendors up to Level {target_level}")
         # --- Call the refactored logic, passing target_level ---
+        # process_vendors will populate the results_dict in place
         await process_vendors(
             unique_vendors_map=unique_vendors_map,
             taxonomy=taxonomy,
-            results=results,
+            results=results_dict, # Pass the dict to be populated
             stats=stats,
             job=job,
             db=db,
@@ -285,18 +378,32 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
                     extra={"stage": job.current_stage, "progress": job.progress})
 
         output_file_name = None # Initialize
+
+        # --- Process results for DB Storage ---
+        try:
+            logger.info("Processing detailed results for database storage.")
+            with log_duration(logger, "Processing detailed results"):
+                 detailed_results_for_db = _prepare_detailed_results_for_storage(results_dict, target_level)
+            logger.info(f"Processed {len(detailed_results_for_db)} items for detailed results storage.")
+        except Exception as proc_err:
+            logger.error("Failed during detailed results processing for DB", exc_info=True)
+            # Continue to generate Excel, but log the error. The job won't store detailed results.
+            detailed_results_for_db = None # Ensure it's None if processing failed
+        # --- End Process results for DB Storage ---
+
+        # --- Generate Excel File ---
         try:
                 logger.info(f"Generating output file")
                 with log_duration(logger, "Generating output file"):
-                    # --- FIX: Removed the extra 'target_level' argument ---
-                    output_file_name = generate_output_file(normalized_vendors_data, results, job_id)
-                    # --- END FIX ---
+                    # Pass the original complex results_dict to generate_output_file
+                    output_file_name = generate_output_file(normalized_vendors_data, results_dict, job_id)
                 logger.info(f"Output file generated", extra={"output_file": output_file_name})
         except Exception as gen_err:
                 logger.error("Failed during output file generation", exc_info=True)
                 job.fail(f"Failed to generate output file: {str(gen_err)}")
                 db.commit()
                 return # Stop processing
+        # --- End Generate Excel File ---
 
         # --- Finalize stats ---
         end_time = datetime.now()
@@ -315,7 +422,8 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
         # --- Final Commit Block ---
         try:
             logger.info("Attempting final job completion update in database.")
-            job.complete(output_file_name, stats)
+            # Pass the processed detailed_results_for_db to the complete method
+            job.complete(output_file_name, stats, detailed_results_for_db)
             job.progress = 1.0 # Ensure progress is 1.0 on completion
             logger.info(f"[_process_vendor_file_async] Committing final job completion status.")
             db.commit()
@@ -324,6 +432,7 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
                             "processing_duration": processing_duration,
                             "output_file": output_file_name,
                             "target_level": target_level,
+                            "detailed_results_stored": bool(detailed_results_for_db), # Log if detailed results were stored
                             "openrouter_calls": stats["api_usage"]["openrouter_calls"],
                             "tokens_used": stats["api_usage"]["openrouter_total_tokens"],
                             "tavily_calls": stats["api_usage"]["tavily_search_calls"],
@@ -399,5 +508,3 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
             logger.error("Job object was None during unexpected error handling.")
     finally:
         logger.info(f"[_process_vendor_file_async] Finished async processing for job {job_id}")
-
-# </file>

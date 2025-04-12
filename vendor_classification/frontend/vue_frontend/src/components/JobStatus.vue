@@ -107,7 +107,7 @@
              </svg>
              <!-- Download Icon -->
              <ArrowDownTrayIcon v-else class="h-5 w-5 mr-2 -ml-1" />
-            {{ isDownloadLoading ? ' Preparing Download...' : 'Download Results' }}
+            {{ isDownloadLoading ? ' Preparing Download...' : 'Download Excel Results' }} <!-- Updated Text -->
           </button>
           <p v-if="downloadError" class="mt-2 text-xs text-red-600 text-center">{{ downloadError }}</p>
         </div>
@@ -115,6 +115,15 @@
         <!-- Stats Section (Rendered within JobStatus when complete) -->
          <!-- Use jobDetails.id -->
          <JobStats v-if="jobDetails?.status === 'completed' && jobDetails?.id" :job-id="jobDetails.id" />
+
+        <!-- ***** NEW: Detailed Results Table Section ***** -->
+        <JobResultsTable
+            v-if="jobDetails?.status === 'completed' && jobDetails?.id"
+            :results="jobStore.jobResults"
+            :loading="jobStore.resultsLoading"
+            :error="jobStore.resultsError"
+        />
+        <!-- ***** END NEW Section ***** -->
 
       </div>
     </div>
@@ -129,6 +138,7 @@
   import apiService from '@/services/api';
   import { useJobStore, type JobDetails } from '@/stores/job';
   import JobStats from './JobStats.vue';
+  import JobResultsTable from './JobResultsTable.vue'; // Import the new component
   import { EnvelopeIcon, ArrowDownTrayIcon, ExclamationTriangleIcon } from '@heroicons/vue/20/solid';
 
   const POLLING_INTERVAL = 5000; // Poll every 5 seconds
@@ -166,6 +176,7 @@
       'classification_level_2': 'Classifying (L2)',
       'classification_level_3': 'Classifying (L3)',
       'classification_level_4': 'Classifying (L4)',
+      'classification_level_5': 'Classifying (L5)', // Added L5
       'search_unknown_vendors': 'Researching Vendors',
       'result_generation': 'Generating Results',
     };
@@ -267,6 +278,12 @@
             if (data.status === 'completed' || data.status === 'failed') {
                 console.log(`JobStatus: [pollJobStatus] Job ${jobId} reached terminal state (${data.status}). Stopping polling.`); // LOGGING
                 stopPolling();
+                // --- NEW: Trigger results fetch if completed ---
+                if (data.status === 'completed') {
+                    console.log(`JobStatus: [pollJobStatus] Job ${jobId} completed. Triggering fetchJobResults.`); // LOGGING
+                    jobStore.fetchJobResults(jobId); // Fetch detailed results
+                }
+                // --- END NEW ---
             }
         } else {
              console.log(`JobStatus: [pollJobStatus] Job ID changed from ${jobId} to ${jobStore.currentJobId} during API call. Ignoring stale data.`); // LOGGING
@@ -379,14 +396,25 @@
           errorMessage.value = null;
           // Fetch initial details if not already present or if status is unknown/stale
           // Use jobDetails.id for comparison
-          if (!jobDetails.value || jobDetails.value.id !== jobStore.currentJobId || (jobDetails.value.status !== 'completed' && jobDetails.value.status !== 'failed')) {
-              console.log(`JobStatus: Fetching initial details or starting polling for ${jobStore.currentJobId}`); // LOGGING
+          const currentDetails = jobStore.jobDetails;
+          if (!currentDetails || currentDetails.id !== jobStore.currentJobId) {
+              console.log(`JobStatus: Fetching initial details and starting polling for ${jobStore.currentJobId}`); // LOGGING
               startPolling(jobStore.currentJobId);
+          } else if (currentDetails.status === 'completed') {
+              console.log(`JobStatus: Job ${jobStore.currentJobId} already completed. Fetching results.`); // LOGGING
+              stopPolling(); // Ensure polling is stopped
+              jobStore.fetchJobResults(jobStore.currentJobId); // Fetch results if already completed on mount
+          } else if (currentDetails.status === 'failed') {
+              console.log(`JobStatus: Job ${jobStore.currentJobId} already failed. Not polling or fetching results.`); // LOGGING
+              stopPolling(); // Ensure polling is stopped
           } else {
-               console.log(`JobStatus: Job ${jobStore.currentJobId} already in terminal state (${jobDetails.value.status}), not polling.`); // LOGGING
+              // Status is pending or processing, start polling
+              console.log(`JobStatus: Job ${jobStore.currentJobId} is ${currentDetails.status}. Starting polling.`); // LOGGING
+              startPolling(jobStore.currentJobId);
           }
       }
   });
+
 
   onUnmounted(() => {
       console.log("JobStatus: Unmounted, stopping polling."); // LOGGING
@@ -407,14 +435,21 @@
           isNotifyLoading.value = false;
 
           // Fetch details or start polling if needed for the new job
-          // Use jobDetails.id for comparison
-          if (!jobStore.jobDetails || jobStore.jobDetails.id !== newJobId || (jobStore.jobDetails.status !== 'completed' && jobStore.jobDetails.status !== 'failed')) {
-               console.log(`JobStatus: Starting polling due to job ID change to ${newJobId}`); // LOGGING
+          const currentDetails = jobStore.jobDetails;
+          if (!currentDetails || currentDetails.id !== newJobId) {
+               console.log(`JobStatus: Fetching initial details and starting polling due to job ID change to ${newJobId}`); // LOGGING
                startPolling(newJobId);
-          } else {
-               // If the new job is already completed/failed, don't poll
-               console.log(`JobStatus: Job ${newJobId} already in terminal state (${jobStore.jobDetails.status}), not polling.`); // LOGGING
+          } else if (currentDetails.status === 'completed') {
+               console.log(`JobStatus: Job ${newJobId} already completed. Fetching results.`); // LOGGING
                stopPolling(); // Ensure polling is stopped
+               jobStore.fetchJobResults(newJobId); // Fetch results if already completed
+          } else if (currentDetails.status === 'failed') {
+               console.log(`JobStatus: Job ${newJobId} already failed. Not polling or fetching results.`); // LOGGING
+               stopPolling(); // Ensure polling is stopped
+          } else {
+               // Status is pending or processing, start polling
+               console.log(`JobStatus: Job ${newJobId} is ${currentDetails.status}. Starting polling.`); // LOGGING
+               startPolling(newJobId);
           }
       } else {
           // Job ID was cleared
@@ -423,11 +458,19 @@
       }
   });
 
-  // Watch for the job status changing to a terminal state
-  watch(() => jobStore.jobDetails?.status, (newStatus: JobDetails['status'] | undefined) => {
-      console.log(`JobStatus: Watched job status changed to: ${newStatus}`); // LOGGING
-      if (newStatus === 'completed' || newStatus === 'failed') {
-          console.log(`JobStatus: Job reached terminal state (${newStatus}), stopping polling.`); // LOGGING
+  // Watch for the job status changing to a terminal state (this handles updates from polling)
+  watch(() => jobStore.jobDetails?.status, (newStatus: JobDetails['status'] | undefined, oldStatus) => {
+      const currentId = jobStore.currentJobId;
+      if (!currentId) return; // Don't do anything if no job is selected
+
+      console.log(`JobStatus: Watched job status changed from ${oldStatus} to: ${newStatus} for job ${currentId}`); // LOGGING
+
+      if (newStatus === 'completed' && oldStatus !== 'completed') {
+          console.log(`JobStatus: Job ${currentId} just completed. Stopping polling and fetching results.`); // LOGGING
+          stopPolling();
+          jobStore.fetchJobResults(currentId); // Fetch detailed results when status changes to completed
+      } else if (newStatus === 'failed' && oldStatus !== 'failed') {
+          console.log(`JobStatus: Job ${currentId} just failed. Stopping polling.`); // LOGGING
           stopPolling();
       }
   });

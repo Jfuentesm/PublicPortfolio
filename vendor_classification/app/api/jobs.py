@@ -10,7 +10,7 @@ from core.database import get_db
 from api.auth import get_current_user
 from models.user import User
 from models.job import Job, JobStatus
-from schemas.job import JobResponse # Import the new schema
+from schemas.job import JobResponse, JobResultItem # Import the new schemas
 from core.logging_config import get_logger
 from core.log_context import set_log_context
 from core.config import settings # Need settings for file path construction
@@ -135,6 +135,50 @@ async def read_job_stats(
 
     # The stats are stored as JSON in the Job model
     return job.stats if job.stats else {}
+
+
+# --- ADDED: Endpoint for Detailed Results ---
+@router.get("/{job_id}/results", response_model=List[JobResultItem])
+async def read_job_results(
+    job_id: str = Path(..., title="The ID of the job to get detailed results for"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retrieve the detailed classification results for a specific completed job.
+    """
+    set_log_context({"username": current_user.username, "target_job_id": job_id})
+    logger.info(f"Fetching detailed results for job ID: {job_id}")
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+
+    if not job:
+        logger.warning(f"Job not found for results", extra={"job_id": job_id})
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    # Authorization Check
+    if job.created_by != current_user.username: # and not current_user.is_superuser:
+        logger.warning(f"Authorization failed: User '{current_user.username}' attempted to access results for job '{job_id}' owned by '{job.created_by}'")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access results for this job")
+
+    # Check if job is completed and has results
+    if job.status != JobStatus.COMPLETED.value:
+        logger.warning(f"Detailed results requested but job not completed",
+                       extra={"job_id": job_id, "status": job.status})
+        # Return empty list instead of 400, as the job exists but results aren't ready
+        return []
+        # Alternatively, raise HTTPException:
+        # raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job is not completed yet.")
+
+    if not job.detailed_results:
+        logger.warning(f"Job {job_id} is completed but has no detailed results stored.", extra={"job_id": job_id})
+        return []
+
+    logger.info(f"Returning {len(job.detailed_results)} detailed result items for job ID: {job_id}")
+    # Pydantic should automatically validate the list of dicts against List[JobResultItem]
+    return job.detailed_results
+# --- END ADDED ---
+
 
 @router.get("/{job_id}/download")
 async def download_job_results(

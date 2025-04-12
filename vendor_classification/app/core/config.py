@@ -24,7 +24,7 @@ logger.info("Initializing application settings")
 # --- BEGIN USER ACTION REQUIRED ---
 
 DEFAULT_OPENROUTER_KEYS = [
-    "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",
+    "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",
     "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"
 ]
 

@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import Session # <<< ADDED IMPORT FOR TYPE HINTING
 from enum import Enum as PyEnum
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List # <<< ADDED List
 
 from core.database import Base
 
@@ -47,8 +47,9 @@ class Job(Base):
     error_message = Column(Text, nullable=True)
     stats = Column(JSON, default={}) # Structure defined by ProcessingStats model
     created_by = Column(String, nullable=False)
-    # --- ADDED: Target Level ---
     target_level = Column(Integer, nullable=False, default=5) # Store the desired classification depth (1-5)
+    # --- ADDED: Detailed Results ---
+    detailed_results = Column(JSON, nullable=True) # Store the list of processed results for UI display
     # --- END ADDED ---
 
     def update_progress(self, progress: float, stage: ProcessingStage, db_session: Optional[Session] = None): # Type hint now valid
@@ -67,7 +68,7 @@ class Job(Base):
                 db_session.rollback()
 
 
-    def complete(self, output_file_name: str, stats: Dict[str, Any]):
+    def complete(self, output_file_name: str, stats: Dict[str, Any], detailed_results: Optional[List[Dict[str, Any]]] = None): # Added detailed_results
         """Mark job as completed."""
         self.status = JobStatus.COMPLETED.value
         self.progress = 1.0
@@ -75,6 +76,7 @@ class Job(Base):
         self.output_file_name = output_file_name
         self.completed_at = datetime.now()
         self.stats = stats
+        self.detailed_results = detailed_results # Save detailed results
         self.updated_at = self.completed_at # Align updated_at with completed_at
 
     def fail(self, error_message: str):
@@ -86,3 +88,5 @@ class Job(Base):
         self.updated_at = datetime.now()
         # Ensure completed_at is Null if it failed
         self.completed_at = None
+        # Ensure detailed_results is Null if it failed
+        self.detailed_results = None

@@ -22,6 +22,20 @@ export interface JobDetails {
     created_by?: string;
 }
 
+// --- ADDED: Interface for a single detailed result item ---
+// Should align with app/schemas/job.py -> JobResultItem
+export interface JobResultItem {
+    vendor_name: string;
+    naics_code: string | null;
+    naics_name: string | null;
+    confidence: number | null;
+    source: string | null; // e.g., "Initial", "Search"
+    notes: string | null;
+    reason: string | null; // Failure reason or notes
+}
+// --- END ADDED ---
+
+
 export const useJobStore = defineStore('job', () => {
     // --- State ---
     const currentJobId = ref<string | null>(null);
@@ -35,6 +49,12 @@ export const useJobStore = defineStore('job', () => {
     const historyError = ref<string | null>(null);
     // --- END ADDED ---
 
+    // --- ADDED: Detailed Job Results State ---
+    const jobResults = ref<JobResultItem[] | null>(null);
+    const resultsLoading = ref(false);
+    const resultsError = ref<string | null>(null);
+    // --- END ADDED ---
+
     // --- Actions ---
     function setCurrentJobId(jobId: string | null): void {
         console.log(`JobStore: Setting currentJobId from '${currentJobId.value}' to '${jobId}'`); // LOGGING
@@ -45,6 +65,12 @@ export const useJobStore = defineStore('job', () => {
             console.log(`JobStore: Cleared jobDetails due to ID change.`); // LOGGING
             error.value = null; // Clear errors
             isLoading.value = false; // Reset loading state
+            // --- ADDED: Clear detailed results when job changes ---
+            jobResults.value = null;
+            resultsLoading.value = false;
+            resultsError.value = null;
+            console.log(`JobStore: Cleared detailed jobResults due to ID change.`); // LOGGING
+            // --- END ADDED ---
 
             // Update URL to reflect the current job ID or clear it
             try {
@@ -64,10 +90,15 @@ export const useJobStore = defineStore('job', () => {
         }
          // If the same job ID is set again, force a refresh of details
          else if (jobId !== null) {
-             console.log(`JobStore: Re-setting same job ID ${jobId}, clearing details to force refresh.`); // LOGGING
+             console.log(`JobStore: Re-setting same job ID ${jobId}, clearing details and results to force refresh.`); // LOGGING
              jobDetails.value = null;
              error.value = null;
              isLoading.value = false;
+             // --- ADDED: Clear detailed results on re-select too ---
+             jobResults.value = null;
+             resultsLoading.value = false;
+             resultsError.value = null;
+             // --- END ADDED ---
          }
     }
 
@@ -95,7 +126,7 @@ export const useJobStore = defineStore('job', () => {
 
     function clearJob(): void {
         console.log('JobStore: Clearing job state.'); // LOGGING
-        setCurrentJobId(null); // This also clears details, error, loading and URL param
+        setCurrentJobId(null); // This also clears details, error, loading, results and URL param
         // --- ADDED: Clear history too on full clear? Optional. ---
         // jobHistory.value = [];
         // historyLoading.value = false;
@@ -122,6 +153,46 @@ export const useJobStore = defineStore('job', () => {
     }
     // --- END ADDED ---
 
+    // --- ADDED: Detailed Job Results Actions ---
+    async function fetchJobResults(jobId: string): Promise<void> {
+        // Only fetch if the jobId matches the current job and results aren't already loaded/loading
+        if (jobId !== currentJobId.value) {
+            console.log(`JobStore: fetchJobResults called for ${jobId}, but current job is ${currentJobId.value}. Skipping.`);
+            return;
+        }
+        if (resultsLoading.value || jobResults.value) {
+             console.log(`JobStore: fetchJobResults called for ${jobId}, but already loading or results exist. Skipping.`);
+             return; // Avoid redundant fetches
+        }
+
+        console.log(`JobStore: Fetching detailed results for job ${jobId}...`);
+        resultsLoading.value = true;
+        resultsError.value = null;
+        try {
+            const results = await apiService.getJobResults(jobId);
+            // Double-check the job ID hasn't changed *during* the API call
+            if (jobId === currentJobId.value) {
+                jobResults.value = results;
+                console.log(`JobStore: Successfully fetched ${results.length} detailed results for ${jobId}.`);
+            } else {
+                 console.log(`JobStore: Job ID changed while fetching results for ${jobId}. Discarding fetched results.`);
+            }
+        } catch (err: any) {
+            console.error(`JobStore: Failed to fetch detailed results for ${jobId}:`, err);
+            // Only set error if it's for the currently selected job
+            if (jobId === currentJobId.value) {
+                resultsError.value = err.message || 'Failed to load detailed results.';
+                jobResults.value = null; // Clear results on error
+            }
+        } finally {
+             // Only stop loading if it's for the currently selected job
+            if (jobId === currentJobId.value) {
+                resultsLoading.value = false;
+            }
+        }
+    }
+    // --- END ADDED ---
+
 
     return {
         currentJobId,
@@ -133,6 +204,11 @@ export const useJobStore = defineStore('job', () => {
         historyLoading,
         historyError,
         fetchJobHistory,
+        // Detailed Results state & actions
+        jobResults,
+        resultsLoading,
+        resultsError,
+        fetchJobResults,
         // Existing actions
         setCurrentJobId,
         updateJobDetails,
