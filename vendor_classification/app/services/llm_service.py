@@ -97,6 +97,10 @@ class LLMService:
         """Gets the current API key based on the index."""
         if not self.api_keys:
             return None
+        # Ensure index is valid
+        if self.current_key_index >= len(self.api_keys):
+            logger.warning(f"OpenRouter key index {self.current_key_index} out of bounds ({len(self.api_keys)} keys). Resetting to 0.")
+            self.current_key_index = 0
         return self.api_keys[self.current_key_index]
 
     def _rotate_key(self):
@@ -165,6 +169,7 @@ class LLMService:
             )
             prompt_length = len(prompt)
             logger.debug(f"Classification prompt created", extra={"prompt_length": prompt_length, "current_key_index": self.current_key_index})
+            # Log the generated prompt (already present)
             llm_trace_logger.debug(f"LLM_TRACE: Generated Prompt (Batch ID: {batch_id}):\n-------\n{prompt}\n-------", extra={'correlation_id': correlation_id})
 
         headers = {
@@ -180,12 +185,15 @@ class LLMService:
             "response_format": {"type": "json_object"}
         }
 
-        # Log Request Details (Trace Log) - Redacted key
+        # Log Request Details (Trace Log)
         try:
+            # Log Headers (Redacted Key - already present)
             log_headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
             log_headers['Authorization'] = f'Bearer [REDACTED_KEY_INDEX_{self.current_key_index}]'
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Headers (Batch ID: {batch_id}):\n{json.dumps(log_headers, indent=2)}", extra={'correlation_id': correlation_id})
+            # --- ADDED: Log Full Request Payload ---
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Payload (Batch ID: {batch_id}):\n{json.dumps(payload, indent=2)}", extra={'correlation_id': correlation_id})
+            # --- END ADDED ---
         except Exception as log_err:
             llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM request details (Batch ID: {batch_id}): {log_err}", extra={'correlation_id': correlation_id})
 
@@ -195,10 +203,12 @@ class LLMService:
             start_time = time.time()
             async with httpx.AsyncClient() as client:
                 response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=90.0)
+                # --- Log Raw Response (already present) ---
                 raw_content = response.text
                 status_code = response.status_code
                 api_duration = time.time() - start_time
                 llm_trace_logger.debug(f"LLM_TRACE: LLM Raw Response (Batch ID: {batch_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
+                # --- End Log Raw Response ---
                 response.raise_for_status() # Check for HTTP errors AFTER logging raw response
                 response_data = response.json()
 
@@ -208,6 +218,7 @@ class LLMService:
                  if message and isinstance(message, dict):
                      content_field = message.get("content")
                      if content_field:
+                         # Update raw_content if message.content exists, otherwise keep response.text
                          raw_content = content_field
                          logger.debug("Extracted 'content' field from LLM JSON response.")
                      else:
@@ -238,6 +249,7 @@ class LLMService:
                 raise ValueError(f"LLM response was not valid JSON or could not be extracted. Preview: {str(raw_content)[:200]}")
 
             try:
+                 # Log Parsed Response (already present)
                  llm_trace_logger.debug(f"LLM_TRACE: LLM Parsed Response (Batch ID: {batch_id}):\n{json.dumps(result, indent=2)}", extra={'correlation_id': correlation_id})
             except Exception as log_err:
                  llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM parsed response (Batch ID: {batch_id}): {log_err}", extra={'correlation_id': correlation_id})
@@ -269,17 +281,19 @@ class LLMService:
              status_code = e.response.status_code
              logger.error(f"HTTP error during LLM batch classification", exc_info=False,
                          extra={ "status_code": status_code, "response_text": response_text, "batch_id": batch_id, "level": level, "key_index_used": self.current_key_index })
+             # Log HTTP Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Batch ID: {batch_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
 
-             # --- ADDED: Key Rotation Logic ---
+             # --- Key Rotation Logic (already present) ---
              if status_code in OPENROUTER_ROTATION_STATUS_CODES:
                  self._rotate_key()
-             # --- END ADDED ---
-             raise # Re-raise for tenacity to handle retry
+             # --- END Key Rotation Logic ---
+             raise # Re-raise for tenacity
 
         except httpx.RequestError as e:
              logger.error(f"Network error during LLM batch classification", exc_info=False,
                          extra={ "error_details": str(e), "batch_id": batch_id, "level": level, "key_index_used": self.current_key_index })
+             # Log Network Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
              # Optionally rotate on specific network errors too, but less common for key issues
              # self._rotate_key()
@@ -294,6 +308,7 @@ class LLMService:
         except Exception as e:
             error_context = { "batch_size": len(batch_data), "level": level, "parent_category_id": parent_category_id, "error": str(e), "model": self.model, "batch_id": batch_id, "key_index_used": self.current_key_index }
             logger.error(f"Unexpected error during LLM batch classification", exc_info=True, extra=error_context)
+            # Log Unexpected Error (already present)
             llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
             # Optionally rotate on unexpected errors, but might hide other issues
             # self._rotate_key()
@@ -334,6 +349,7 @@ class LLMService:
             prompt = generate_search_prompt(vendor_data, search_results, taxonomy, attempt_id)
             prompt_length = len(prompt)
             logger.debug(f"Search results prompt created", extra={"prompt_length": prompt_length, "current_key_index": self.current_key_index})
+            # Log Generated Prompt (already present)
             llm_trace_logger.debug(f"LLM_TRACE: Generated Search Prompt (Attempt ID: {attempt_id}):\n-------\n{prompt}\n-------", extra={'correlation_id': correlation_id})
 
         headers = {
@@ -349,12 +365,15 @@ class LLMService:
             "response_format": {"type": "json_object"}
         }
 
-        # Log Request Details (Trace Log) - Redacted key
+        # Log Request Details (Trace Log)
         try:
+            # Log Headers (Redacted Key - already present)
             log_headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
             log_headers['Authorization'] = f'Bearer [REDACTED_KEY_INDEX_{self.current_key_index}]'
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Headers (Attempt ID: {attempt_id}):\n{json.dumps(log_headers, indent=2)}", extra={'correlation_id': correlation_id})
+            # --- ADDED: Log Full Request Payload ---
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Payload (Attempt ID: {attempt_id}):\n{json.dumps(payload, indent=2)}", extra={'correlation_id': correlation_id})
+            # --- END ADDED ---
         except Exception as log_err:
             llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM request details (Attempt ID: {attempt_id}): {log_err}", extra={'correlation_id': correlation_id})
 
@@ -364,10 +383,12 @@ class LLMService:
             start_time = time.time()
             async with httpx.AsyncClient() as client:
                 response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=60.0)
+                # --- Log Raw Response (already present) ---
                 raw_content = response.text
                 status_code = response.status_code
                 api_duration = time.time() - start_time
                 llm_trace_logger.debug(f"LLM_TRACE: LLM Raw Response (Attempt ID: {attempt_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
+                # --- End Log Raw Response ---
                 response.raise_for_status()
                 response_data = response.json()
 
@@ -377,6 +398,7 @@ class LLMService:
                  if message and isinstance(message, dict):
                      content_field = message.get("content")
                      if content_field:
+                         # Update raw_content if message.content exists, otherwise keep response.text
                          raw_content = content_field
                          logger.debug("Extracted 'content' field from LLM JSON response (search).")
                      else:
@@ -401,6 +423,7 @@ class LLMService:
                 raise ValueError(f"LLM response after search was not valid JSON or could not be extracted. Preview: {str(raw_content)[:200]}")
 
             try:
+                 # Log Parsed Response (already present)
                  llm_trace_logger.debug(f"LLM_TRACE: LLM Parsed Response (Attempt ID: {attempt_id}):\n{json.dumps(result, indent=2)}", extra={'correlation_id': correlation_id})
             except Exception as log_err:
                  llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM parsed response (Attempt ID: {attempt_id}): {log_err}", extra={'correlation_id': correlation_id})
@@ -421,17 +444,19 @@ class LLMService:
              status_code = e.response.status_code
              logger.error(f"HTTP error during search result processing", exc_info=False,
                          extra={ "status_code": status_code, "response_text": response_text, "vendor": vendor_name, "attempt_id": attempt_id, "key_index_used": self.current_key_index })
+             # Log HTTP Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Attempt ID: {attempt_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
 
-             # --- ADDED: Key Rotation Logic ---
+             # --- Key Rotation Logic (already present) ---
              if status_code in OPENROUTER_ROTATION_STATUS_CODES:
                  self._rotate_key()
-             # --- END ADDED ---
+             # --- END Key Rotation Logic ---
              raise # Re-raise for tenacity
 
         except httpx.RequestError as e:
              logger.error(f"Network error during search result processing", exc_info=False,
                          extra={ "error_details": str(e), "vendor": vendor_name, "attempt_id": attempt_id, "key_index_used": self.current_key_index })
+             # Log Network Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
              # Optionally rotate on network errors
              # self._rotate_key()
@@ -446,6 +471,7 @@ class LLMService:
         except Exception as e:
             error_context = { "vendor": vendor_name, "error": str(e), "model": self.model, "attempt_id": attempt_id, "key_index_used": self.current_key_index }
             logger.error(f"Unexpected error during search result processing", exc_info=True, extra=error_context)
+            # Log Unexpected Error (already present)
             llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
             # Optionally rotate on unexpected errors
             # self._rotate_key()

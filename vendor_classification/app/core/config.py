@@ -21,20 +21,13 @@ logger.info("Initializing application settings")
 # Example ENV format: OPENROUTER_API_KEYS="key1,key2,key3"
 # For this exercise, we'll define them directly as defaults.
 
-# !!! IMPORTANT: YOU MUST REPLACE THESE PLACEHOLDER KEYS WITH YOUR ACTUAL, VALID KEYS !!!
-# !!! FAILURE TO DO SO WILL CAUSE API ERRORS (LIKE HTTPStatusError) !!!
-
 # --- BEGIN USER ACTION REQUIRED ---
 
-# Replace these placeholder keys with your actual, valid OpenRouter API keys
-# Obtain keys from https://openrouter.ai/keys
 DEFAULT_OPENROUTER_KEYS = [
-    "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",
-    "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"
+    "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",
+    "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"
 ]
 
-# Replace these placeholder keys with your actual, valid Tavily API keys
-# Obtain keys from https://app.tavily.com/home
 DEFAULT_TAVILY_KEYS = [
     "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",
     "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",
