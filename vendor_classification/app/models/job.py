@@ -49,7 +49,8 @@ class Job(Base):
     created_by = Column(String, nullable=False)
     target_level = Column(Integer, nullable=False, default=5) # Store the desired classification depth (1-5)
     # --- ADDED: Detailed Results ---
-    detailed_results = Column(JSON, nullable=True) # Store the list of processed results for UI display
+    # Stores List[JobResultItem] as defined in schemas/job.py
+    detailed_results = Column(JSON, nullable=True)
     # --- END ADDED ---
 
     def update_progress(self, progress: float, stage: ProcessingStage, db_session: Optional[Session] = None): # Type hint now valid
@@ -68,7 +69,9 @@ class Job(Base):
                 db_session.rollback()
 
 
-    def complete(self, output_file_name: str, stats: Dict[str, Any], detailed_results: Optional[List[Dict[str, Any]]] = None): # Added detailed_results
+    # --- UPDATED: complete method signature ---
+    def complete(self, output_file_name: str, stats: Dict[str, Any], detailed_results: Optional[List[Dict[str, Any]]] = None):
+    # --- END UPDATED ---
         """Mark job as completed."""
         self.status = JobStatus.COMPLETED.value
         self.progress = 1.0
@@ -76,7 +79,9 @@ class Job(Base):
         self.output_file_name = output_file_name
         self.completed_at = datetime.now()
         self.stats = stats
-        self.detailed_results = detailed_results # Save detailed results
+        # --- UPDATED: Save detailed results ---
+        self.detailed_results = detailed_results
+        # --- END UPDATED ---
         self.updated_at = self.completed_at # Align updated_at with completed_at
 
     def fail(self, error_message: str):
@@ -88,5 +93,6 @@ class Job(Base):
         self.updated_at = datetime.now()
         # Ensure completed_at is Null if it failed
         self.completed_at = None
-        # Ensure detailed_results is Null if it failed
+        # --- UPDATED: Ensure detailed_results is Null if it failed ---
         self.detailed_results = None
+        # --- END UPDATED ---

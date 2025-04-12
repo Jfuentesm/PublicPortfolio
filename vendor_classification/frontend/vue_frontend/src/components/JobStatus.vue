@@ -116,14 +116,14 @@
          <!-- Use jobDetails.id -->
          <JobStats v-if="jobDetails?.status === 'completed' && jobDetails?.id" :job-id="jobDetails.id" />
 
-        <!-- ***** NEW: Detailed Results Table Section ***** -->
+        <!-- ***** UPDATED: Detailed Results Table Section ***** -->
         <JobResultsTable
             v-if="jobDetails?.status === 'completed' && jobDetails?.id"
             :results="jobStore.jobResults"
             :loading="jobStore.resultsLoading"
             :error="jobStore.resultsError"
-        />
-        <!-- ***** END NEW Section ***** -->
+            :target-level="jobDetails.target_level || 5"  /> <!-- Pass target level -->
+        <!-- ***** END UPDATED Section ***** -->
 
       </div>
     </div>
@@ -278,12 +278,17 @@
             if (data.status === 'completed' || data.status === 'failed') {
                 console.log(`JobStatus: [pollJobStatus] Job ${jobId} reached terminal state (${data.status}). Stopping polling.`); // LOGGING
                 stopPolling();
-                // --- NEW: Trigger results fetch if completed ---
+                // --- UPDATED: Trigger results fetch if completed ---
                 if (data.status === 'completed') {
                     console.log(`JobStatus: [pollJobStatus] Job ${jobId} completed. Triggering fetchJobResults.`); // LOGGING
-                    jobStore.fetchJobResults(jobId); // Fetch detailed results
+                    // Check if results are already loading or present before fetching again
+                    if (!jobStore.resultsLoading && !jobStore.jobResults) {
+                        jobStore.fetchJobResults(jobId); // Fetch detailed results
+                    } else {
+                         console.log(`JobStatus: [pollJobStatus] Job ${jobId} completed, but results already loading or present. Skipping fetch.`); // LOGGING
+                    }
                 }
-                // --- END NEW ---
+                // --- END UPDATED ---
             }
         } else {
              console.log(`JobStatus: [pollJobStatus] Job ID changed from ${jobId} to ${jobStore.currentJobId} during API call. Ignoring stale data.`); // LOGGING
@@ -401,9 +406,13 @@
               console.log(`JobStatus: Fetching initial details and starting polling for ${jobStore.currentJobId}`); // LOGGING
               startPolling(jobStore.currentJobId);
           } else if (currentDetails.status === 'completed') {
-              console.log(`JobStatus: Job ${jobStore.currentJobId} already completed. Fetching results.`); // LOGGING
+              console.log(`JobStatus: Job ${jobStore.currentJobId} already completed. Fetching results if needed.`); // LOGGING
               stopPolling(); // Ensure polling is stopped
-              jobStore.fetchJobResults(jobStore.currentJobId); // Fetch results if already completed on mount
+              // --- UPDATED: Fetch results only if not already present/loading ---
+              if (!jobStore.resultsLoading && !jobStore.jobResults) {
+                  jobStore.fetchJobResults(jobStore.currentJobId); // Fetch results if already completed on mount
+              }
+              // --- END UPDATED ---
           } else if (currentDetails.status === 'failed') {
               console.log(`JobStatus: Job ${jobStore.currentJobId} already failed. Not polling or fetching results.`); // LOGGING
               stopPolling(); // Ensure polling is stopped
@@ -440,9 +449,13 @@
                console.log(`JobStatus: Fetching initial details and starting polling due to job ID change to ${newJobId}`); // LOGGING
                startPolling(newJobId);
           } else if (currentDetails.status === 'completed') {
-               console.log(`JobStatus: Job ${newJobId} already completed. Fetching results.`); // LOGGING
+               console.log(`JobStatus: Job ${newJobId} already completed. Fetching results if needed.`); // LOGGING
                stopPolling(); // Ensure polling is stopped
-               jobStore.fetchJobResults(newJobId); // Fetch results if already completed
+               // --- UPDATED: Fetch results only if not already present/loading ---
+               if (!jobStore.resultsLoading && !jobStore.jobResults) {
+                    jobStore.fetchJobResults(newJobId); // Fetch results if already completed
+               }
+               // --- END UPDATED ---
           } else if (currentDetails.status === 'failed') {
                console.log(`JobStatus: Job ${newJobId} already failed. Not polling or fetching results.`); // LOGGING
                stopPolling(); // Ensure polling is stopped
@@ -466,9 +479,13 @@
       console.log(`JobStatus: Watched job status changed from ${oldStatus} to: ${newStatus} for job ${currentId}`); // LOGGING
 
       if (newStatus === 'completed' && oldStatus !== 'completed') {
-          console.log(`JobStatus: Job ${currentId} just completed. Stopping polling and fetching results.`); // LOGGING
+          console.log(`JobStatus: Job ${currentId} just completed. Stopping polling and fetching results if needed.`); // LOGGING
           stopPolling();
-          jobStore.fetchJobResults(currentId); // Fetch detailed results when status changes to completed
+          // --- UPDATED: Fetch results only if not already present/loading ---
+          if (!jobStore.resultsLoading && !jobStore.jobResults) {
+            jobStore.fetchJobResults(currentId); // Fetch detailed results when status changes to completed
+          }
+          // --- END UPDATED ---
       } else if (newStatus === 'failed' && oldStatus !== 'failed') {
           console.log(`JobStatus: Job ${currentId} just failed. Stopping polling.`); // LOGGING
           stopPolling();

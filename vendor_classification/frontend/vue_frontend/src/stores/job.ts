@@ -22,18 +22,27 @@ export interface JobDetails {
     created_by?: string;
 }
 
-// --- ADDED: Interface for a single detailed result item ---
+// --- UPDATED: Interface for a single detailed result item ---
 // Should align with app/schemas/job.py -> JobResultItem
 export interface JobResultItem {
     vendor_name: string;
-    naics_code: string | null;
-    naics_name: string | null;
-    confidence: number | null;
-    source: string | null; // e.g., "Initial", "Search"
-    notes: string | null;
-    reason: string | null; // Failure reason or notes
+    level1_id: string | null;
+    level1_name: string | null;
+    level2_id: string | null;
+    level2_name: string | null;
+    level3_id: string | null;
+    level3_name: string | null;
+    level4_id: string | null;
+    level4_name: string | null;
+    level5_id: string | null;
+    level5_name: string | null;
+    final_confidence: number | null;
+    final_status: string; // 'Classified', 'Not Possible', 'Error'
+    classification_source: string | null; // 'Initial', 'Search'
+    classification_notes_or_reason: string | null;
+    achieved_level: number | null; // 0-5
 }
-// --- END ADDED ---
+// --- END UPDATED ---
 
 
 export const useJobStore = defineStore('job', () => {
@@ -155,19 +164,26 @@ export const useJobStore = defineStore('job', () => {
 
     // --- ADDED: Detailed Job Results Actions ---
     async function fetchJobResults(jobId: string): Promise<void> {
-        // Only fetch if the jobId matches the current job and results aren't already loaded/loading
+        // Only fetch if the jobId matches the current job
         if (jobId !== currentJobId.value) {
             console.log(`JobStore: fetchJobResults called for ${jobId}, but current job is ${currentJobId.value}. Skipping.`);
             return;
         }
-        if (resultsLoading.value || jobResults.value) {
-             console.log(`JobStore: fetchJobResults called for ${jobId}, but already loading or results exist. Skipping.`);
-             return; // Avoid redundant fetches
+        // Avoid redundant fetches if already loading or results exist
+        if (resultsLoading.value) {
+             console.log(`JobStore: fetchJobResults called for ${jobId}, but already loading. Skipping.`);
+             return;
         }
+         // Allow re-fetching even if results exist, in case they need refresh (e.g., after reclassification - future)
+         // if (jobResults.value) {
+         //     console.log(`JobStore: fetchJobResults called for ${jobId}, but results already exist. Skipping.`);
+         //     return;
+         // }
 
         console.log(`JobStore: Fetching detailed results for job ${jobId}...`);
         resultsLoading.value = true;
         resultsError.value = null;
+        jobResults.value = null; // Clear previous results before fetching
         try {
             const results = await apiService.getJobResults(jobId);
             // Double-check the job ID hasn't changed *during* the API call

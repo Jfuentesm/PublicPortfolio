@@ -25,6 +25,9 @@ from utils.taxonomy_loader import load_taxonomy
 
 # Import the refactored logic
 from .classification_logic import process_vendors
+# Import the schema for type hinting
+from schemas.job import JobResultItem
+
 
 # Configure logger
 logger = get_logger("vendor_classification.tasks")
@@ -33,89 +36,100 @@ logger.debug("Successfully imported Dict and Any from typing for classification 
 # --- END ADDED ---
 
 
-# --- ADDED: Helper function to process results for DB storage ---
+# --- UPDATED: Helper function to process results for DB storage ---
 def _prepare_detailed_results_for_storage(
     results_dict: Dict[str, Dict],
-    target_level: int
+    target_level: int # Keep target_level for reference if needed, but we store all levels now
 ) -> List[Dict[str, Any]]:
     """
-    Processes the complex results dictionary into a flat list suitable for JSON storage
-    and frontend display. Extracts the classification details from the deepest successful level achieved.
+    Processes the complex results dictionary (containing level1, level2... sub-dicts)
+    into a flat list of dictionaries, where each dictionary represents a vendor
+    and contains fields for all L1-L5 classifications, plus final status details.
+    Matches the JobResultItem schema.
     """
     processed_list = []
-    logger.info(f"Preparing detailed results for storage (target level: {target_level}). Processing {len(results_dict)} vendors.")
+    logger.info(f"Preparing detailed results for storage. Processing {len(results_dict)} vendors.")
 
     for vendor_name, vendor_results in results_dict.items():
-        final_result = {
+        # Initialize the flat structure for this vendor
+        flat_result: Dict[str, Any] = {
             "vendor_name": vendor_name,
-            "naics_code": None,
-            "naics_name": None,
-            "confidence": None,
-            "source": "Initial", # Default source
-            "notes": None,
-            "reason": None, # Failure reason
+            "level1_id": None, "level1_name": None,
+            "level2_id": None, "level2_name": None,
+            "level3_id": None, "level3_name": None,
+            "level4_id": None, "level4_name": None,
+            "level5_id": None, "level5_name": None,
+            "final_confidence": None,
+            "final_status": "Not Possible", # Default status
+            "classification_source": "Initial", # Default source
+            "classification_notes_or_reason": None,
+            "achieved_level": 0 # Default achieved level
         }
 
-        # Find the result from the deepest successfully classified level up to target_level
-        deepest_level_found = 0
-        best_level_data = None
+        deepest_successful_level = 0
+        final_level_data = None
+        final_source = "Initial" # Track the source of the final decision point
+        final_notes_or_reason = None
 
-        for level in range(target_level, 0, -1): # Check from target down to 1
+        # Iterate through levels 1 to 5 to populate the flat structure
+        for level in range(1, 6):
             level_key = f"level{level}"
             level_data = vendor_results.get(level_key)
 
-            if level_data and isinstance(level_data, dict) and not level_data.get("classification_not_possible", True):
-                # Found a successful classification at this level
-                deepest_level_found = level
-                best_level_data = level_data
-                break # Stop searching once the deepest successful level is found
+            if level_data and isinstance(level_data, dict):
+                # Populate the corresponding fields in flat_result
+                flat_result[f"level{level}_id"] = level_data.get("category_id")
+                flat_result[f"level{level}_name"] = level_data.get("category_name")
 
-        if best_level_data:
-            # Populate from the best level found
-            final_result["naics_code"] = best_level_data.get("category_id")
-            final_result["naics_name"] = best_level_data.get("category_name")
-            final_result["confidence"] = best_level_data.get("confidence")
-            final_result["source"] = best_level_data.get("classification_source", "Initial") # Get source from level data
-            final_result["notes"] = best_level_data.get("notes")
-            # logger.debug(f"Vendor '{vendor_name}': Found best result at Level {deepest_level_found} (Source: {final_result['source']})")
+                # Track the deepest successful classification
+                if not level_data.get("classification_not_possible", True):
+                    deepest_successful_level = level
+                    final_level_data = level_data # Store data of the deepest successful level
+                    final_source = level_data.get("classification_source", final_source) # Update source if this level was successful
+                    final_notes_or_reason = level_data.get("notes") # Get notes from successful level
+                elif deepest_successful_level == 0: # If no level succeeded yet, track potential failure reasons/notes from L1
+                    if level == 1:
+                        final_notes_or_reason = level_data.get("classification_not_possible_reason") or level_data.get("notes")
+                        final_source = level_data.get("classification_source", final_source) # Source might be 'Search' even if L1 failed
+
+            # If a level wasn't processed (e.g., stopped early), its fields remain None
+
+        # Determine final status, confidence, and notes based on the deepest successful level
+        if final_level_data:
+            flat_result["final_status"] = "Classified"
+            flat_result["final_confidence"] = final_level_data.get("confidence")
+            flat_result["achieved_level"] = deepest_successful_level
+            flat_result["classification_notes_or_reason"] = final_notes_or_reason # Use notes from final level
         else:
-            # No successful classification found up to target_level.
-            # Try to find the reason from L1 or search failure.
-            l1_data = vendor_results.get("level1")
-            reason = "Classification not possible or failed." # Default reason
-            source = "Initial" # Default
+            # No level was successfully classified
+            flat_result["final_status"] = "Not Possible"
+            flat_result["final_confidence"] = 0.0
+            flat_result["achieved_level"] = 0
+            # Use the reason/notes captured from L1 failure or search failure
+            flat_result["classification_notes_or_reason"] = final_notes_or_reason
 
-            if l1_data and isinstance(l1_data, dict):
-                reason = l1_data.get("classification_not_possible_reason") or reason
-                source = l1_data.get("classification_source", source) # Get source even if failed
-                final_result["notes"] = l1_data.get("notes") # Get notes if available
+        flat_result["classification_source"] = final_source # Set the final determined source
 
-            # Check if search was attempted and failed (search results might contain more info)
-            search_results = vendor_results.get("search_results")
-            if search_results and isinstance(search_results, dict):
-                search_error = search_results.get("error")
-                if search_error:
-                    reason = f"Search Error: {search_error}"
-                # Check if L1 classification from search failed
-                search_l1_class = search_results.get("classification_l1")
-                if search_l1_class and isinstance(search_l1_class, dict) and search_l1_class.get("classification_not_possible"):
-                    reason = search_l1_class.get("classification_not_possible_reason") or reason
-                    final_result["notes"] = search_l1_class.get("notes") or final_result["notes"]
-                source = "Search" # If search was involved, mark source as Search
+        # Handle potential ERROR states explicitly
+        l1_data = vendor_results.get("level1")
+        if l1_data and l1_data.get("category_id") == "ERROR":
+            flat_result["final_status"] = "Error"
+            flat_result["classification_notes_or_reason"] = l1_data.get("classification_not_possible_reason") or "Processing error occurred"
 
-            final_result["reason"] = reason
-            final_result["source"] = source
-            final_result["naics_code"] = l1_data.get("category_id") if l1_data else "N/A" # Show L1 ID if available, even if failed later
-            final_result["naics_name"] = l1_data.get("category_name") if l1_data else "N/A"
-            final_result["confidence"] = 0.0 # Confidence is 0 if failed
-            # logger.debug(f"Vendor '{vendor_name}': No successful classification found. Reason: {reason} (Source: {source})")
+        # Validate against Pydantic model (optional, but good practice)
+        try:
+            JobResultItem.model_validate(flat_result)
+            processed_list.append(flat_result)
+        except Exception as validation_err:
+            logger.error(f"Validation failed for prepared result of vendor '{vendor_name}'",
+                         exc_info=True, extra={"result_data": flat_result})
+            # Optionally append a placeholder error entry or skip
+            # For now, let's skip invalid entries
+            continue
 
-
-        processed_list.append(final_result)
-
-    logger.info(f"Finished preparing {len(processed_list)} detailed result items.")
+    logger.info(f"Finished preparing {len(processed_list)} detailed result items for storage.")
     return processed_list
-# --- END ADDED ---
+# --- END UPDATED ---
 
 
 @shared_task(bind=True)
@@ -296,8 +310,9 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
     # --- Initialize results dictionary ---
     # This will be populated by process_vendors
     results_dict: Dict[str, Dict] = {}
-    # This will hold the processed results for DB storage
+    # --- UPDATED: This will hold the processed results for DB storage (List[JobResultItem]) ---
     detailed_results_for_db: Optional[List[Dict[str, Any]]] = None
+    # --- END UPDATED ---
     # --- End Initialize results dictionary ---
 
     try:
@@ -383,7 +398,9 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
         try:
             logger.info("Processing detailed results for database storage.")
             with log_duration(logger, "Processing detailed results"):
+                 # --- UPDATED: Call the new preparation function ---
                  detailed_results_for_db = _prepare_detailed_results_for_storage(results_dict, target_level)
+                 # --- END UPDATED ---
             logger.info(f"Processed {len(detailed_results_for_db)} items for detailed results storage.")
         except Exception as proc_err:
             logger.error("Failed during detailed results processing for DB", exc_info=True)
@@ -396,6 +413,8 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
                 logger.info(f"Generating output file")
                 with log_duration(logger, "Generating output file"):
                     # Pass the original complex results_dict to generate_output_file
+                    # generate_output_file needs to be updated if its logic depends on the old flattened structure
+                    # For now, assume it can handle the complex results_dict or adapt it internally
                     output_file_name = generate_output_file(normalized_vendors_data, results_dict, job_id)
                 logger.info(f"Output file generated", extra={"output_file": output_file_name})
         except Exception as gen_err:
@@ -422,8 +441,9 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
         # --- Final Commit Block ---
         try:
             logger.info("Attempting final job completion update in database.")
-            # Pass the processed detailed_results_for_db to the complete method
+            # --- UPDATED: Pass the processed detailed_results_for_db to the complete method ---
             job.complete(output_file_name, stats, detailed_results_for_db)
+            # --- END UPDATED ---
             job.progress = 1.0 # Ensure progress is 1.0 on completion
             logger.info(f"[_process_vendor_file_async] Committing final job completion status.")
             db.commit()
@@ -432,7 +452,10 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
                             "processing_duration": processing_duration,
                             "output_file": output_file_name,
                             "target_level": target_level,
-                            "detailed_results_stored": bool(detailed_results_for_db), # Log if detailed results were stored
+                            # --- UPDATED: Log if detailed results were stored ---
+                            "detailed_results_stored": bool(detailed_results_for_db),
+                            "detailed_results_count": len(detailed_results_for_db) if detailed_results_for_db else 0,
+                            # --- END UPDATED ---
                             "openrouter_calls": stats["api_usage"]["openrouter_calls"],
                             "tokens_used": stats["api_usage"]["openrouter_total_tokens"],
                             "tavily_calls": stats["api_usage"]["tavily_search_calls"],

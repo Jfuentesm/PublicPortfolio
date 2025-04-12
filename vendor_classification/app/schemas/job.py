@@ -7,19 +7,28 @@ from enum import Enum as PyEnum
 
 from models.job import JobStatus, ProcessingStage # Import enums from model
 
-# --- ADDED: Schema for a single result item ---
+# --- UPDATED: Schema for a single detailed result item ---
 class JobResultItem(BaseModel):
-    vendor_name: str
-    naics_code: Optional[str] = None
-    naics_name: Optional[str] = None
-    confidence: Optional[float] = None
-    source: Optional[str] = None # e.g., "Initial", "Search"
-    notes: Optional[str] = None
-    reason: Optional[str] = None # Failure reason or notes
+    vendor_name: str = Field(..., description="Original vendor name")
+    level1_id: Optional[str] = Field(None, description="Level 1 Category ID")
+    level1_name: Optional[str] = Field(None, description="Level 1 Category Name")
+    level2_id: Optional[str] = Field(None, description="Level 2 Category ID")
+    level2_name: Optional[str] = Field(None, description="Level 2 Category Name")
+    level3_id: Optional[str] = Field(None, description="Level 3 Category ID")
+    level3_name: Optional[str] = Field(None, description="Level 3 Category Name")
+    level4_id: Optional[str] = Field(None, description="Level 4 Category ID")
+    level4_name: Optional[str] = Field(None, description="Level 4 Category Name")
+    level5_id: Optional[str] = Field(None, description="Level 5 Category ID")
+    level5_name: Optional[str] = Field(None, description="Level 5 Category Name")
+    final_confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Confidence score of the final classification level achieved (0.0 if not possible)")
+    final_status: str = Field(..., description="Overall status ('Classified', 'Not Possible', 'Error')")
+    classification_source: Optional[str] = Field(None, description="Source of the final classification ('Initial', 'Search')")
+    classification_notes_or_reason: Optional[str] = Field(None, description="LLM notes or reason for failure/low confidence")
+    achieved_level: Optional[int] = Field(None, ge=0, le=5, description="Deepest level successfully classified (0 if none)")
 
     class Config:
         from_attributes = True # For potential future ORM mapping if results move to separate table
-# --- END ADDED ---
+# --- END UPDATED ---
 
 
 class JobBase(BaseModel):
@@ -52,7 +61,7 @@ class JobResponse(JobBase):
         use_enum_values = True # Ensure enum values (strings) are used in the response
 
 
-# Schema for the new results endpoint
-class JobResultsResponse(BaseModel):
-    job_id: str
-    results: List[JobResultItem] = []
+# Schema for the new results endpoint (redundant as endpoint returns List[JobResultItem])
+# class JobResultsResponse(BaseModel):
+#     job_id: str
+#     results: List[JobResultItem] = []

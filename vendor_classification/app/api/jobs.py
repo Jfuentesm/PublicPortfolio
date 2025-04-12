@@ -10,7 +10,9 @@ from core.database import get_db
 from api.auth import get_current_user
 from models.user import User
 from models.job import Job, JobStatus
-from schemas.job import JobResponse, JobResultItem # Import the new schemas
+# --- UPDATED: Import JobResultItem ---
+from schemas.job import JobResponse, JobResultItem
+# --- END UPDATED ---
 from core.logging_config import get_logger
 from core.log_context import set_log_context
 from core.config import settings # Need settings for file path construction
@@ -146,6 +148,7 @@ async def read_job_results(
 ):
     """
     Retrieve the detailed classification results for a specific completed job.
+    Returns a list of items conforming to the JobResultItem schema.
     """
     set_log_context({"username": current_user.username, "target_job_id": job_id})
     logger.info(f"Fetching detailed results for job ID: {job_id}")
@@ -174,6 +177,9 @@ async def read_job_results(
         logger.warning(f"Job {job_id} is completed but has no detailed results stored.", extra={"job_id": job_id})
         return []
 
+    # The detailed_results field should already contain a list of dicts
+    # matching the JobResultItem schema, prepared by the background task.
+    # Pydantic will validate this structure upon return.
     logger.info(f"Returning {len(job.detailed_results)} detailed result items for job ID: {job_id}")
     # Pydantic should automatically validate the list of dicts against List[JobResultItem]
     return job.detailed_results

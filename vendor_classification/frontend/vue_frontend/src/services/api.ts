@@ -4,7 +4,9 @@ import axios, {
     type AxiosError // Import AxiosError type
 } from 'axios';
 import { useAuthStore } from '@/stores/auth'; // Adjust path as needed
+// --- UPDATED: Import JobResultItem ---
 import type { JobDetails, JobResultItem } from '@/stores/job'; // Adjust path as needed
+// --- END UPDATED ---
 
 // --- Define API Response Interfaces ---
 
@@ -309,6 +311,7 @@ const apiService = {
 
     /**
      * Fetches the detailed classification results for a specific job.
+     * Returns a list of items matching the JobResultItem interface.
      */
     async getJobResults(jobId: string): Promise<JobResultItem[]> {
         console.log(`[api.ts getJobResults] Fetching detailed results for job ID: ${jobId}`); // LOGGING
