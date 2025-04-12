@@ -16,16 +16,21 @@ logger = logging.getLogger("vendor_classification")
 
 logger.info("Initializing application settings")
 
+
 # --- Define Key Lists ---
 # It's better to load these from environment variables in production
 # Example ENV format: OPENROUTER_API_KEYS="key1,key2,key3"
-# For this exercise, we'll define them directly as defaults.
+# For development, we'll define them directly as defaults.
 
 # --- BEGIN USER ACTION REQUIRED ---
 
 DEFAULT_OPENROUTER_KEYS = [
-    "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",
-    "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"
+    "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",
+    "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",
+    "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",
+    "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",
+    "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",
+    "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"
 ]
 
 DEFAULT_TAVILY_KEYS = [
@@ -114,6 +119,9 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = os.getenv("SMTP_TLS", "true").lower() == "true"
     EMAIL_FROM: Optional[str] = os.getenv("EMAIL_FROM", None) # Sender email
 
+    # --- ADDED: LLM Cache Configuration ---
+    USE_LLM_CACHE: bool = os.getenv("USE_LLM_CACHE", "false").lower() == "true"
+
     class Config:
         env_file = ".env"
         case_sensitive = True
@@ -129,6 +137,8 @@ class Settings(BaseSettings):
         logger.info(f"Password reset token expiry: {self.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES} minutes")
         logger.info(f"Frontend URL for links: {self.FRONTEND_URL}")
         logger.info(f"SMTP Configured: Host={self.SMTP_HOST is not None}, User={self.SMTP_USER is not None}, From={self.EMAIL_FROM is not None}")
+        # --- ADDED: Log cache setting ---
+        logger.info(f"LLM Cache Enabled: {self.USE_LLM_CACHE}")
 
 
         # Enhanced check for placeholder keys after initialization
