@@ -2,6 +2,8 @@
 import httpx
 import json
 import re
+import os  # Added for file operations
+import hashlib # Added for cache key generation
 from typing import List, Dict, Any, Optional, Set
 import logging
 import time
@@ -20,6 +22,66 @@ logger = get_logger("vendor_classification.llm_service")
 llm_trace_logger = logging.getLogger("llm_api_trace")
 
 logger.debug("Successfully imported generate_batch_prompt and generate_search_prompt from tasks.classification_prompts.")
+
+# --- Cache Configuration ---
+CACHE_DIR = "data/cache"
+CACHE_FILE_PATH = os.path.join(CACHE_DIR, "openrouter_dev_cache.json")
+CACHE_ENABLED = os.path.exists(CACHE_FILE_PATH) # Cache is active only if the file exists
+
+if CACHE_ENABLED:
+    logger.warning(f"--- OpenRouter DEV CACHE ACTIVE --- API calls will be cached in {CACHE_FILE_PATH}")
+else:
+    logger.info(f"--- OpenRouter DEV CACHE INACTIVE --- Cache file not found at {CACHE_FILE_PATH}. Live API calls will be made.")
+
+
+# --- Cache Helper Functions ---
+def _load_cache() -> Dict[str, Any]:
+    """Loads the cache from the JSON file."""
+    if not CACHE_ENABLED: # Double check, though should be checked before calling
+        return {}
+    try:
+        with open(CACHE_FILE_PATH, 'r') as f:
+            cache_data = json.load(f)
+            logger.debug(f"Loaded cache with {len(cache_data)} entries from {CACHE_FILE_PATH}")
+            return cache_data
+    except FileNotFoundError:
+        logger.info(f"Cache file {CACHE_FILE_PATH} not found. Starting with empty cache.")
+        return {}
+    except json.JSONDecodeError:
+        logger.error(f"Error decoding JSON from cache file {CACHE_FILE_PATH}. Returning empty cache.", exc_info=True)
+        return {}
+    except Exception as e:
+        logger.error(f"Error loading cache file {CACHE_FILE_PATH}: {e}", exc_info=True)
+        return {}
+
+def _save_cache(cache_data: Dict[str, Any]):
+    """Saves the cache data to the JSON file."""
+    if not CACHE_ENABLED: # Only save if cache was enabled at startup
+        return
+    try:
+        # Ensure the cache directory exists
+        os.makedirs(os.path.dirname(CACHE_FILE_PATH), exist_ok=True)
+        with open(CACHE_FILE_PATH, 'w') as f:
+            json.dump(cache_data, f, indent=2)
+        logger.debug(f"Saved cache with {len(cache_data)} entries to {CACHE_FILE_PATH}")
+    except IOError as e:
+        logger.error(f"Error writing cache file {CACHE_FILE_PATH}: {e}", exc_info=True)
+    except Exception as e:
+        logger.error(f"Unexpected error saving cache file {CACHE_FILE_PATH}: {e}", exc_info=True)
+
+def _generate_cache_key(payload: Dict[str, Any]) -> str:
+    """Generates a consistent cache key based on the request payload."""
+    # Create a stable representation of the payload (sort keys, handle messages)
+    key_data = {
+        "model": payload.get("model"),
+        "messages": [msg.get("content", "") for msg in payload.get("messages", [])], # Only content matters most
+        "temperature": payload.get("temperature"),
+        "max_tokens": payload.get("max_tokens"),
+        "top_p": payload.get("top_p"),
+        "response_format": payload.get("response_format")
+    }
+    stable_string = json.dumps(key_data, sort_keys=True)
+    return hashlib.sha256(stable_string.encode('utf-8')).hexdigest()
 
 # --- Helper function for JSON parsing (Remains unchanged) ---
 def _extract_json_from_response(response_content: str) -> Optional[Dict[str, Any]]:
@@ -73,7 +135,7 @@ def _extract_json_from_response(response_content: str) -> Optional[Dict[str, Any
 OPENROUTER_ROTATION_STATUS_CODES = {401, 403, 429, 500, 502, 503, 504}
 
 class LLMService:
-    """Service for interacting with OpenRouter API, with key rotation."""
+    """Service for interacting with OpenRouter API, with key rotation and optional dev caching."""
 
     def __init__(self):
         """Initialize the LLM service."""
@@ -82,6 +144,7 @@ class LLMService:
         self.api_base = settings.OPENROUTER_API_BASE
         self.model = settings.OPENROUTER_MODEL
         self.current_key_index = 0
+        self.cache = _load_cache() if CACHE_ENABLED else {} # Load cache on init if enabled
 
         if not self.api_keys:
              logger.error("OpenRouter API key list is empty! LLM calls will fail.")
@@ -91,7 +154,9 @@ class LLMService:
         logger.debug("LLM service initialized",
                     extra={"api_base": self.api_base,
                            "model": self.model,
-                           "key_count": len(self.api_keys)})
+                           "key_count": len(self.api_keys),
+                           "cache_enabled": CACHE_ENABLED,
+                           "initial_cache_size": len(self.cache)})
 
     def _get_current_key(self) -> Optional[str]:
         """Gets the current API key based on the index."""
@@ -124,7 +189,7 @@ class LLMService:
         search_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Send a batch of vendors to LLM for classification, with key rotation on failure.
+        Send a batch of vendors to LLM for classification, with key rotation and optional caching.
         """
         batch_names = [vd.get('vendor_name', f'Unknown_{i}') for i, vd in enumerate(batch_data)]
         context_type = "Search Context" if search_context else "Initial Data"
@@ -143,8 +208,8 @@ class LLMService:
 
         # --- Get current key ---
         current_api_key = self._get_current_key()
-        if not current_api_key:
-            logger.error("Cannot classify batch: No OpenRouter API key available (list empty or initialization failed).")
+        if not current_api_key and not CACHE_ENABLED: # Only fail if cache is also disabled
+            logger.error("Cannot classify batch: No OpenRouter API key available and cache is disabled.")
             llm_trace_logger.error(f"LLM_TRACE: LLM API Error (Batch ID: {batch_id}): No API key available.", extra={'correlation_id': correlation_id})
             # Return error structure consistent with other failures
             return {
@@ -169,11 +234,10 @@ class LLMService:
             )
             prompt_length = len(prompt)
             logger.debug(f"Classification prompt created", extra={"prompt_length": prompt_length, "current_key_index": self.current_key_index})
-            # Log the generated prompt (already present)
             llm_trace_logger.debug(f"LLM_TRACE: Generated Prompt (Batch ID: {batch_id}):\n-------\n{prompt}\n-------", extra={'correlation_id': correlation_id})
 
         headers = {
-            "Authorization": f"Bearer {current_api_key}", # Use current key
+            "Authorization": f"Bearer {current_api_key}", # Use current key (might be None if only cache is active)
             "Content-Type": "application/json",
             "HTTP-Referer": "naicsvendorclassification.com", "X-Title": "NAICS Vendor Classification"
         }
@@ -185,15 +249,35 @@ class LLMService:
             "response_format": {"type": "json_object"}
         }
 
+        # --- CACHE CHECK ---
+        cache_key = _generate_cache_key(payload)
+        if CACHE_ENABLED and cache_key in self.cache:
+            logger.warning(f"--- CACHE HIT --- Returning cached response for Level {level} batch {batch_id[:8]}...")
+            llm_trace_logger.info(f"LLM_TRACE: Cache Hit (Batch ID: {batch_id}, Key: {cache_key})", extra={'correlation_id': correlation_id})
+            # Simulate usage if needed, or return cached usage
+            cached_response = self.cache[cache_key]
+            cached_response.setdefault("usage", {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}) # Ensure usage exists
+            return cached_response
+        # --- END CACHE CHECK ---
+
+        # If cache miss or disabled, proceed with API call
+        logger.info(f"--- CACHE MISS --- Making LIVE API call for Level {level} batch {batch_id[:8]}...")
+
+        if not current_api_key: # Check key again *after* cache miss
+             logger.error("Cannot make live API call: No OpenRouter API key available.")
+             llm_trace_logger.error(f"LLM_TRACE: LLM API Error (Batch ID: {batch_id}): No API key available after cache miss.", extra={'correlation_id': correlation_id})
+             # Return error structure
+             return {
+                 "result": { "level": level, "batch_id": batch_id, "parent_category_id": parent_category_id, "classifications": [ { "vendor_name": vd.get('vendor_name', f'Unknown_{i}'), "category_id": "ERROR", "category_name": "ERROR", "confidence": 0.0, "classification_not_possible": True, "classification_not_possible_reason": "No API key configured", "notes": "Failed due to missing API key configuration." } for i, vd in enumerate(batch_data) ] },
+                 "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+             }
+
         # Log Request Details (Trace Log)
         try:
-            # Log Headers (Redacted Key - already present)
             log_headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
             log_headers['Authorization'] = f'Bearer [REDACTED_KEY_INDEX_{self.current_key_index}]'
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Headers (Batch ID: {batch_id}):\n{json.dumps(log_headers, indent=2)}", extra={'correlation_id': correlation_id})
-            # --- ADDED: Log Full Request Payload ---
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Payload (Batch ID: {batch_id}):\n{json.dumps(payload, indent=2)}", extra={'correlation_id': correlation_id})
-            # --- END ADDED ---
         except Exception as log_err:
             llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM request details (Batch ID: {batch_id}): {log_err}", extra={'correlation_id': correlation_id})
 
@@ -203,12 +287,10 @@ class LLMService:
             start_time = time.time()
             async with httpx.AsyncClient() as client:
                 response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=90.0)
-                # --- Log Raw Response (already present) ---
                 raw_content = response.text
                 status_code = response.status_code
                 api_duration = time.time() - start_time
                 llm_trace_logger.debug(f"LLM_TRACE: LLM Raw Response (Batch ID: {batch_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
-                # --- End Log Raw Response ---
                 response.raise_for_status() # Check for HTTP errors AFTER logging raw response
                 response_data = response.json()
 
@@ -218,7 +300,6 @@ class LLMService:
                  if message and isinstance(message, dict):
                      content_field = message.get("content")
                      if content_field:
-                         # Update raw_content if message.content exists, otherwise keep response.text
                          raw_content = content_field
                          logger.debug("Extracted 'content' field from LLM JSON response.")
                      else:
@@ -249,7 +330,6 @@ class LLMService:
                 raise ValueError(f"LLM response was not valid JSON or could not be extracted. Preview: {str(raw_content)[:200]}")
 
             try:
-                 # Log Parsed Response (already present)
                  llm_trace_logger.debug(f"LLM_TRACE: LLM Parsed Response (Batch ID: {batch_id}):\n{json.dumps(result, indent=2)}", extra={'correlation_id': correlation_id})
             except Exception as log_err:
                  llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM parsed response (Batch ID: {batch_id}): {log_err}", extra={'correlation_id': correlation_id})
@@ -274,44 +354,41 @@ class LLMService:
                            "failed_or_not_possible": classification_count - successful_count
                        })
 
-            return { "result": result, "usage": usage_data }
+            api_result = { "result": result, "usage": usage_data }
+
+            # --- SAVE TO CACHE ---
+            if CACHE_ENABLED:
+                logger.info(f"--- SAVING TO CACHE --- Storing successful response for batch {batch_id[:8]} (Key: {cache_key[:8]}...)")
+                self.cache[cache_key] = api_result # Add result to in-memory cache
+                _save_cache(self.cache) # Save the whole cache to file
+            # --- END SAVE TO CACHE ---
+
+            return api_result
 
         except httpx.HTTPStatusError as e:
              response_text = raw_content or (e.response.text[:500] if hasattr(e.response, 'text') else "[No Response Body]")
              status_code = e.response.status_code
              logger.error(f"HTTP error during LLM batch classification", exc_info=False,
                          extra={ "status_code": status_code, "response_text": response_text, "batch_id": batch_id, "level": level, "key_index_used": self.current_key_index })
-             # Log HTTP Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Batch ID: {batch_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
-
-             # --- Key Rotation Logic (already present) ---
-             if status_code in OPENROUTER_ROTATION_STATUS_CODES:
-                 self._rotate_key()
-             # --- END Key Rotation Logic ---
+             if status_code in OPENROUTER_ROTATION_STATUS_CODES: self._rotate_key()
              raise # Re-raise for tenacity
 
         except httpx.RequestError as e:
              logger.error(f"Network error during LLM batch classification", exc_info=False,
                          extra={ "error_details": str(e), "batch_id": batch_id, "level": level, "key_index_used": self.current_key_index })
-             # Log Network Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
-             # Optionally rotate on specific network errors too, but less common for key issues
-             # self._rotate_key()
              raise # Re-raise for tenacity
 
         except ValueError as ve: # Catch the specific error raised on JSON parse failure
              logger.error(f"LLM response parsing error during batch classification", exc_info=False,
                           extra={"error": str(ve), "batch_id": batch_id, "level": level})
-             # Don't rotate on parse errors, likely not a key issue
              raise # Re-raise for tenacity
 
         except Exception as e:
             error_context = { "batch_size": len(batch_data), "level": level, "parent_category_id": parent_category_id, "error": str(e), "model": self.model, "batch_id": batch_id, "key_index_used": self.current_key_index }
             logger.error(f"Unexpected error during LLM batch classification", exc_info=True, extra=error_context)
-            # Log Unexpected Error (already present)
             llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
-            # Optionally rotate on unexpected errors, but might hide other issues
-            # self._rotate_key()
             raise # Re-raise for tenacity
 
     @retry(stop=stop_after_attempt(settings.MAX_RETRIES), wait=wait_exponential(multiplier=1, min=settings.RETRY_DELAY, max=10))
@@ -323,7 +400,7 @@ class LLMService:
         taxonomy: Taxonomy
     ) -> Dict[str, Any]:
         """
-        Process search results for L1 classification, with key rotation on failure.
+        Process search results for L1 classification, with key rotation and optional caching.
         """
         vendor_name = vendor_data.get('vendor_name', 'UnknownVendor')
         logger.info(f"Processing search results for initial L1 classification",
@@ -336,8 +413,8 @@ class LLMService:
 
         # --- Get current key ---
         current_api_key = self._get_current_key()
-        if not current_api_key:
-            logger.error("Cannot process search results: No OpenRouter API key available.")
+        if not current_api_key and not CACHE_ENABLED: # Only fail if cache is also disabled
+            logger.error("Cannot process search results: No OpenRouter API key available and cache is disabled.")
             llm_trace_logger.error(f"LLM_TRACE: LLM API Error (Attempt ID: {attempt_id}): No API key available.", extra={'correlation_id': correlation_id})
             return {
                 "result": { "vendor_name": vendor_name, "category_id": "ERROR", "category_name": "ERROR", "confidence": 0.0, "classification_not_possible": True, "classification_not_possible_reason": "No API key configured", "notes": "" },
@@ -349,7 +426,6 @@ class LLMService:
             prompt = generate_search_prompt(vendor_data, search_results, taxonomy, attempt_id)
             prompt_length = len(prompt)
             logger.debug(f"Search results prompt created", extra={"prompt_length": prompt_length, "current_key_index": self.current_key_index})
-            # Log Generated Prompt (already present)
             llm_trace_logger.debug(f"LLM_TRACE: Generated Search Prompt (Attempt ID: {attempt_id}):\n-------\n{prompt}\n-------", extra={'correlation_id': correlation_id})
 
         headers = {
@@ -365,15 +441,32 @@ class LLMService:
             "response_format": {"type": "json_object"}
         }
 
+        # --- CACHE CHECK ---
+        cache_key = _generate_cache_key(payload)
+        if CACHE_ENABLED and cache_key in self.cache:
+            logger.warning(f"--- CACHE HIT --- Returning cached response for search results processing {attempt_id[:8]}...")
+            llm_trace_logger.info(f"LLM_TRACE: Cache Hit (Attempt ID: {attempt_id}, Key: {cache_key})", extra={'correlation_id': correlation_id})
+            cached_response = self.cache[cache_key]
+            cached_response.setdefault("usage", {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+            return cached_response
+        # --- END CACHE CHECK ---
+
+        logger.info(f"--- CACHE MISS --- Making LIVE API call for search results processing {attempt_id[:8]}...")
+
+        if not current_api_key: # Check key again *after* cache miss
+             logger.error("Cannot make live API call for search results: No OpenRouter API key available.")
+             llm_trace_logger.error(f"LLM_TRACE: LLM API Error (Attempt ID: {attempt_id}): No API key available after cache miss.", extra={'correlation_id': correlation_id})
+             return {
+                 "result": { "vendor_name": vendor_name, "category_id": "ERROR", "category_name": "ERROR", "confidence": 0.0, "classification_not_possible": True, "classification_not_possible_reason": "No API key configured", "notes": "" },
+                 "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+             }
+
         # Log Request Details (Trace Log)
         try:
-            # Log Headers (Redacted Key - already present)
             log_headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
             log_headers['Authorization'] = f'Bearer [REDACTED_KEY_INDEX_{self.current_key_index}]'
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Headers (Attempt ID: {attempt_id}):\n{json.dumps(log_headers, indent=2)}", extra={'correlation_id': correlation_id})
-            # --- ADDED: Log Full Request Payload ---
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Payload (Attempt ID: {attempt_id}):\n{json.dumps(payload, indent=2)}", extra={'correlation_id': correlation_id})
-            # --- END ADDED ---
         except Exception as log_err:
             llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM request details (Attempt ID: {attempt_id}): {log_err}", extra={'correlation_id': correlation_id})
 
@@ -383,12 +476,10 @@ class LLMService:
             start_time = time.time()
             async with httpx.AsyncClient() as client:
                 response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=60.0)
-                # --- Log Raw Response (already present) ---
                 raw_content = response.text
                 status_code = response.status_code
                 api_duration = time.time() - start_time
                 llm_trace_logger.debug(f"LLM_TRACE: LLM Raw Response (Attempt ID: {attempt_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
-                # --- End Log Raw Response ---
                 response.raise_for_status()
                 response_data = response.json()
 
@@ -398,7 +489,6 @@ class LLMService:
                  if message and isinstance(message, dict):
                      content_field = message.get("content")
                      if content_field:
-                         # Update raw_content if message.content exists, otherwise keep response.text
                          raw_content = content_field
                          logger.debug("Extracted 'content' field from LLM JSON response (search).")
                      else:
@@ -423,7 +513,6 @@ class LLMService:
                 raise ValueError(f"LLM response after search was not valid JSON or could not be extracted. Preview: {str(raw_content)[:200]}")
 
             try:
-                 # Log Parsed Response (already present)
                  llm_trace_logger.debug(f"LLM_TRACE: LLM Parsed Response (Attempt ID: {attempt_id}):\n{json.dumps(result, indent=2)}", extra={'correlation_id': correlation_id})
             except Exception as log_err:
                  llm_trace_logger.warning(f"LLM_TRACE: Failed to log LLM parsed response (Attempt ID: {attempt_id}): {log_err}", extra={'correlation_id': correlation_id})
@@ -437,42 +526,39 @@ class LLMService:
             usage_data = { "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": total_tokens }
             set_log_context({ "openrouter_prompt_tokens": prompt_tokens, "openrouter_completion_tokens": completion_tokens, "openrouter_total_tokens": total_tokens })
 
-            return { "result": result, "usage": usage_data }
+            api_result = { "result": result, "usage": usage_data }
+
+            # --- SAVE TO CACHE ---
+            if CACHE_ENABLED:
+                logger.info(f"--- SAVING TO CACHE --- Storing successful response for search results {attempt_id[:8]} (Key: {cache_key[:8]}...)")
+                self.cache[cache_key] = api_result # Add result to in-memory cache
+                _save_cache(self.cache) # Save the whole cache to file
+            # --- END SAVE TO CACHE ---
+
+            return api_result
 
         except httpx.HTTPStatusError as e:
              response_text = raw_content or (e.response.text[:500] if hasattr(e.response, 'text') else "[No Response Body]")
              status_code = e.response.status_code
              logger.error(f"HTTP error during search result processing", exc_info=False,
                          extra={ "status_code": status_code, "response_text": response_text, "vendor": vendor_name, "attempt_id": attempt_id, "key_index_used": self.current_key_index })
-             # Log HTTP Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Attempt ID: {attempt_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
-
-             # --- Key Rotation Logic (already present) ---
-             if status_code in OPENROUTER_ROTATION_STATUS_CODES:
-                 self._rotate_key()
-             # --- END Key Rotation Logic ---
+             if status_code in OPENROUTER_ROTATION_STATUS_CODES: self._rotate_key()
              raise # Re-raise for tenacity
 
         except httpx.RequestError as e:
              logger.error(f"Network error during search result processing", exc_info=False,
                          extra={ "error_details": str(e), "vendor": vendor_name, "attempt_id": attempt_id, "key_index_used": self.current_key_index })
-             # Log Network Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
-             # Optionally rotate on network errors
-             # self._rotate_key()
              raise # Re-raise for tenacity
 
         except ValueError as ve: # Catch the specific error raised on JSON parse failure
              logger.error(f"LLM response parsing error during search result processing", exc_info=False,
                           extra={"error": str(ve), "vendor": vendor_name, "attempt_id": attempt_id})
-             # Don't rotate on parse errors
              raise # Re-raise for tenacity
 
         except Exception as e:
             error_context = { "vendor": vendor_name, "error": str(e), "model": self.model, "attempt_id": attempt_id, "key_index_used": self.current_key_index }
             logger.error(f"Unexpected error during search result processing", exc_info=True, extra=error_context)
-            # Log Unexpected Error (already present)
             llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
-            # Optionally rotate on unexpected errors
-            # self._rotate_key()
             raise # Re-raise for tenacity
