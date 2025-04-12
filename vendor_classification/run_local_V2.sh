@@ -53,8 +53,8 @@ echo "Docker container/network/volume cleanup attempt finished."
 # ----- END DOCKER CLEANUP -----
 
 # Create necessary directories
-echo "Creating data directories..."
-mkdir -p data/input data/output data/taxonomy data/logs # Ensures structure exists
+echo "Creating data directories (input, output, taxonomy, logs, cache)..."
+mkdir -p data/input data/output data/taxonomy data/logs data/cache # Ensures all structure exists
 
 # --- ADDED: Clear logs directory ---
 echo "Clearing previous contents of data/logs/ ..."
@@ -63,9 +63,20 @@ echo "Clearing previous contents of data/logs/ ..."
 rm -rf data/logs && mkdir -p data/logs || { echo "ERROR: Failed to clear and recreate data/logs directory. Check permissions."; exit 1; }
 # --- END: Clear logs directory ---
 
-# Set permissions for log directory (needs to happen AFTER recreation)
-echo "Setting permissions for log directory..."
+# --- ADDED: Ensure cache file exists (Optional but helpful) ---
+CACHE_FILE="data/cache/openrouter_dev_cache.json"
+if [ ! -f "$CACHE_FILE" ]; then
+    echo "Cache file '$CACHE_FILE' not found. Creating empty file..."
+    touch "$CACHE_FILE" || { echo "ERROR: Failed to create cache file '$CACHE_FILE'. Check permissions."; exit 1; }
+else
+    echo "Cache file '$CACHE_FILE' already exists."
+fi
+# --- END: Ensure cache file exists ---
+
+# Set permissions for log and cache directories (needs to happen AFTER recreation/creation)
+echo "Setting permissions for data directories (logs and cache)..."
 chmod -R 777 data/logs || echo "Warning: Could not set permissions on data/logs. Logging might fail if user IDs mismatch."
+chmod -R 777 data/cache || echo "Warning: Could not set permissions on data/cache. Caching might fail if user IDs mismatch." # <-- ADDED THIS LINE
 
 # Export the port as an environment variable
 export WEB_PORT
@@ -94,8 +105,8 @@ $COMPOSE_CMD up -d
 
 # Check if containers started successfully
 if [ $? -ne 0 ]; then
-  echo "There was an error starting the containers. Please check the Docker logs."
-  exit 1
+    echo "There was an error starting the containers. Please check the Docker logs."
+    exit 1
 fi
 
 WAIT_SECONDS=15 # Keep wait time as DB init might take a moment
@@ -141,6 +152,7 @@ echo "Login with username: admin, password: password"
 echo "PostgreSQL is available on host port 5433"
 echo "Database data in volume '$VOLUME_NAME' was REMOVED and recreated." # Updated message
 echo "Log directory 'data/logs' was cleared before this run."
+echo "Cache file '$CACHE_FILE' ensured to exist." # Added message
 echo ""
 echo "*** Frontend Development Note ***"
 echo "The frontend served by this container is the *built* version."
