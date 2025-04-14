@@ -4,8 +4,8 @@ import axios, {
     type AxiosError // Import AxiosError type
 } from 'axios';
 import { useAuthStore } from '@/stores/auth'; // Adjust path as needed
-// --- UPDATED: Import JobResultItem ---
-import type { JobDetails, JobResultItem } from '@/stores/job'; // Adjust path as needed
+// --- UPDATED: Import JobResultItem and ReviewResultItem ---
+import type { JobDetails, JobResultItem, ReviewResultItem } from '@/stores/job'; // Adjust path as needed
 // --- END UPDATED ---
 
 // --- Define API Response Interfaces ---
@@ -81,7 +81,21 @@ export interface JobResponse {
     created_by: string;
     error_message?: string | null;
     target_level: number; // Ensure target_level is included here
+    // --- ADDED: Job Type and Parent Link ---
+    job_type: 'CLASSIFICATION' | 'REVIEW';
+    parent_job_id: string | null;
+    // --- END ADDED ---
 }
+
+// --- ADDED: Job Results Response Interface ---
+// Matches backend schemas/job.py -> JobResultsResponse
+export interface JobResultsResponse {
+    job_id: string;
+    job_type: 'CLASSIFICATION' | 'REVIEW';
+    results: JobResultItem[] | ReviewResultItem[]; // Union type
+}
+// --- END ADDED ---
+
 
 // Matches backend models/classification.py -> ProcessingStats and console log
 export interface JobStatsData {
@@ -108,6 +122,13 @@ export interface JobStatsData {
         tavily_search_calls: number | null;
         cost_estimate_usd: number | null;
     } | null; // Allow api_usage itself to be null if not populated
+    // --- ADDED: Stats specific to REVIEW jobs ---
+    reclassify_input?: Array<{ vendor_name: string; hint: string }>; // Input hints
+    total_items_processed?: number;
+    successful_reclassifications?: number;
+    failed_reclassifications?: number;
+    parent_job_id?: string; // Include parent ID in stats for review jobs
+    // --- END ADDED ---
 }
 
 
@@ -122,6 +143,7 @@ interface GetJobsParams {
     status?: string;
     start_date?: string; // ISO string format
     end_date?: string; // ISO string format
+    job_type?: 'CLASSIFICATION' | 'REVIEW'; // Filter by type
     skip?: number;
     limit?: number;
 }
@@ -129,6 +151,19 @@ interface GetJobsParams {
 // --- ADDED: Password Reset Interfaces ---
 // Matches backend schemas/password_reset.py -> MessageResponse
 interface MessageResponse {
+    message: string;
+}
+// --- END ADDED ---
+
+// --- ADDED: Reclassification Interfaces ---
+// Matches backend schemas/review.py -> ReclassifyRequestItem
+interface ReclassifyRequestItemData {
+    vendor_name: string;
+    hint: string;
+}
+// Matches backend schemas/review.py -> ReclassifyResponse
+interface ReclassifyResponseData {
+    review_job_id: string;
     message: string;
 }
 // --- END ADDED ---
@@ -294,7 +329,7 @@ const apiService = {
     async getJobStatus(jobId: string): Promise<JobDetails> {
         console.log(`[api.ts getJobStatus] Fetching status for job ID: ${jobId}`); // LOGGING
         const response = await axiosInstance.get<JobDetails>(`/jobs/${jobId}`);
-        console.log(`[api.ts getJobStatus] Received status for job ${jobId}:`, response.data.status, `Target Level: ${response.data.target_level}`); // LOGGING
+        console.log(`[api.ts getJobStatus] Received status for job ${jobId}:`, response.data.status, `Target Level: ${response.data.target_level}`, `Job Type: ${response.data.job_type}`); // LOGGING
         return response.data;
     },
 
@@ -311,12 +346,12 @@ const apiService = {
 
     /**
      * Fetches the detailed classification results for a specific job.
-     * Returns a list of items matching the JobResultItem interface.
+     * Returns the JobResultsResponse structure containing job type and results list.
      */
-    async getJobResults(jobId: string): Promise<JobResultItem[]> {
+    async getJobResults(jobId: string): Promise<JobResultsResponse> {
         console.log(`[api.ts getJobResults] Fetching detailed results for job ID: ${jobId}`); // LOGGING
-        const response = await axiosInstance.get<JobResultItem[]>(`/jobs/${jobId}/results`);
-        console.log(`[api.ts getJobResults] Received ${response.data.length} detailed result items for job ${jobId}.`); // LOGGING
+        const response = await axiosInstance.get<JobResultsResponse>(`/jobs/${jobId}/results`);
+        console.log(`[api.ts getJobResults] Received ${response.data.results.length} detailed result items for job ${jobId} (Type: ${response.data.job_type}).`); // LOGGING
         return response.data;
     },
 
@@ -467,8 +502,21 @@ const apiService = {
         });
         console.log(`[api.ts resetPassword] Reset response: ${response.data.message}`);
         return response.data;
-    }
+    },
     // --- END Password Reset API Methods ---
+
+    // --- ADDED: Reclassification API Method ---
+    /**
+     * Submits flagged items for reclassification.
+     */
+    async reclassifyJob(originalJobId: string, items: ReclassifyRequestItemData[]): Promise<ReclassifyResponseData> {
+        console.log(`[api.ts reclassifyJob] Submitting ${items.length} items for reclassification for job ${originalJobId}`);
+        const payload = { items: items };
+        const response = await axiosInstance.post<ReclassifyResponseData>(`/jobs/${originalJobId}/reclassify`, payload);
+        console.log(`[api.ts reclassifyJob] Reclassification job started: ${response.data.review_job_id}`);
+        return response.data;
+    }
+    // --- END ADDED ---
 };
 
 export default apiService;

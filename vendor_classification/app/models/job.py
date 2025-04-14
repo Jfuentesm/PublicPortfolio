@@ -1,6 +1,6 @@
 # <file path='app/models/job.py'>
 # --- file path='app/models/job.py' ---
-from sqlalchemy import Column, String, Float, DateTime, Enum as SQLEnum, JSON, Text, Integer # <<< ADDED Integer
+from sqlalchemy import Column, String, Float, DateTime, Enum as SQLEnum, JSON, Text, Integer, ForeignKey # <<< ADDED ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Session # <<< ADDED IMPORT FOR TYPE HINTING
 from enum import Enum as PyEnum
@@ -26,7 +26,16 @@ class ProcessingStage(str, PyEnum):
     CLASSIFICATION_L4 = "classification_level_4"
     CLASSIFICATION_L5 = "classification_level_5" # ADDED L5 Stage
     SEARCH = "search_unknown_vendors" # This stage now covers search AND recursive post-search classification
+    RECLASSIFICATION = "reclassification" # <<< ADDED Reclassification Stage
     RESULT_GENERATION = "result_generation"
+
+# --- ADDED: Job Type Enum ---
+class JobType(str, PyEnum):
+    """Type of job."""
+    CLASSIFICATION = "CLASSIFICATION"
+    REVIEW = "REVIEW"
+# --- END ADDED ---
+
 
 class Job(Base):
     """Job model for tracking classification jobs."""
@@ -45,13 +54,19 @@ class Job(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
     notification_email = Column(String, nullable=True)
     error_message = Column(Text, nullable=True)
-    stats = Column(JSON, default={}) # Structure defined by ProcessingStats model
+    stats = Column(JSON, default={}) # Structure defined by ProcessingStats model OR used for review inputs
     created_by = Column(String, nullable=False)
     target_level = Column(Integer, nullable=False, default=5) # Store the desired classification depth (1-5)
-    # --- ADDED: Detailed Results ---
-    # Stores List[JobResultItem] as defined in schemas/job.py
-    detailed_results = Column(JSON, nullable=True)
+
+    # --- ADDED: Job Type and Parent Link ---
+    job_type = Column(String, default=JobType.CLASSIFICATION.value, nullable=False)
+    parent_job_id = Column(String, ForeignKey("jobs.id"), nullable=True, index=True) # Link to original job for reviews
     # --- END ADDED ---
+
+    # Stores List[JobResultItem] for CLASSIFICATION jobs
+    # Stores List[ReviewResultItem] for REVIEW jobs
+    detailed_results = Column(JSON, nullable=True)
+
 
     def update_progress(self, progress: float, stage: ProcessingStage, db_session: Optional[Session] = None): # Type hint now valid
         """Update job progress and stage, optionally committing."""
@@ -70,13 +85,15 @@ class Job(Base):
 
 
     # --- UPDATED: complete method signature ---
-    def complete(self, output_file_name: str, stats: Dict[str, Any], detailed_results: Optional[List[Dict[str, Any]]] = None):
+    # detailed_results type hint updated to handle both list types
+    def complete(self, output_file_name: Optional[str], stats: Dict[str, Any], detailed_results: Optional[List[Dict[str, Any]]] = None):
     # --- END UPDATED ---
         """Mark job as completed."""
         self.status = JobStatus.COMPLETED.value
         self.progress = 1.0
-        self.current_stage = ProcessingStage.RESULT_GENERATION.value # Ensure stage reflects completion
-        self.output_file_name = output_file_name
+        # Ensure stage reflects completion (Result Generation for CLASSIFICATION, RECLASSIFICATION for REVIEW)
+        self.current_stage = ProcessingStage.RESULT_GENERATION.value if self.job_type == JobType.CLASSIFICATION.value else ProcessingStage.RECLASSIFICATION.value
+        self.output_file_name = output_file_name # Can be None for review jobs if no file is generated
         self.completed_at = datetime.now()
         self.stats = stats
         # --- UPDATED: Save detailed results ---

@@ -1,7 +1,15 @@
 <template>
     <div v-if="jobStore.currentJobId" class="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200">
-      <div class="bg-gray-100 text-gray-800 p-4 sm:p-5 border-b border-gray-200">
+      <div class="bg-gray-100 text-gray-800 p-4 sm:p-5 border-b border-gray-200 flex justify-between items-center">
         <h4 class="text-xl font-semibold mb-0">Job Status</h4>
+         <!-- Link to Parent Job (if this is a Review Job) -->
+         <button v-if="jobDetails?.job_type === 'REVIEW' && jobDetails.parent_job_id"
+                @click="viewParentJob"
+                title="View Original Classification Job"
+                class="text-xs inline-flex items-center px-2.5 py-1.5 border border-gray-300 shadow-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary">
+            <ArrowUturnLeftIcon class="h-4 w-4 mr-1.5 text-gray-500"/>
+            View Original Job
+        </button>
       </div>
       <div class="p-6 sm:p-8 space-y-6"> <!-- Increased spacing -->
 
@@ -11,12 +19,23 @@
             <span>{{ errorMessage }}</span>
         </div>
 
+        <!-- Reclassification Started Message -->
+        <div v-if="showReclassifySuccessMessage && jobStore.lastReviewJobId" class="p-3 bg-green-100 border border-green-300 text-green-800 rounded-md text-sm flex items-center justify-between">
+             <div class="flex items-center">
+                 <CheckCircleIcon class="h-5 w-5 mr-2 text-green-600 flex-shrink-0"/>
+                 <span>Re-classification job started successfully (ID: {{ jobStore.lastReviewJobId }}).</span>
+             </div>
+             <button @click="viewReviewJob(jobStore.lastReviewJobId!)" class="ml-4 text-xs font-semibold text-green-700 hover:text-green-900 underline">View Review Job</button>
+        </div>
+
+
         <!-- Job ID & Status Row -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm border-b border-gray-100 pb-4">
           <div>
              <strong class="text-gray-600 block mb-1">Job ID:</strong>
              <!-- Display the full ID for clarity during debugging -->
              <span class="text-gray-900 font-mono text-xs bg-gray-100 px-2 py-1 rounded break-all">{{ jobStore.currentJobId }}</span>
+             <span v-if="jobDetails?.job_type === 'REVIEW'" class="ml-2 inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800 align-middle">REVIEW</span>
           </div>
            <div class="flex items-center space-x-2">
              <strong class="text-gray-600">Status:</strong>
@@ -55,7 +74,9 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-500 border-t border-gray-100 pt-5">
             <div>
                  <strong class="block text-gray-600 mb-0.5">Created:</strong>
+                 <!-- --- FIX: Use formattedCreatedAt computed property --- -->
                  <span>{{ formattedCreatedAt }}</span>
+                 <!-- --- END FIX --- -->
             </div>
             <div>
                  <strong class="block text-gray-600 mb-0.5">Updated:</strong>
@@ -95,8 +116,8 @@
             <p v-if="notifyMessage" :class="notifyMessageIsError ? 'text-red-600' : 'text-green-600'" class="mt-2 text-xs">{{ notifyMessage }}</p>
         </div>
 
-        <!-- Download Section -->
-        <div v-if="jobDetails?.status === 'completed'" class="pt-5 border-t border-gray-100">
+        <!-- Download Section (Only for completed CLASSIFICATION jobs) -->
+        <div v-if="jobDetails?.status === 'completed' && jobDetails?.job_type === 'CLASSIFICATION'" class="pt-5 border-t border-gray-100">
           <button @click="downloadResults"
                   class="w-full flex justify-center items-center px-4 py-2.5 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   :disabled="isDownloadLoading">
@@ -116,13 +137,24 @@
          <!-- Use jobDetails.id -->
          <JobStats v-if="jobDetails?.status === 'completed' && jobDetails?.id" :job-id="jobDetails.id" />
 
-        <!-- ***** UPDATED: Detailed Results Table Section ***** -->
+        <!-- ***** UPDATED: Conditional Detailed Results Table Section ***** -->
+        <!-- Show CLASSIFICATION results table -->
         <JobResultsTable
-            v-if="jobDetails?.status === 'completed' && jobDetails?.id"
-            :results="jobStore.jobResults"
+            v-if="jobDetails?.status === 'completed' && jobDetails?.id && jobDetails?.job_type === 'CLASSIFICATION'"
+            :results="jobStore.jobResults as JobResultItem[] | null"
             :loading="jobStore.resultsLoading"
             :error="jobStore.resultsError"
-            :target-level="jobDetails.target_level || 5"  /> <!-- Pass target level -->
+            :target-level="jobDetails.target_level || 5"
+            @submit-flags="handleSubmitFlags" /> <!-- Listen for submit event -->
+
+        <!-- Show REVIEW results table -->
+        <ReviewResultsTable
+            v-if="jobDetails?.status === 'completed' && jobDetails?.id && jobDetails?.job_type === 'REVIEW'"
+            :results="jobStore.jobResults as ReviewResultItem[] | null"
+            :loading="jobStore.resultsLoading"
+            :error="jobStore.resultsError"
+            :target-level="jobDetails.target_level || 5"
+            @submit-flags="handleSubmitFlags" /> <!-- Listen for submit event -->
         <!-- ***** END UPDATED Section ***** -->
 
       </div>
@@ -136,10 +168,11 @@
   <script setup lang="ts">
   import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
   import apiService from '@/services/api';
-  import { useJobStore, type JobDetails } from '@/stores/job';
+  import { useJobStore, type JobDetails, type JobResultItem, type ReviewResultItem } from '@/stores/job';
   import JobStats from './JobStats.vue';
-  import JobResultsTable from './JobResultsTable.vue'; // Import the new component
-  import { EnvelopeIcon, ArrowDownTrayIcon, ExclamationTriangleIcon } from '@heroicons/vue/20/solid';
+  import JobResultsTable from './JobResultsTable.vue';
+  import ReviewResultsTable from './ReviewResultsTable.vue'; // Import the new component
+  import { EnvelopeIcon, ArrowDownTrayIcon, ExclamationTriangleIcon, ArrowUturnLeftIcon, CheckCircleIcon } from '@heroicons/vue/20/solid';
 
   const POLLING_INTERVAL = 5000; // Poll every 5 seconds
   const jobStore = useJobStore();
@@ -148,6 +181,7 @@
   const isLoading = ref(false); // Tracks if a poll request is currently in flight
   const errorMessage = ref<string | null>(null); // Stores polling or general errors
   const pollingIntervalId = ref<number | null>(null); // Stores the ID from setInterval
+  const showReclassifySuccessMessage = ref(false); // Control visibility of success message
 
   // --- Notification State ---
   const notificationEmail = ref('');
@@ -176,9 +210,11 @@
       'classification_level_2': 'Classifying (L2)',
       'classification_level_3': 'Classifying (L3)',
       'classification_level_4': 'Classifying (L4)',
-      'classification_level_5': 'Classifying (L5)', // Added L5
+      'classification_level_5': 'Classifying (L5)',
       'search_unknown_vendors': 'Researching Vendors',
+      'reclassification': 'Re-classifying', // Added stage
       'result_generation': 'Generating Results',
+      'pending': 'Pending Start', // Added pending stage mapping
     };
     return stageNames[stage] || stage; // Fallback to raw stage name if not mapped
   });
@@ -222,7 +258,9 @@
       }
   };
 
+  // --- FIX: Re-add formattedCreatedAt ---
   const formattedCreatedAt = computed(() => formatDateTime(jobDetails.value?.created_at));
+  // --- END FIX ---
   const formattedUpdatedAt = computed(() => formatDateTime(jobDetails.value?.updated_at));
 
   const formattedEstimatedCompletion = computed(() => {
@@ -270,7 +308,7 @@
         const data = await apiService.getJobStatus(jobId);
         // IMPORTANT: Check if the job ID is still the current one *after* the API call returns
         if (jobStore.currentJobId === jobId) {
-            console.log(`JobStatus: [pollJobStatus] Received status data for ${jobId}: Status=${data.status}, Progress=${data.progress}, Stage=${data.current_stage}`); // LOGGING
+            console.log(`JobStatus: [pollJobStatus] Received status data for ${jobId}: Status=${data.status}, Progress=${data.progress}, Stage=${data.current_stage}, Type=${data.job_type}`); // LOGGING
             jobStore.updateJobDetails(data); // Update the store
             errorMessage.value = null; // Clear previous errors on successful poll
 
@@ -394,6 +432,38 @@
     }
   };
 
+  // --- ADDED: Reclassification Submission ---
+  const handleSubmitFlags = async () => {
+    console.log("JobStatus: Handling submit flags event...");
+    const reviewJobId = await jobStore.submitFlagsForReview();
+    if (reviewJobId) {
+        // Show success message
+        showReclassifySuccessMessage.value = true;
+        // Hide message after a delay
+        setTimeout(() => { showReclassifySuccessMessage.value = false; }, 7000);
+        // Optionally fetch history to update the list
+        jobStore.fetchJobHistory();
+        // Do NOT automatically navigate - let user click the link in the success message
+        // jobStore.setCurrentJobId(reviewJobId);
+    } else {
+        // Error is handled within the store and displayed by the table component
+        console.log("JobStatus: Flag submission failed (error handled in store).");
+    }
+  };
+
+  // --- ADDED: Navigation ---
+  const viewParentJob = () => {
+      if (jobDetails.value?.parent_job_id) {
+          jobStore.setCurrentJobId(jobDetails.value.parent_job_id);
+      }
+  };
+
+  const viewReviewJob = (reviewJobId: string) => {
+       jobStore.setCurrentJobId(reviewJobId);
+       showReclassifySuccessMessage.value = false; // Hide message on navigation
+  };
+
+
   // --- Lifecycle Hooks ---
   onMounted(() => {
       console.log(`JobStatus: Mounted. Current job ID from store: ${jobStore.currentJobId}`); // LOGGING
@@ -402,6 +472,7 @@
           // Fetch initial details if not already present or if status is unknown/stale
           // Use jobDetails.id for comparison
           const currentDetails = jobStore.jobDetails;
+          // Fetch details if they are missing OR if the ID matches but type/status might be stale
           if (!currentDetails || currentDetails.id !== jobStore.currentJobId) {
               console.log(`JobStatus: Fetching initial details and starting polling for ${jobStore.currentJobId}`); // LOGGING
               startPolling(jobStore.currentJobId);
@@ -434,6 +505,7 @@
   // Watch for changes in the store's currentJobId
   watch(() => jobStore.currentJobId, (newJobId: string | null | undefined) => {
       console.log(`JobStatus: Watched currentJobId changed to: ${newJobId}`); // LOGGING
+      showReclassifySuccessMessage.value = false; // Hide success message on job change
       if (newJobId) {
           // Reset component state when job ID changes
           errorMessage.value = null;
@@ -445,6 +517,7 @@
 
           // Fetch details or start polling if needed for the new job
           const currentDetails = jobStore.jobDetails;
+          // Fetch details if they are missing OR if the ID matches but type/status might be stale
           if (!currentDetails || currentDetails.id !== newJobId) {
                console.log(`JobStatus: Fetching initial details and starting polling due to job ID change to ${newJobId}`); // LOGGING
                startPolling(newJobId);

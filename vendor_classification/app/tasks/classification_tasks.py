@@ -17,7 +17,7 @@ from core.log_context import set_correlation_id, set_job_id, set_log_context, cl
 # Import log helpers from utils
 from utils.log_utils import LogTimer, log_duration
 
-from models.job import Job, JobStatus, ProcessingStage
+from models.job import Job, JobStatus, ProcessingStage, JobType # <<< ADDED JobType
 from services.file_service import read_vendor_file, normalize_vendor_data, generate_output_file
 from services.llm_service import LLMService
 from services.search_service import SearchService
@@ -27,6 +27,8 @@ from utils.taxonomy_loader import load_taxonomy
 from .classification_logic import process_vendors
 # Import the schema for type hinting
 from schemas.job import JobResultItem
+# Import review schemas/logic if needed (likely handled by separate task)
+from schemas.review import ReviewResultItem
 
 
 # Configure logger
@@ -46,9 +48,10 @@ def _prepare_detailed_results_for_storage(
     into a flat list of dictionaries, where each dictionary represents a vendor
     and contains fields for all L1-L5 classifications, plus final status details.
     Matches the JobResultItem schema.
+    THIS IS FOR **CLASSIFICATION** JOBS. Review jobs store results differently.
     """
     processed_list = []
-    logger.info(f"Preparing detailed results for storage. Processing {len(results_dict)} vendors.")
+    logger.info(f"Preparing detailed results for CLASSIFICATION job storage. Processing {len(results_dict)} vendors.")
 
     for vendor_name, vendor_results in results_dict.items():
         # Initialize the flat structure for this vendor
@@ -85,12 +88,14 @@ def _prepare_detailed_results_for_storage(
                 if not level_data.get("classification_not_possible", True):
                     deepest_successful_level = level
                     final_level_data = level_data # Store data of the deepest successful level
-                    final_source = level_data.get("classification_source", final_source) # Update source if this level was successful
+                    # Update source based on the source recorded *at that level*
+                    final_source = level_data.get("classification_source", final_source)
                     final_notes_or_reason = level_data.get("notes") # Get notes from successful level
                 elif deepest_successful_level == 0: # If no level succeeded yet, track potential failure reasons/notes from L1
                     if level == 1:
                         final_notes_or_reason = level_data.get("classification_not_possible_reason") or level_data.get("notes")
-                        final_source = level_data.get("classification_source", final_source) # Source might be 'Search' even if L1 failed
+                        # Update source based on L1 source if it exists
+                        final_source = level_data.get("classification_source", final_source)
 
             # If a level wasn't processed (e.g., stopped early), its fields remain None
 
@@ -108,13 +113,18 @@ def _prepare_detailed_results_for_storage(
             # Use the reason/notes captured from L1 failure or search failure
             flat_result["classification_notes_or_reason"] = final_notes_or_reason
 
-        flat_result["classification_source"] = final_source # Set the final determined source
+        # Set the final determined source
+        flat_result["classification_source"] = final_source
 
-        # Handle potential ERROR states explicitly
+        # Handle potential ERROR states explicitly (e.g., if L1 failed with ERROR)
         l1_data = vendor_results.get("level1")
         if l1_data and l1_data.get("category_id") == "ERROR":
             flat_result["final_status"] = "Error"
             flat_result["classification_notes_or_reason"] = l1_data.get("classification_not_possible_reason") or "Processing error occurred"
+            # Override source if error occurred
+            final_source = l1_data.get("classification_source", "Initial")
+            flat_result["classification_source"] = final_source
+
 
         # Validate against Pydantic model (optional, but good practice)
         try:
@@ -127,7 +137,7 @@ def _prepare_detailed_results_for_storage(
             # For now, let's skip invalid entries
             continue
 
-    logger.info(f"Finished preparing {len(processed_list)} detailed result items for storage.")
+    logger.info(f"Finished preparing {len(processed_list)} detailed result items for CLASSIFICATION job storage.")
     return processed_list
 # --- END UPDATED ---
 
@@ -137,7 +147,7 @@ def _prepare_detailed_results_for_storage(
 def process_vendor_file(self, job_id: str, file_path: str, target_level: int):
 # --- END UPDATED ---
     """
-    Celery task entry point for processing a vendor file.
+    Celery task entry point for processing a vendor file (CLASSIFICATION job type).
     Orchestrates the overall process by calling the main async helper.
 
     Args:
@@ -146,7 +156,7 @@ def process_vendor_file(self, job_id: str, file_path: str, target_level: int):
         target_level: The desired maximum classification level (1-5)
     """
     task_id = self.request.id if self.request and self.request.id else "UnknownTaskID"
-    logger.info(f"***** process_vendor_file TASK RECEIVED *****",
+    logger.info(f"***** process_vendor_file TASK RECEIVED (CLASSIFICATION) *****",
                 extra={
                     "celery_task_id": task_id,
                     "job_id_arg": job_id,
@@ -156,7 +166,7 @@ def process_vendor_file(self, job_id: str, file_path: str, target_level: int):
 
     set_correlation_id(job_id) # Set correlation ID early
     set_job_id(job_id)
-    set_log_context({"target_level": target_level}) # Add target level to context
+    set_log_context({"target_level": target_level, "job_type": JobType.CLASSIFICATION.value}) # Add target level and type to context
     logger.info(f"Starting vendor file processing task (inside function)",
                 extra={"job_id": job_id, "file_path": file_path, "target_level": target_level})
 
@@ -194,11 +204,17 @@ def process_vendor_file(self, job_id: str, file_path: str, target_level: int):
                 logger.warning(f"Task received target_level {target_level} but job record has {job.target_level}. Using task value: {target_level}.")
                 # Optionally update job record here if desired, or just proceed with task value
 
+            # Ensure job type is CLASSIFICATION
+            if job.job_type != JobType.CLASSIFICATION.value:
+                 logger.error(f"process_vendor_file task called for a non-CLASSIFICATION job.", extra={"job_id": job_id, "job_type": job.job_type})
+                 raise ValueError(f"Job {job_id} is not a CLASSIFICATION job.")
+
+
             set_log_context({
                 "company_name": job.company_name,
                 "creator": job.created_by,
                 "file_name": job.input_file_name
-                # target_level already set above
+                # target_level and job_type already set above
             })
             logger.info(f"Processing file for company",
                         extra={"company": job.company_name})
@@ -254,14 +270,14 @@ def process_vendor_file(self, job_id: str, file_path: str, target_level: int):
             loop.close()
             logger.debug(f"Event loop closed for task.")
         clear_all_context()
-        logger.info(f"***** process_vendor_file TASK FINISHED *****", extra={"job_id": job_id})
+        logger.info(f"***** process_vendor_file TASK FINISHED (CLASSIFICATION) *****", extra={"job_id": job_id})
 
 
 # --- UPDATED: Added target_level parameter ---
 async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, target_level: int):
 # --- END UPDATED ---
     """
-    Asynchronous part of the vendor file processing.
+    Asynchronous part of the vendor file processing (CLASSIFICATION job type).
     Sets up services, initializes stats, calls the core processing logic,
     and handles final result generation and job status updates.
     """
@@ -398,7 +414,7 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
         try:
             logger.info("Processing detailed results for database storage.")
             with log_duration(logger, "Processing detailed results"):
-                 # --- UPDATED: Call the new preparation function ---
+                 # --- UPDATED: Call the preparation function ---
                  detailed_results_for_db = _prepare_detailed_results_for_storage(results_dict, target_level)
                  # --- END UPDATED ---
             logger.info(f"Processed {len(detailed_results_for_db)} items for detailed results storage.")
@@ -531,3 +547,213 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
             logger.error("Job object was None during unexpected error handling.")
     finally:
         logger.info(f"[_process_vendor_file_async] Finished async processing for job {job_id}")
+
+
+# --- ADDED: Reclassification Task ---
+@shared_task(bind=True)
+def reclassify_flagged_vendors_task(self, review_job_id: str):
+    """
+    Celery task entry point for re-classifying flagged vendors (REVIEW job type).
+    Orchestrates the reclassification process.
+
+    Args:
+        review_job_id: The ID of the REVIEW job.
+    """
+    task_id = self.request.id if self.request and self.request.id else "UnknownTaskID"
+    logger.info(f"***** reclassify_flagged_vendors_task TASK RECEIVED *****",
+                extra={"celery_task_id": task_id, "review_job_id": review_job_id})
+
+    set_correlation_id(review_job_id) # Use review job ID as correlation ID
+    set_job_id(review_job_id)
+    set_log_context({"job_type": JobType.REVIEW.value})
+    logger.info(f"Starting reclassification task", extra={"review_job_id": review_job_id})
+
+    # Initialize loop within the task context
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    logger.debug(f"Created and set new asyncio event loop for review job {review_job_id}")
+
+    db = SessionLocal()
+    review_job = None
+
+    try:
+        review_job = db.query(Job).filter(Job.id == review_job_id).first()
+        if not review_job:
+            logger.error("Review job not found in database at start of task!", extra={"review_job_id": review_job_id})
+            raise ValueError("Review job not found.")
+
+        # Ensure job type is REVIEW
+        if review_job.job_type != JobType.REVIEW.value:
+            logger.error(f"reclassify_flagged_vendors_task called for a non-REVIEW job.", extra={"review_job_id": review_job_id, "job_type": review_job.job_type})
+            raise ValueError(f"Job {review_job_id} is not a REVIEW job.")
+
+        set_log_context({
+            "company_name": review_job.company_name,
+            "creator": review_job.created_by,
+            "parent_job_id": review_job.parent_job_id
+        })
+        logger.info(f"Processing review for company", extra={"company": review_job.company_name})
+
+        # --- Call the async reclassification logic ---
+        logger.info(f"About to run async reclassification processing for review job {review_job_id}")
+        with LogTimer(logger, "Complete reclassification processing", level=logging.INFO, include_in_stats=True):
+            loop.run_until_complete(_process_reclassification_async(review_job_id, db))
+
+        logger.info(f"Reclassification processing completed successfully (async part finished)")
+
+    except Exception as e:
+        logger.error(f"Error processing reclassification task", exc_info=True, extra={"review_job_id": review_job_id})
+        try:
+            # Re-query the job within this exception handler
+            db_error_session = SessionLocal()
+            try:
+                job_in_error = db_error_session.query(Job).filter(Job.id == review_job_id).first()
+                if job_in_error:
+                    if job_in_error.status != JobStatus.COMPLETED.value:
+                        err_msg = f"Reclassification task failed: {type(e).__name__}: {str(e)}"
+                        job_in_error.fail(err_msg[:2000])
+                        db_error_session.commit()
+                        logger.info(f"Review job status updated to failed due to task error", extra={"error": str(e)})
+                    else:
+                        logger.warning(f"Task error occurred after review job was marked completed, status not changed.", extra={"error": str(e)})
+                else:
+                    logger.error("Review job not found when trying to mark as failed.", extra={"review_job_id": review_job_id})
+            except Exception as db_error:
+                logger.error(f"Error updating review job status during task failure handling", exc_info=True,
+                            extra={"original_error": str(e), "db_error": str(db_error)})
+                db_error_session.rollback()
+            finally:
+                db_error_session.close()
+        except Exception as final_db_error:
+            logger.critical(f"CRITICAL: Failed even to handle database update in reclassification task error handler.", exc_info=final_db_error)
+
+    finally:
+        if db:
+            db.close()
+            logger.debug(f"Main database session closed for reclassification task.")
+        if loop and not loop.is_closed():
+            loop.close()
+            logger.debug(f"Event loop closed for reclassification task.")
+        clear_all_context()
+        logger.info(f"***** reclassify_flagged_vendors_task TASK FINISHED *****", extra={"review_job_id": review_job_id})
+
+
+async def _process_reclassification_async(review_job_id: str, db: Session):
+    """
+    Asynchronous part of the reclassification task.
+    Sets up services, calls the core reclassification logic, stores results.
+    """
+    logger.info(f"[_process_reclassification_async] Starting async processing for review job {review_job_id}")
+
+    llm_service = LLMService()
+    # search_service is not needed for reclassification
+
+    review_job = db.query(Job).filter(Job.id == review_job_id).first()
+    if not review_job:
+        logger.error(f"[_process_reclassification_async] Review job not found in database", extra={"review_job_id": review_job_id})
+        return
+
+    # Import the core logic function here to avoid circular imports at module level
+    from .reclassification_logic import process_reclassification
+
+    review_results_list = None
+    final_stats = {}
+
+    try:
+        review_job.status = JobStatus.PROCESSING.value
+        review_job.current_stage = ProcessingStage.RECLASSIFICATION.value
+        review_job.progress = 0.1 # Start progress
+        logger.info(f"[_process_reclassification_async] Committing initial status update: {review_job.status}, {review_job.current_stage}, {review_job.progress}")
+        db.commit()
+        logger.info(f"Review job status updated",
+                    extra={"status": review_job.status, "stage": review_job.current_stage, "progress": review_job.progress})
+
+        # --- Call the reclassification logic ---
+        # This function will handle fetching parent data, calling LLM, etc.
+        review_results_list, final_stats = await process_reclassification(
+            review_job=review_job,
+            db=db,
+            llm_service=llm_service
+        )
+        # --- End call ---
+
+        logger.info(f"Reclassification logic completed. Processed {final_stats.get('total_items_processed', 0)} items.")
+        review_job.progress = 0.95 # Mark logic as complete
+
+        # --- Final Commit Block ---
+        try:
+            logger.info("Attempting final review job completion update in database.")
+            # Pass None for output_file_name as review jobs don't generate one
+            review_job.complete(output_file_name=None, stats=final_stats, detailed_results=review_results_list)
+            review_job.progress = 1.0
+            logger.info(f"[_process_reclassification_async] Committing final review job completion status.")
+            db.commit()
+            logger.info(f"Review job completed successfully",
+                        extra={
+                            "processing_duration": final_stats.get("processing_duration_seconds"),
+                            "items_processed": final_stats.get("total_items_processed"),
+                            "successful": final_stats.get("successful_reclassifications"),
+                            "failed": final_stats.get("failed_reclassifications"),
+                            "openrouter_calls": final_stats.get("api_usage", {}).get("openrouter_calls"),
+                            "tokens_used": final_stats.get("api_usage", {}).get("openrouter_total_tokens"),
+                            "estimated_cost": final_stats.get("api_usage", {}).get("cost_estimate_usd")
+                        })
+        except Exception as final_commit_err:
+            logger.error("CRITICAL: Failed to commit final review job completion status!", exc_info=True)
+            db.rollback()
+            # Attempt to mark as failed (similar logic as in main task handler)
+            try:
+                db_fail_final = SessionLocal()
+                job_fail_final = db_fail_final.query(Job).filter(Job.id == review_job_id).first()
+                if job_fail_final:
+                    err_msg = f"Failed during final commit: {type(final_commit_err).__name__}: {str(final_commit_err)}"
+                    job_fail_final.fail(err_msg[:2000])
+                    db_fail_final.commit()
+                db_fail_final.close()
+            except Exception as fail_err:
+                logger.error("CRITICAL: Also failed to mark review job as failed after final commit error.", exc_info=fail_err)
+        # --- End Final Commit Block ---
+
+    # Handle specific errors from process_reclassification or other issues
+    except (ValueError, FileNotFoundError) as logic_err:
+        logger.error(f"[_process_reclassification_async] Data or File error during reclassification logic", exc_info=True,
+                    extra={"error": str(logic_err)})
+        if review_job:
+            err_msg = f"Reclassification data error: {type(logic_err).__name__}: {str(logic_err)}"
+            review_job.fail(err_msg[:2000])
+            db.commit()
+    except SQLAlchemyError as db_err:
+         logger.error(f"[_process_reclassification_async] Database error during reclassification processing", exc_info=True,
+                     extra={"error": str(db_err)})
+         db.rollback()
+         # Attempt to mark as failed (similar logic as in main task handler)
+         try:
+            db_fail_db = SessionLocal()
+            job_fail_db = db_fail_db.query(Job).filter(Job.id == review_job_id).first()
+            if job_fail_db and job_fail_db.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
+                 err_msg = f"Database error: {type(db_err).__name__}: {str(db_err)}"
+                 job_fail_db.fail(err_msg[:2000])
+                 db_fail_db.commit()
+            db_fail_db.close()
+         except Exception as fail_err:
+            logger.error("CRITICAL: Also failed to mark review job as failed after database error.", exc_info=fail_err)
+
+    except Exception as async_err:
+        logger.error(f"[_process_reclassification_async] Unexpected error during async reclassification processing", exc_info=True,
+                    extra={"error": str(async_err)})
+        db.rollback()
+        # Attempt to mark as failed (similar logic as in main task handler)
+        try:
+            db_fail_unexpected = SessionLocal()
+            job_fail_unexpected = db_fail_unexpected.query(Job).filter(Job.id == review_job_id).first()
+            if job_fail_unexpected and job_fail_unexpected.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
+                err_msg = f"Unexpected error: {type(async_err).__name__}: {str(async_err)}"
+                job_fail_unexpected.fail(err_msg[:2000])
+                db_fail_unexpected.commit()
+            db_fail_unexpected.close()
+        except Exception as fail_err:
+            logger.error("CRITICAL: Also failed to mark review job as failed after unexpected error.", exc_info=fail_err)
+    finally:
+        logger.info(f"[_process_reclassification_async] Finished async processing for review job {review_job_id}")
+
+# --- END ADDED ---

@@ -1,25 +1,28 @@
 <template>
   <div class="mt-8 p-4 sm:p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner">
-    <h5 class="text-lg font-semibold text-gray-800 mb-4">Detailed Classification Results</h5>
+    <h5 class="text-lg font-semibold text-gray-800 mb-4">Reviewed Classification Results</h5>
+    <p class="text-sm text-gray-600 mb-4">
+      Showing results after applying user hints. You can flag items again for further review if needed.
+    </p>
 
     <!-- Search Input -->
     <div class="mb-4">
-      <label for="results-search" class="sr-only">Search Results</label>
+      <label for="review-results-search" class="sr-only">Search Reviewed Results</label>
       <div class="relative rounded-md shadow-sm">
-         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <MagnifyingGlassIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
-          </div>
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <MagnifyingGlassIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
+        </div>
         <input
           type="text"
-          id="results-search"
+          id="review-results-search"
           v-model="searchTerm"
-          placeholder="Search Vendor, Category, ID, Notes..."
+          placeholder="Search Vendor, Hint, Category, ID, Notes..."
           class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
         />
       </div>
     </div>
 
-    <!-- Action Buttons (Submit Flags) -->
+     <!-- Action Buttons (Submit Flags) -->
     <div class="mb-4 text-right" v-if="jobStore.hasFlaggedItems">
         <button
           type="button"
@@ -31,9 +34,8 @@
           <PaperAirplaneIcon v-else class="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
           Submit {{ jobStore.flaggedForReview.size }} Flag{{ jobStore.flaggedForReview.size !== 1 ? 's' : '' }} for Re-classification
         </button>
-         <p v-if="jobStore.reclassifyError" class="text-xs text-red-600 mt-1 text-right">{{ jobStore.reclassifyError }}</p>
+        <p v-if="jobStore.reclassifyError" class="text-xs text-red-600 mt-1 text-right">{{ jobStore.reclassifyError }}</p>
     </div>
-
 
     <!-- Loading/Error States -->
     <div v-if="loading" class="text-center py-5 text-gray-500">
@@ -41,13 +43,13 @@
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
       </svg>
-      <p class="mt-2 text-sm">Loading detailed results...</p>
+      <p class="mt-2 text-sm">Loading reviewed results...</p>
     </div>
     <div v-else-if="error" class="p-4 bg-red-100 border border-red-300 text-red-800 rounded-md text-sm">
-      Error loading results: {{ error }}
+      Error loading reviewed results: {{ error }}
     </div>
     <div v-else-if="!results || results.length === 0" class="text-center py-5 text-gray-500">
-      No detailed results found for this job.
+      No reviewed results found for this job.
     </div>
 
     <!-- Results Table -->
@@ -76,11 +78,11 @@
             <td :colspan="headers.length + 1" class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No results match your search criteria.</td>
           </tr>
           <tr v-for="(item, index) in filteredAndSortedResults" :key="item.vendor_name + '-' + index" class="hover:bg-gray-50 align-top" :class="{'bg-blue-50': jobStore.isFlagged(item.vendor_name)}">
-             <!-- Flag Button Cell -->
-             <td class="px-2 py-2 text-center align-middle">
+            <!-- Flag Button Cell -->
+            <td class="px-2 py-2 text-center align-middle">
                  <button
                     @click="toggleFlag(item.vendor_name)"
-                    :title="jobStore.isFlagged(item.vendor_name) ? 'Edit hint or remove flag' : 'Flag for re-classification'"
+                    :title="jobStore.isFlagged(item.vendor_name) ? 'Remove flag and hint' : 'Flag for re-classification'"
                     class="p-1 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary"
                     :class="jobStore.isFlagged(item.vendor_name) ? 'text-primary' : 'text-gray-400 hover:text-primary-dark'"
                   >
@@ -88,59 +90,54 @@
                     <FlagIconOutline v-else class="h-5 w-5" aria-hidden="true" />
                     <span class="sr-only">Flag item</span>
                   </button>
-             </td>
-             <!-- Data Cells -->
+            </td>
+            <!-- Data Cells -->
             <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.vendor_name }}</td>
-            <!-- Level 1 -->
-            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item, 1)">{{ item.level1_id || '-' }}</td>
-            <td class="px-3 py-2 text-xs" :class="getCellClass(item, 1)">{{ item.level1_name || '-' }}</td>
-            <!-- Level 2 -->
-            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item, 2)">{{ item.level2_id || '-' }}</td>
-            <td class="px-3 py-2 text-xs" :class="getCellClass(item, 2)">{{ item.level2_name || '-' }}</td>
-            <!-- Level 3 -->
-            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item, 3)">{{ item.level3_id || '-' }}</td>
-            <td class="px-3 py-2 text-xs" :class="getCellClass(item, 3)">{{ item.level3_name || '-' }}</td>
-            <!-- Level 4 -->
-            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item, 4)">{{ item.level4_id || '-' }}</td>
-            <td class="px-3 py-2 text-xs" :class="getCellClass(item, 4)">{{ item.level4_name || '-' }}</td>
-            <!-- Level 5 -->
-            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item, 5)">{{ item.level5_id || '-' }}</td>
-            <td class="px-3 py-2 text-xs" :class="getCellClass(item, 5)">{{ item.level5_name || '-' }}</td>
-            <!-- Other columns -->
+            <td class="px-3 py-2 text-xs text-gray-600 max-w-xs break-words">
+                <span v-if="!jobStore.isFlagged(item.vendor_name)">{{ item.hint }}</span>
+                 <!-- Inline Hint Editor when Flagged -->
+                <textarea v-else
+                          rows="2"
+                          :value="jobStore.getHint(item.vendor_name)"
+                          @input="updateHint(item.vendor_name, ($event.target as HTMLTextAreaElement).value)"
+                          placeholder="Enter new hint..."
+                          class="block w-full text-xs rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                ></textarea>
+            </td>
+            <!-- Original Classification -->
+            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-500">{{ item.original_result?.level1_id || '-' }}</td>
+            <td class="px-3 py-2 text-xs text-gray-500">{{ item.original_result?.level1_name || '-' }}</td>
+            <!-- ... Add other original levels L2-L5 similarly ... -->
+            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-500">{{ item.original_result?.level5_id || '-' }}</td>
+            <td class="px-3 py-2 text-xs text-gray-500">{{ item.original_result?.level5_name || '-' }}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-xs text-center text-gray-500">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                      :class="getStatusClass(item.original_result?.final_status)">
+                    {{ item.original_result?.final_status }}
+                </span>
+            </td>
+
+            <!-- New Classification -->
+            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item.new_result, 1)">{{ item.new_result?.level1_id || '-' }}</td>
+            <td class="px-3 py-2 text-xs" :class="getCellClass(item.new_result, 1)">{{ item.new_result?.level1_name || '-' }}</td>
+            <!-- ... Add other new levels L2-L5 similarly ... -->
+            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item.new_result, 5)">{{ item.new_result?.level5_id || '-' }}</td>
+            <td class="px-3 py-2 text-xs" :class="getCellClass(item.new_result, 5)">{{ item.new_result?.level5_name || '-' }}</td>
             <td class="px-3 py-2 whitespace-nowrap text-sm text-center">
-              <span v-if="item.final_confidence !== null && item.final_confidence !== undefined"
-                    :class="getConfidenceClass(item.final_confidence)">
-                {{ (item.final_confidence * 100).toFixed(1) }}%
+              <span v-if="item.new_result?.final_confidence !== null && item.new_result?.final_confidence !== undefined"
+                    :class="getConfidenceClass(item.new_result.final_confidence)">
+                {{ (item.new_result.final_confidence * 100).toFixed(1) }}%
               </span>
               <span v-else class="text-gray-400 text-xs">N/A</span>
             </td>
             <td class="px-3 py-2 whitespace-nowrap text-xs text-center">
                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                    :class="getStatusClass(item.final_status)">
-                {{ item.final_status }}
-              </span>
-            </td>
-             <td class="px-3 py-2 whitespace-nowrap text-xs text-center">
-              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                    :class="item.classification_source === 'Search' ? 'bg-blue-100 text-blue-800' : (item.classification_source === 'Review' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800')">
-                {{ item.classification_source }}
+                    :class="getStatusClass(item.new_result?.final_status)">
+                {{ item.new_result?.final_status }}
               </span>
             </td>
             <td class="px-3 py-2 text-xs text-gray-500 max-w-xs break-words">
-                 <!-- Show hint input if flagged -->
-                 <div v-if="jobStore.isFlagged(item.vendor_name)">
-                    <label :for="'hint-' + index" class="sr-only">Hint for {{ item.vendor_name }}</label>
-                    <textarea :id="'hint-' + index"
-                              rows="2"
-                              :value="jobStore.getHint(item.vendor_name)"
-                              @input="updateHint(item.vendor_name, ($event.target as HTMLTextAreaElement).value)"
-                              placeholder="Enter hint..."
-                              class="block w-full text-xs rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                    ></textarea>
-                    <p v-if="!jobStore.getHint(item.vendor_name)" class="text-red-600 text-xs mt-1">Hint required for submission.</p>
-                 </div>
-                 <!-- Show notes/reason if not flagged -->
-                 <span v-else>{{ item.classification_notes_or_reason || '-' }}</span>
+              {{ item.new_result?.classification_notes_or_reason || '-' }}
             </td>
           </tr>
         </tbody>
@@ -149,13 +146,10 @@
 
      <!-- Row Count -->
     <div class="mt-3 text-xs text-gray-500">
-      Showing {{ filteredAndSortedResults.length }} of {{ results?.length || 0 }} results.
+      Showing {{ filteredAndSortedResults.length }} of {{ results?.length || 0 }} reviewed results.
     </div>
 
-    <!-- Pagination (Placeholder - Implement if needed for very large datasets) -->
-    <!-- <div class="mt-4 flex justify-between items-center"> ... </div> -->
-
-     <!-- Hint Input Modal (Alternative to inline editor) -->
+    <!-- Hint Input Modal -->
     <!-- <HintInputModal
         :open="showHintModal"
         :vendor-name="selectedVendorForHint"
@@ -163,30 +157,33 @@
         @close="showHintModal = false"
         @save="saveHint"
     /> -->
+     <!-- Note: Using inline editor instead of modal for now -->
 
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, type PropType } from 'vue';
-import { useJobStore, type JobResultItem } from '@/stores/job'; // Use the updated interface
+import { useJobStore, type ReviewResultItem, type JobResultItem } from '@/stores/job';
 import { FlagIcon as FlagIconOutline, MagnifyingGlassIcon, PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/vue/24/outline';
 import { FlagIcon as FlagIconSolid, ChevronUpIcon, ChevronDownIcon, ChevronUpDownIcon } from '@heroicons/vue/20/solid';
 // import HintInputModal from './HintInputModal.vue'; // Import if using modal
 
 // --- Define Header Interface ---
-interface TableHeader {
-  key: keyof JobResultItem; // Use keyof JobResultItem here
+interface ReviewTableHeader {
+  key: string; // Use string for complex/nested keys
   label: string;
   sortable: boolean;
   minWidth?: string;
+  isOriginal?: boolean; // Flag for styling/grouping
+  isNew?: boolean;      // Flag for styling/grouping
 }
 // --- END Define Header Interface ---
 
 // --- Props ---
 const props = defineProps({
   results: {
-    type: Array as PropType<JobResultItem[] | null>, // This table handles JobResultItem
+    type: Array as PropType<ReviewResultItem[] | null>,
     required: true,
   },
   loading: {
@@ -210,61 +207,67 @@ const jobStore = useJobStore();
 
 // --- Internal State ---
 const searchTerm = ref('');
-const sortKey = ref<keyof JobResultItem | null>('vendor_name'); // Default sort
+const sortKey = ref<string | null>('vendor_name'); // Default sort by vendor name
 const sortDirection = ref<'asc' | 'desc' | null>('asc'); // Default sort direction
 // const showHintModal = ref(false); // State for modal
 // const selectedVendorForHint = ref(''); // State for modal
 
 // --- Table Headers Definition ---
-// --- UPDATED: Apply TableHeader type ---
-const headers = ref<TableHeader[]>([
+const headers = ref<ReviewTableHeader[]>([
   { key: 'vendor_name', label: 'Vendor Name', sortable: true, minWidth: '150px' },
-  { key: 'level1_id', label: 'L1 ID', sortable: true, minWidth: '80px' },
-  { key: 'level1_name', label: 'L1 Name', sortable: true, minWidth: '150px' },
-  { key: 'level2_id', label: 'L2 ID', sortable: true, minWidth: '80px' },
-  { key: 'level2_name', label: 'L2 Name', sortable: true, minWidth: '150px' },
-  { key: 'level3_id', label: 'L3 ID', sortable: true, minWidth: '80px' },
-  { key: 'level3_name', label: 'L3 Name', sortable: true, minWidth: '150px' },
-  { key: 'level4_id', label: 'L4 ID', sortable: true, minWidth: '80px' },
-  { key: 'level4_name', label: 'L4 Name', sortable: true, minWidth: '150px' },
-  { key: 'level5_id', label: 'L5 ID', sortable: true, minWidth: '80px' },
-  { key: 'level5_name', label: 'L5 Name', sortable: true, minWidth: '150px' },
-  { key: 'final_confidence', label: 'Confidence', sortable: true, minWidth: '100px' },
-  { key: 'final_status', label: 'Status', sortable: true, minWidth: '100px' },
-  { key: 'classification_source', label: 'Source', sortable: true, minWidth: '80px' },
-  { key: 'classification_notes_or_reason', label: 'Hint / Notes / Reason', sortable: false, minWidth: '200px' }, // Combined column
+  { key: 'hint', label: 'User Hint', sortable: true, minWidth: '180px' },
+  // Original Results
+  { key: 'original_result.level1_id', label: 'Orig L1 ID', sortable: true, minWidth: '80px', isOriginal: true },
+  { key: 'original_result.level1_name', label: 'Orig L1 Name', sortable: true, minWidth: '120px', isOriginal: true },
+  // Add L2-L4 original if needed
+  { key: 'original_result.level5_id', label: 'Orig L5 ID', sortable: true, minWidth: '80px', isOriginal: true },
+  { key: 'original_result.level5_name', label: 'Orig L5 Name', sortable: true, minWidth: '120px', isOriginal: true },
+  { key: 'original_result.final_status', label: 'Orig Status', sortable: true, minWidth: '100px', isOriginal: true },
+  // New Results
+  { key: 'new_result.level1_id', label: 'New L1 ID', sortable: true, minWidth: '80px', isNew: true },
+  { key: 'new_result.level1_name', label: 'New L1 Name', sortable: true, minWidth: '120px', isNew: true },
+   // Add L2-L4 new if needed
+  { key: 'new_result.level5_id', label: 'New L5 ID', sortable: true, minWidth: '80px', isNew: true },
+  { key: 'new_result.level5_name', label: 'New L5 Name', sortable: true, minWidth: '120px', isNew: true },
+  { key: 'new_result.final_confidence', label: 'New Confidence', sortable: true, minWidth: '100px', isNew: true },
+  { key: 'new_result.final_status', label: 'New Status', sortable: true, minWidth: '100px', isNew: true },
+  { key: 'new_result.classification_notes_or_reason', label: 'New Notes / Reason', sortable: false, minWidth: '200px', isNew: true },
 ]);
-// --- END UPDATED ---
 
 // --- Computed Properties ---
 
+// Helper to get nested values for sorting/filtering
+const getNestedValue = (obj: any, path: string): any => {
+  return path.split('.').reduce((value, key) => (value && value[key] !== undefined ? value[key] : null), obj);
+};
+
+
 const filteredAndSortedResults = computed(() => {
-  // Ensure results is JobResultItem[] for this table
-  const resultsData = props.results as JobResultItem[] | null;
-  if (!resultsData) return [];
+  if (!props.results) return [];
 
-  let filtered = resultsData;
+  let filtered = props.results;
 
-  // Filtering (case-insensitive, searches across multiple relevant fields)
+  // Filtering
   if (searchTerm.value) {
     const lowerSearchTerm = searchTerm.value.toLowerCase();
     filtered = filtered.filter(item =>
       item.vendor_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level1_id?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level1_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level2_id?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level2_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level3_id?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level3_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level4_id?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level4_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level5_id?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level5_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.classification_notes_or_reason?.toLowerCase().includes(lowerSearchTerm) ||
-      item.final_status?.toLowerCase().includes(lowerSearchTerm) ||
-      item.classification_source?.toLowerCase().includes(lowerSearchTerm) ||
-      // Include hint in search if vendor is flagged
-      (jobStore.isFlagged(item.vendor_name) && jobStore.getHint(item.vendor_name)?.toLowerCase().includes(lowerSearchTerm))
+      item.hint?.toLowerCase().includes(lowerSearchTerm) ||
+      // Search within original results
+      item.original_result?.level1_id?.toLowerCase().includes(lowerSearchTerm) ||
+      item.original_result?.level1_name?.toLowerCase().includes(lowerSearchTerm) ||
+      // ... add other original levels ...
+      item.original_result?.level5_id?.toLowerCase().includes(lowerSearchTerm) ||
+      item.original_result?.level5_name?.toLowerCase().includes(lowerSearchTerm) ||
+      item.original_result?.final_status?.toLowerCase().includes(lowerSearchTerm) ||
+      // Search within new results
+      item.new_result?.level1_id?.toLowerCase().includes(lowerSearchTerm) ||
+      item.new_result?.level1_name?.toLowerCase().includes(lowerSearchTerm) ||
+      // ... add other new levels ...
+      item.new_result?.level5_id?.toLowerCase().includes(lowerSearchTerm) ||
+      item.new_result?.level5_name?.toLowerCase().includes(lowerSearchTerm) ||
+      item.new_result?.final_status?.toLowerCase().includes(lowerSearchTerm) ||
+      item.new_result?.classification_notes_or_reason?.toLowerCase().includes(lowerSearchTerm)
     );
   }
 
@@ -273,30 +276,17 @@ const filteredAndSortedResults = computed(() => {
     const key = sortKey.value;
     const direction = sortDirection.value === 'asc' ? 1 : -1;
 
-    // Use slice() to avoid sorting the original array directly if it's reactive
     filtered = filtered.slice().sort((a, b) => {
-      // Handle sorting by hint if flagged
-      let valA: any;
-      let valB: any;
-      if (key === 'classification_notes_or_reason') {
-         valA = jobStore.isFlagged(a.vendor_name) ? jobStore.getHint(a.vendor_name) : a.classification_notes_or_reason;
-         valB = jobStore.isFlagged(b.vendor_name) ? jobStore.getHint(b.vendor_name) : b.classification_notes_or_reason;
-      } else {
-        // Type assertion needed because TypeScript can't guarantee key is valid for both a and b
-        valA = a[key as keyof JobResultItem];
-        valB = b[key as keyof JobResultItem];
-      }
+      const valA = getNestedValue(a, key);
+      const valB = getNestedValue(b, key);
 
-
-      // Handle null/undefined values consistently (e.g., push them to the end)
       const aIsNull = valA === null || valA === undefined || valA === '';
       const bIsNull = valB === null || valB === undefined || valB === '';
 
       if (aIsNull && bIsNull) return 0;
-      if (aIsNull) return 1 * direction; // Nulls/empty last
-      if (bIsNull) return -1 * direction; // Nulls/empty last
+      if (aIsNull) return 1 * direction;
+      if (bIsNull) return -1 * direction;
 
-      // Type-specific comparison
       if (typeof valA === 'string' && typeof valB === 'string') {
         return valA.localeCompare(valB) * direction;
       }
@@ -304,8 +294,6 @@ const filteredAndSortedResults = computed(() => {
         return (valA - valB) * direction;
       }
 
-      // Fallback for other types or mixed types (simple comparison)
-      // Convert to string for consistent comparison if types differ or are complex
       const strA = String(valA).toLowerCase();
       const strB = String(valB).toLowerCase();
       if (strA < strB) return -1 * direction;
@@ -319,19 +307,17 @@ const filteredAndSortedResults = computed(() => {
 
 // --- Methods ---
 
-function sortBy(key: keyof JobResultItem) {
+function sortBy(key: string) { // Key is now string due to nesting
   if (sortKey.value === key) {
-    // Cycle direction: asc -> desc -> null (no sort)
     if (sortDirection.value === 'asc') {
         sortDirection.value = 'desc';
     } else if (sortDirection.value === 'desc') {
         sortDirection.value = null;
-        sortKey.value = null; // Clear key if sort is disabled
-    } else { // Was null, start with asc
+        sortKey.value = null;
+    } else {
         sortDirection.value = 'asc';
     }
   } else {
-    // Start new sort
     sortKey.value = key;
     sortDirection.value = 'asc';
   }
@@ -353,12 +339,13 @@ function getStatusClass(status: string | null | undefined): string {
     }
 }
 
-// Highlight cells beyond the target classification depth
-function getCellClass(item: JobResultItem, level: number): string {
+// Highlight cells beyond the target classification depth in the *new* result
+function getCellClass(item: JobResultItem | null | undefined, level: number): string {
     const baseClass = 'text-gray-700';
-    const beyondDepthClass = 'text-gray-400 italic'; // Style for beyond depth
+    const beyondDepthClass = 'text-gray-400 italic';
 
-    // Check if the ID for this level exists and is not null/empty
+    if (!item) return baseClass; // Handle case where new_result might be null
+
     const levelIdKey = `level${level}_id` as keyof JobResultItem;
     const hasId = item[levelIdKey] !== null && item[levelIdKey] !== undefined && item[levelIdKey] !== '';
 
@@ -374,7 +361,7 @@ function toggleFlag(vendorName: string) {
         jobStore.unflagVendor(vendorName);
     } else {
         jobStore.flagVendor(vendorName);
-        // If using modal:
+        // Optionally open modal here if using one
         // selectedVendorForHint.value = vendorName;
         // showHintModal.value = true;
     }
@@ -394,7 +381,6 @@ function updateHint(vendorName: string, hint: string) {
 async function submitFlags() {
     emit('submit-flags'); // Notify parent (JobStatus) to handle submission logic
 }
-
 
 // --- Helper Component for Sort Icons ---
 const SortIcon = {
@@ -417,17 +403,8 @@ const SortIcon = {
 </script>
 
 <style scoped>
-/* Add minimum width to table cells if needed for better layout */
-/* th, td { min-width: 100px; } */
-/* th:first-child, td:first-child { min-width: 150px; } */ /* Vendor Name */
-/* th:last-child, td:last-child { min-width: 200px; } */ /* Notes */
-
-/* Ensure table layout is fixed if content wrapping becomes an issue */
-/* table { table-layout: fixed; } */
-
-/* Style for cells beyond requested depth */
-.text-gray-400.italic {
-    /* Add a visual cue, e.g., slightly lighter background or border */
-    /* background-color: #f9fafb; */
-}
+/* Add styles for visually separating original vs new columns if desired */
+/* e.g., a subtle border or background */
+/* th[isOriginal="true"], td[isOriginal="true"] { ... } */
+/* th[isNew="true"], td[isNew="true"] { ... } */
 </style>

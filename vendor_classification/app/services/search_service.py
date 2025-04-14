@@ -7,7 +7,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 import time
 import uuid
 import json
-
+from core import config
 from core.config import settings
 from core.logging_config import get_logger
 from core.log_context import set_log_context, get_correlation_id
@@ -26,7 +26,7 @@ class SearchService:
     def __init__(self):
         """Initialize the search service."""
         logger.info("Initializing Tavily Search service with key rotation")
-        self.api_keys = settings.TAVILY_API_KEYS
+        self.api_keys = config.MANUAL_TAVILY_API_KEYS
         self.base_url = "https://api.tavily.com"
         self.current_key_index = 0
 

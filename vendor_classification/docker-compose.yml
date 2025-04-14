@@ -1,3 +1,4 @@
+# docker-compose.yaml
 services:
   web:
     build:
@@ -6,54 +7,60 @@ services:
     ports:
       - "${WEB_PORT:-8001}:8000"
     volumes:
-      # - ./app:/app          # <-- REMOVE OR COMMENT OUT THIS LINE FOR PRODUCTION/STAGING
-                              # Keep it if you need hot-reloading of backend code during dev
-      - ./data:/data        # Keep this for persistent data
+      # - ./app:/app          # Keep commented out unless backend hot-reloading is needed
+      - ./data:/data
+    # --- ADDED env_file ---
+    env_file:
+      - .env # Tells Docker Compose to load variables from the .env file in the context root
+    # --- END ADDED env_file ---
     environment:
+      # You can keep these if they are specific overrides or not in .env
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/vendor_classification
       - REDIS_URL=redis://redis:6379/0
-      # API keys are hardcoded in config.py - consider moving to env vars
-      - PYTHONUNBUFFERED=1 # Ensure logs appear immediately
-      - LOG_LEVEL=DEBUG    # Set log level explicitly
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+      # Note: Variables defined here in 'environment' will OVERRIDE those in .env if they have the same name.
+      # It's generally better to define DATABASE_URL, REDIS_URL etc. in .env as well
+      # and remove them from here unless you specifically need to override.
     depends_on:
       db:
-        condition: service_healthy # Wait for DB to be healthy before initializing
+        condition: service_healthy
       redis:
-        condition: service_started # Wait for Redis to start
+        condition: service_started
     networks:
       - app-network
-    # --- MODIFIED COMMAND ---
-    # Run initialization script THEN start Uvicorn
     command: sh -c "echo '>>> [Web CMD Start] Waiting briefly for DB...' && sleep 5 && echo '>>> [Web CMD Start] Running DB Initialization...' && python core/initialize_db.py && echo '>>> [Web CMD Start] Starting Uvicorn...' && uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug"
-    # --- END MODIFIED COMMAND ---
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 45s # Increase start period slightly to allow for init
+      start_period: 45s
 
   worker:
     build:
       context: .
       dockerfile: Dockerfile.worker
     volumes:
-      # - ./app:/app # Consider removing this too if worker code doesn't need hot-reload
+      # - ./app:/app # Keep commented out unless worker hot-reloading is needed
       - ./data:/data
+    # --- ADDED env_file ---
+    env_file:
+      - .env # Tells Docker Compose to load variables from the .env file in the context root
+    # --- END ADDED env_file ---
     environment:
+      # Same note as above: prefer defining these in .env and removing from here
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/vendor_classification
       - REDIS_URL=redis://redis:6379/0
-      # API keys are hardcoded in config.py
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=DEBUG
     depends_on:
       db:
-        condition: service_healthy # Wait for DB
+        condition: service_healthy
       redis:
-        condition: service_started # Wait for Redis
+        condition: service_started
     networks:
       - app-network
-    # Consider adding a simple healthcheck if possible (e.g., celery status)
 
   db:
     image: postgres:14
@@ -67,7 +74,6 @@ services:
       - "5433:5432"
     networks:
       - app-network
-    # Add healthcheck for the database
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d vendor_classification"]
       interval: 10s

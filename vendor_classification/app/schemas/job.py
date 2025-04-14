@@ -1,13 +1,14 @@
 # <file path='app/schemas/job.py'>
 # app/schemas/job.py
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, Dict, Any, List # <<< ADDED List
+from typing import Optional, Dict, Any, List, Union # <<< ADDED Union
 from datetime import datetime
 from enum import Enum as PyEnum
 
-from models.job import JobStatus, ProcessingStage # Import enums from model
+from models.job import JobStatus, ProcessingStage, JobType # Import enums from model
+from .review import ReviewResultItem # Import the review result schema
 
-# --- UPDATED: Schema for a single detailed result item ---
+# --- UPDATED: Schema for a single detailed result item (for CLASSIFICATION jobs) ---
 class JobResultItem(BaseModel):
     vendor_name: str = Field(..., description="Original vendor name")
     level1_id: Optional[str] = Field(None, description="Level 1 Category ID")
@@ -53,6 +54,12 @@ class JobResponse(JobBase):
     error_message: Optional[str] = Field(None, example="Failed during search phase.")
     stats: Dict[str, Any] = Field(default={}, example={"total_vendors": 100, "unique_vendors": 95})
     created_by: str = Field(..., example="user@example.com")
+
+    # --- ADDED: Job Type and Parent Link ---
+    job_type: JobType = Field(..., example=JobType.CLASSIFICATION)
+    parent_job_id: Optional[str] = Field(None, example="job_xyz789")
+    # --- END ADDED ---
+
     # NOTE: We don't include detailed_results here by default to keep this response smaller.
     # It will be fetched via a separate endpoint if needed.
 
@@ -61,7 +68,10 @@ class JobResponse(JobBase):
         use_enum_values = True # Ensure enum values (strings) are used in the response
 
 
-# Schema for the new results endpoint (redundant as endpoint returns List[JobResultItem])
-# class JobResultsResponse(BaseModel):
-#     job_id: str
-#     results: List[JobResultItem] = []
+# --- ADDED: Schema for the detailed results endpoint response ---
+# This allows the endpoint to return either type of result list based on job type
+class JobResultsResponse(BaseModel):
+    job_id: str
+    job_type: JobType
+    results: Union[List[JobResultItem], List[ReviewResultItem]] = Field(..., description="List of detailed results, structure depends on job_type")
+# --- END ADDED ---
