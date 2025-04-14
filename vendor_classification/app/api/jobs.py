@@ -1,3 +1,4 @@
+
 # <file path='app/api/jobs.py'>
 # app/api/jobs.py
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Path # Added Path
@@ -11,7 +12,9 @@ import os # <<< ADDED for path joining
 from core.database import get_db
 from api.auth import get_current_user
 from models.user import User
-from models.job import Job, JobStatus, JobType # <<< ADDED JobType
+# --- CORRECTED IMPORT: Add ProcessingStage ---
+from models.job import Job, JobStatus, JobType, ProcessingStage
+# --- END CORRECTED IMPORT ---
 # --- UPDATED: Import specific schemas ---
 from schemas.job import JobResponse, JobResultItem, JobResultsResponse
 from schemas.review import ReclassifyPayload, ReclassifyResponse, ReviewResultItem # <<< ADDED Review Schemas
@@ -300,7 +303,9 @@ async def reclassify_job_items(
         input_file_name=f"Review of {original_job.input_file_name}", # Indicate source
         output_file_name=None, # Review jobs don't produce downloads (for now)
         status=JobStatus.PENDING.value,
-        current_stage=ProcessingStage.PENDING.value, # Start as pending
+        # --- FIX: Use a valid ProcessingStage ---
+        current_stage=ProcessingStage.RECLASSIFICATION.value, # Set initial stage to RECLASSIFICATION
+        # --- END FIX ---
         progress=0.0,
         created_by=current_user.username,
         target_level=original_job.target_level, # Inherit target level
