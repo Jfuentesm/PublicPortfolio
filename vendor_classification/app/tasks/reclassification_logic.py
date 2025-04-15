@@ -63,9 +63,21 @@ async def process_reclassification(
             logger.error("Review job is missing parent job ID or input hints.", extra={"job_stats": review_job.stats if review_job else None})
             raise ValueError("Review job is missing parent job ID or input hints.")
 
-        items_to_reclassify: List[ReclassifyRequestItem] = [
-            ReclassifyRequestItem(**item) for item in review_job.stats['reclassify_input']
-        ]
+        # --- FIX: Handle potential non-list or invalid items in reclassify_input ---
+        input_items = review_job.stats['reclassify_input']
+        items_to_reclassify: List[ReclassifyRequestItem] = []
+        if isinstance(input_items, list):
+            for item in input_items:
+                try:
+                    # Validate each item conforms to the Pydantic model
+                    items_to_reclassify.append(ReclassifyRequestItem.model_validate(item))
+                except Exception as item_validation_err:
+                    logger.warning(f"Skipping invalid item in reclassify_input: {item}. Error: {item_validation_err}", exc_info=False)
+        else:
+            logger.error(f"reclassify_input in job stats is not a list: {type(input_items)}", extra={"job_id": review_job.id})
+            raise ValueError("Invalid format for reclassify_input in job stats.")
+        # --- END FIX ---
+
         final_stats["total_items_processed"] = len(items_to_reclassify)
         if not items_to_reclassify:
              logger.warning("No valid items found in reclassify_input stats.")
@@ -149,8 +161,6 @@ async def process_reclassification(
                 original_vendor_input_data['vendor_name'] = vendor_name # Ensure name is correct
 
                 # Generate the specific prompt for reclassification
-                # This prompt needs access to the taxonomy structure
-                # --- UPDATED CALL to get_level_dict ---
                 prompt = generate_reclassification_prompt(
                     original_vendor_data=original_vendor_input_data, # Pass original data
                     user_hint=hint,
@@ -159,40 +169,45 @@ async def process_reclassification(
                     target_level=review_job.target_level, # Pass the target level for reclassification
                     attempt_id=f"{review_job.id}-{vendor_name}" # Create a unique ID for this attempt
                 )
-                # --- END UPDATED CALL ---
 
-                # --- ADDED LOGGING ---
-                logger.debug(f"Generated reclassification prompt for '{vendor_name}':\n{prompt}")
-                # --- END LOGGING ---
+                logger.debug(f"Generated reclassification prompt for '{vendor_name}'") # Prompt content logged by LLM service now
 
-                # Call LLM (using classify_batch for consistency, even if batch size is 1)
-                # Note: classify_batch might need adaptation to handle hints effectively
-                # Or create a new llm_service method like `reclassify_single`
-                # The prompt now asks for a specific JSON output format, so parse that
-                llm_response_str = await llm_service.call_llm(
+                # --- UPDATED: Call the new LLM service method ---
+                # Pass the nested api_usage dict directly for updates
+                parsed_llm_output = await llm_service.call_llm_with_prompt(
                     prompt=prompt,
-                    stats=final_stats["api_usage"], # Pass the nested dict
-                    job_id=review_job.id # Pass review job ID for logging/cache key
+                    stats_dict=final_stats["api_usage"], # Pass the nested dict
+                    job_id=review_job.id, # Pass review job ID for logging/cache key
+                    max_tokens=1024 # Adjust if needed for reclassification output size
                 )
+                # --- END UPDATED ---
 
-                # --- ADDED LOGGING ---
-                logger.debug(f"Raw LLM string response for '{vendor_name}': {llm_response_str}")
-                # --- END LOGGING ---
+                # Remove the old parse call:
+                # parsed_llm_output = llm_service.parse_json_response(llm_response_str, ...)
 
-                # Parse the LLM response JSON
-                parsed_llm_output = llm_service.parse_json_response(llm_response_str, job_id=review_job.id, vendor_name=vendor_name)
+                logger.debug(f"Parsed LLM response dictionary for '{vendor_name}': {parsed_llm_output}")
 
                 # Extract the classification result for this vendor
-                # Based on the prompt's output_format, it should be in classifications[0]
-                if parsed_llm_output and "classifications" in parsed_llm_output and isinstance(parsed_llm_output["classifications"], list) and len(parsed_llm_output["classifications"]) > 0:
-                     llm_output_data = parsed_llm_output["classifications"][0]
-                     logger.debug(f"Parsed LLM classification data for '{vendor_name}': {llm_output_data}")
+                # The prompt asks for a specific JSON output format, so parse that
+                # Expecting format like: {"batch_id": "...", "level": N, "classifications": [...]}
+                # Or potentially just the classification dict directly if the prompt asks for single output
+                llm_output_data = None # Initialize
+                if parsed_llm_output and isinstance(parsed_llm_output, dict):
+                    # Check if the response has the expected 'classifications' list structure
+                    if "classifications" in parsed_llm_output and isinstance(parsed_llm_output["classifications"], list) and len(parsed_llm_output["classifications"]) > 0:
+                        llm_output_data = parsed_llm_output["classifications"][0]
+                        logger.debug(f"Extracted classification data from 'classifications' list for '{vendor_name}': {llm_output_data}")
+                    # Fallback: Check if the root object itself looks like the classification structure
+                    elif "vendor_name" in parsed_llm_output and "level1" in parsed_llm_output:
+                         llm_output_data = parsed_llm_output
+                         logger.debug(f"Using root LLM response object as classification data for '{vendor_name}': {llm_output_data}")
+                    else:
+                        logger.warning(f"Parsed LLM output for '{vendor_name}' does not match expected structures ('classifications' list or direct result). Output: {parsed_llm_output}")
                 else:
-                     logger.warning(f"Failed to parse valid classification structure from LLM response for '{vendor_name}'. Response: {llm_response_str}")
-                     llm_output_data = None # Ensure it's None if parsing failed
+                     logger.warning(f"Failed to get valid dictionary from LLM response for '{vendor_name}'. Response: {parsed_llm_output}")
 
 
-                # --- UPDATED: More robust check for L1 data from parsed output ---
+                # --- More robust check for L1 data from parsed output ---
                 l1_data = llm_output_data.get("level1") if llm_output_data else None
                 l1_category_id = l1_data.get("category_id") if l1_data else None
                 l1_category_name = l1_data.get("category_name") if l1_data else None
@@ -200,11 +215,7 @@ async def process_reclassification(
 
                 # Check if we got valid L1 classification data
                 if l1_data and l1_category_id and l1_category_name and l1_category_id not in ["ERROR", "N/A"] and not classification_not_possible:
-                # --- END UPDATED ---
                      # --- Recursive Classification based on Hint ---
-                     # The prompt asks the LLM to perform hierarchical classification.
-                     # We need to construct the JobResultItem from the potentially multi-level data returned by the LLM.
-
                      achieved_level = 0
                      final_confidence = 0.0
                      final_notes = None
@@ -273,7 +284,11 @@ async def process_reclassification(
                          elif not l1_category_id or not l1_category_name:
                              reason = "LLM response missing Level 1 category_id or category_name."
                      elif llm_output_data is None:
-                         reason = "Failed to parse classification data from LLM response."
+                         # Reason is based on why llm_output_data became None earlier
+                         if parsed_llm_output is None:
+                             reason = "LLM call failed or response parsing failed."
+                         else:
+                             reason = "LLM response structure did not match expected format."
                      else: # llm_output_data exists but no l1_data
                          reason = "LLM response missing 'level1' field."
 
