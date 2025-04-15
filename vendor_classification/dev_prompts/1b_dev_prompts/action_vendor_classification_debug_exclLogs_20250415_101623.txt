@@ -1,0 +1,2247 @@
+<goal or issue to address>
+we have just implemented the "flag and reclassify" feature. It seems to have worked at level 1, but I can't verify L2 which was the target, because the reclassified result table doesn't show the L2, L3, L4. 
+  
+<backend log of reclassify job>
+{"timestamp": "2025-04-15T14:03:13.307519Z", "level": "DEBUG", "logger": "llm_api_trace", "message": "LLM_TRACE: Starting call_llm_with_prompt (Job ID: review_54211b280aab)", "correlation_id": "review_54211b280aab", "job_id": "review_54211b280aab", "module": "llm_service", "function": "call_llm_with_prompt", "line": 465, "process_id": 24, "thread_id": 281473872154656, "host": "30c76f4cb50a", "job_type": "REVIEW", "company_name": "aaa", "creator": "admin", "parent_job_id": "b861503d-832f-43f9-8f45-f8534fafe99b", "review_job_id": "review_54211b280aab", "current_vendor": "Brian Loebig"}
+{"timestamp": "2025-04-15T14:03:13.310290Z", "level": "DEBUG", "logger": "llm_api_trace", "message": "LLM_TRACE: Provided Prompt (Job ID: review_54211b280aab):\n-------\n\n<role>You are a precise vendor classification expert using the NAICS taxonomy. You are re-evaluating a previous classification based on new user input.</role>\n\n<task>Re-classify the vendor described in `<original_vendor_data>` using the crucial information provided in `<user_hint>`. The previous attempt is in `<original_classification_attempt>` for context. Your goal is to determine the most accurate NAICS classification up to **Level 2** based *primarily* on the user hint combined with the original data.</task>\n\n<instructions>\n1.  **Prioritize the `<user_hint>`**. Assume it provides the most accurate context about the vendor's primary business activity for the user's purposes.\n2.  Use the `<original_vendor_data>` to supplement the hint if necessary.\n3.  Refer to the `<original_classification_attempt>` only for context on why the previous classification might have been incorrect or insufficient. Do not simply repeat the old result unless the hint strongly confirms it.\n4.  Perform a hierarchical classification starting from Level 1 up to the target Level 2.\n5.  For **each level**:\n    a.  Determine the most appropriate category based on the hint and data. Use the provided taxonomy structure (implicitly known or explicitly provided if needed in future versions).\n    b.  If a confident classification for the current level is possible, provide the `category_id`, `category_name`, `confidence` (> 0.0), set `classification_not_possible` to `false`, and optionally add `notes`. Proceed to the next level if the target level allows.\n    c.  If classification for the current level is **not possible** (due to ambiguity even with the hint, or the hint pointing to an activity outside the available subcategories), set `classification_not_possible` to `true`, `confidence` to `0.0`, provide a `classification_not_possible_reason`, set `category_id`/`category_name` to \"N/A\", and **stop** the classification process for this vendor (do not include results for subsequent levels).\n6.  Structure your response as a **single JSON object** matching the schema in `<output_format>`. Ensure it contains results for all levels attempted up to the point of success or failure.\n7.  The output JSON should represent the *new* classification attempt based on the hint.\n8.  Respond *only* with the valid JSON object.\n</instructions>\n\n<original_vendor_data>\n  <name>Brian Loebig</name>\n</original_vendor_data>\n\n<user_hint>sells cars</user_hint>\n\n<original_classification_attempt>\n  <status>Classified</status>\n  <achieved_level>2</achieved_level>\n  <reason_or_notes>Loebig Ink specializes in SEO, web design, and small business consulting, which aligns with the broad category of Professional, Scientific, and Technical Services.</reason_or_notes>\n  <level_1_result id=\"54\" name=\"Professional, Scientific, and Technical Services\"/>\n  <level_2_result id=\"541\" name=\"Professional, Scientific, and Technical Services\"/>\n</original_classification_attempt>\n\n<output_format>\nRespond *only* with a valid JSON object containing the *new* classification result for this vendor, based *primarily* on the <user_hint> and <original_vendor_data>.\nThe JSON object should represent the full classification attempt up to Level 2, following the standard structure used previously.\n\njson\n{\n  \"level\": 2, // The target level for this reclassification\n  \"attempt_id\": \"review_54211b280aab-Brian Loebig\", // ID for this specific attempt\n  \"vendor_name\": \"Brian Loebig\", // Exact vendor name\n  \"classifications\": [ // Array with ONE entry for this vendor\n    {\n      \"vendor_name\": \"Brian Loebig\", // Vendor name again\n      // --- L1 Result ---\n      \"level1\": {\n        \"category_id\": \"string\", // L1 ID from taxonomy or \"N/A\"\n        \"category_name\": \"string\", // L1 Name or \"N/A\"\n        \"confidence\": \"float\", // 0.0-1.0\n        \"classification_not_possible\": \"boolean\",\n        \"classification_not_possible_reason\": \"string | null\",\n        \"notes\": \"string | null\" // Justification based on hint/data\n      },\n      // --- L2 Result (if L1 possible and target_level >= 2) ---\n      \"level2\": { // Include ONLY if L1 was possible AND target_level >= 2\n        \"category_id\": \"string\", // L2 ID or \"N/A\"\n        \"category_name\": \"string\", // L2 Name or \"N/A\"\n        \"confidence\": \"float\",\n        \"classification_not_possible\": \"boolean\",\n        \"classification_not_possible_reason\": \"string | null\",\n        \"notes\": \"string | null\"\n      } // , ... include level3, level4, level5 similarly if possible and target_level allows\n      // --- L3 Result (if L2 possible and target_level >= 3) ---\n      // --- L4 Result (if L3 possible and target_level >= 4) ---\n      // --- L5 Result (if L4 possible and target_level >= 5) ---\n    }\n  ]\n}\n\n</output_format>\n\n-------", "correlation_id": "review_54211b280aab", "job_id": "review_54211b280aab", "module": "llm_service", "function": "call_llm_with_prompt", "line": 466, "process_id": 24, "thread_id": 281473872154656, "host": "30c76f4cb50a", "job_type": "REVIEW", "company_name": "aaa", "creator": "admin", "parent_job_id": "b861503d-832f-43f9-8f45-f8534fafe99b", "review_job_id": "review_54211b280aab", "current_vendor": "Brian Loebig"}
+{"timestamp": "2025-04-15T14:03:13.311862Z", "level": "INFO", "logger": "llm_api_trace", "message": "LLM_TRACE: Generating new API key. URL: https://openrouter.ai/api/v1/keys, ProvKeyIndex: 0", "correlation_id": "review_54211b280aab", "job_id": "review_54211b280aab", "module": "llm_service", "function": "_generate_api_key", "line": 239, "process_id": 24, "thread_id": 281473872154656, "host": "30c76f4cb50a", "job_type": "REVIEW", "company_name": "aaa", "creator": "admin", "parent_job_id": "b861503d-832f-43f9-8f45-f8534fafe99b", "review_job_id": "review_54211b280aab", "current_vendor": "Brian Loebig"}
+{"timestamp": "2025-04-15T14:03:13.311965Z", "level": "DEBUG", "logger": "llm_api_trace", "message": "LLM_TRACE: Key Generation Payload: {\"name\": \"auto-gen-vendor-classifier-20250415-140313\", \"label\": \"my-app-instance\"}", "correlation_id": "review_54211b280aab", "job_id": "review_54211b280aab", "module": "llm_service", "function": "_generate_api_key", "line": 240, "process_id": 24, "thread_id": 281473872154656, "host": "30c76f4cb50a", "job_type": "REVIEW", "company_name": "aaa", "creator": "admin", "parent_job_id": "b861503d-832f-43f9-8f45-f8534fafe99b", "review_job_id": "review_54211b280aab", "current_vendor": "Brian Loebig"}
+{"timestamp": "2025-04-15T14:03:13.612175Z", "level": "DEBUG", "logger": "llm_api_trace", "message": "LLM_TRACE: Key Generation Raw Response (Status: 201):\n{\"data\":{\"hash\":\"573b96a465edc1815a921a5a9d01cc49a0cc3012367a738b715b2a8f258ec112\",\"name\":\"auto-gen-vendor-classifier-20250415-140313\",\"label\":\"sk-or-v1-213...be7\",\"disabled\":false,\"limit\":null,\"usage\":0,\"created_at\":\"2025-04-15T14:03:13.566556+00:00\",\"updated_at\":null},\"key\":\"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\"}", "correlation_id": "review_54211b280aab", "job_id": "review_54211b280aab", "module": "llm_service", "function": "_generate_api_key", "line": 245, "process_id": 24, "thread_id": 281473872154656, "host": "30c76f4cb50a", "job_type": "REVIEW", "company_name": "aaa", "creator": "admin", "parent_job_id": "b861503d-832f-43f9-8f45-f8534fafe99b", "review_job_id": "review_54211b280aab", "current_vendor": "Brian Loebig"}
+{"timestamp": "2025-04-15T14:03:13.613165Z", "level": "INFO", "logger": "llm_api_trace", "message": "LLM_TRACE: Successfully generated key 573b96a4...", "correlation_id": "review_54211b280aab", "job_id": "review_54211b280aab", "module": "llm_service", "function": "_generate_api_key", "line": 264, "process_id": 24, "thread_id": 281473872154656, "host": "30c76f4cb50a", "job_type": "REVIEW", "company_name": "aaa", "creator": "admin", "parent_job_id": "b861503d-832f-43f9-8f45-f8534fafe99b", "review_job_id": "review_54211b280aab", "current_vendor": "Brian Loebig"}
+{"timestamp": "2025-04-15T14:03:13.615054Z", "level": "DEBUG", "logger": "llm_api_trace", "message": "LLM_TRACE: LLM Request Headers (Generic prompt call, Job ID: review_54211b280aab):\n{\n  \"Content-Type\": \"application/json\",\n  \"HTTP-Referer\": \"naicsvendorclassification.com\",\n  \"X-Title\": \"NAICS Vendor Classification\",\n  \"Authorization\": \"Bearer [REDACTED_GENERATED_KEY_573b96a4]\"\n}", "correlation_id": "review_54211b280aab", "job_id": "review_54211b280aab", "module": "llm_service", "function": "_call_llm_endpoint", "line": 562, "process_id": 24, "thread_id": 281473872154656, "host": "30c76f4cb50a", "job_type": "REVIEW", "company_name": "aaa", "creator": "admin", "parent_job_id": "b861503d-832f-43f9-8f45-f8534fafe99b", "review_job_id": "review_54211b280aab", "current_vendor": "Brian Loebig"}
+{"timestamp": "2025-04-15T14:03:13.615656Z", "level": "DEBUG", "logger": "llm_api_trace", "message": "LLM_TRACE: LLM Request Payload (Generic prompt call, Job ID: review_54211b280aab):\n{\n  \"model\": \"deepseek/deepseek-chat-v3-0324:free\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"\\n<role>You are a precise vendor classification expert using the NAICS taxonomy. You are re-evaluating a previous classification based on new user input.</role>\\n\\n<task>Re-classify the vendor described in `<original_vendor_data>` using the crucial information provided in `<user_hint>`. The previous attempt is in `<original_classification_attempt>` for context. Your goal is to determine the most accurate NAICS classification up to **Level 2** based *primarily* on the user hint combined with the original data.</task>\\n\\n<instructions>\\n1.  **Prioritize the `<user_hint>`**. Assume it provides the most accurate context about the vendor's primary business activity for the user's purposes.\\n2.  Use the `<original_vendor_data>` to supplement the hint if necessary.\\n3.  Refer to the `<original_classification_attempt>` only for context on why the previous classification might have been incorrect or insufficient. Do not simply repeat the old result unless the hint strongly confirms it.\\n4.  Perform a hierarchical classification starting from Level 1 up to the target Level 2.\\n5.  For **each level**:\\n    a.  Determine the most appropriate category based on the hint and data. Use the provided taxonomy structure (implicitly known or explicitly provided if needed in future versions).\\n    b.  If a confident classification for the current level is possible, provide the `category_id`, `category_name`, `confidence` (> 0.0), set `classification_not_possible` to `false`, and optionally add `notes`. Proceed to the next level if the target level allows.\\n    c.  If classification for the current level is **not possible** (due to ambiguity even with the hint, or the hint pointing to an activity outside the available subcategories), set `classification_not_possible` to `true`, `confidence` to `0.0`, provide a `classification_not_possible_reason`, set `category_id`/`category_name` to \\\"N/A\\\", and **stop** the classification process for this vendor (do not include results for subsequent levels).\\n6.  Structure your response as a **single JSON object** matching the schema in `<output_format>`. Ensure it contains results for all levels attempted up to the point of success or failure.\\n7.  The output JSON should represent the *new* classification attempt based on the hint.\\n8.  Respond *only* with the valid JSON object.\\n</instructions>\\n\\n<original_vendor_data>\\n  <name>Brian Loebig</name>\\n</original_vendor_data>\\n\\n<user_hint>sells cars</user_hint>\\n\\n<original_classification_attempt>\\n  <status>Classified</status>\\n  <achieved_level>2</achieved_level>\\n  <reason_or_notes>Loebig Ink specializes in SEO, web design, and small business consulting, which aligns with the broad category of Professional, Scientific, and Technical Services.</reason_or_notes>\\n  <level_1_result id=\\\"54\\\" name=\\\"Professional, Scientific, and Technical Services\\\"/>\\n  <level_2_result id=\\\"541\\\" name=\\\"Professional, Scientific, and Technical Services\\\"/>\\n</original_classification_attempt>\\n\\n<output_format>\\nRespond *only* with a valid JSON object containing the *new* classification result for this vendor, based *primarily* on the <user_hint> and <original_vendor_data>.\\nThe JSON object should represent the full classification attempt up to Level 2, following the standard structure used previously.\\n\\njson\\n{\\n  \\\"level\\\": 2, // The target level for this reclassification\\n  \\\"attempt_id\\\": \\\"review_54211b280aab-Brian Loebig\\\", // ID for this specific attempt\\n  \\\"vendor_name\\\": \\\"Brian Loebig\\\", // Exact vendor name\\n  \\\"classifications\\\": [ // Array with ONE entry for this vendor\\n    {\\n      \\\"vendor_name\\\": \\\"Brian Loebig\\\", // Vendor name again\\n      // --- L1 Result ---\\n      \\\"level1\\\": {\\n        \\\"category_id\\\": \\\"string\\\", // L1 ID from taxonomy or \\\"N/A\\\"\\n        \\\"category_name\\\": \\\"string\\\", // L1 Name or \\\"N/A\\\"\\n        \\\"confidence\\\": \\\"float\\\", // 0.0-1.0\\n        \\\"classification_not_possible\\\": \\\"boolean\\\",\\n        \\\"classification_not_possible_reason\\\": \\\"string | null\\\",\\n        \\\"notes\\\": \\\"string | null\\\" // Justification based on hint/data\\n      },\\n      // --- L2 Result (if L1 possible and target_level >= 2) ---\\n      \\\"level2\\\": { // Include ONLY if L1 was possible AND target_level >= 2\\n        \\\"category_id\\\": \\\"string\\\", // L2 ID or \\\"N/A\\\"\\n        \\\"category_name\\\": \\\"string\\\", // L2 Name or \\\"N/A\\\"\\n        \\\"confidence\\\": \\\"float\\\",\\n        \\\"classification_not_possible\\\": \\\"boolean\\\",\\n        \\\"classification_not_possible_reason\\\": \\\"string | null\\\",\\n        \\\"notes\\\": \\\"string | null\\\"\\n      } // , ... include level3, level4, level5 similarly if possible and target_level allows\\n      // --- L3 Result (if L2 possible and target_level >= 3) ---\\n      // --- L4 Result (if L3 possible and target_level >= 4) ---\\n      // --- L5 Result (if L4 possible and target_level >= 5) ---\\n    }\\n  ]\\n}\\n\\n</output_format>\\n\"\n    }\n  ],\n  \"temperature\": 0.1,\n  \"max_tokens\": 1024,\n  \"top_p\": 0.9,\n  \"frequency_penalty\": 0,\n  \"presence_penalty\": 0,\n  \"response_format\": {\n    \"type\": \"json_object\"\n  }\n}", "correlation_id": "review_54211b280aab", "job_id": "review_54211b280aab", "module": "llm_service", "function": "_call_llm_endpoint", "line": 563, "process_id": 24, "thread_id": 281473872154656, "host": "30c76f4cb50a", "job_type": "REVIEW", "company_name": "aaa", "creator": "admin", "parent_job_id": "b861503d-832f-43f9-8f45-f8534fafe99b", "review_job_id": "review_54211b280aab", "current_vendor": "Brian Loebig"}
+{"timestamp": "2025-04-15T14:03:20.731820Z", "level": "DEBUG", "logger": "llm_api_trace", "message": "LLM_TRACE: LLM Raw Response (Generic prompt call, Job ID: review_54211b280aab, Status: 200, Duration: 7.116s):\n-------\n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n\n         \n{\"id\":\"gen-1744725793-GsSGUr4rl5E4ShyOTipR\",\"provider\":\"Targon\",\"model\":\"deepseek/deepseek-chat-v3-0324\",\"object\":\"chat.completion\",\"created\":1744725793,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\n  \\\"level\\\": 2,\\n  \\\"attempt_id\\\": \\\"review_54211b280aab-Brian Loebig\\\",\\n  \\\"vendor_name\\\": \\\"Brian Loebig\\\",\\n  \\\"classifications\\\": [\\n    {\\n      \\\"vendor_name\\\": \\\"Brian Loebig\\\",\\n      \\\"level1\\\": {\\n        \\\"category_id\\\": \\\"44-45\\\",\\n        \\\"category_name\\\": \\\"Retail Trade\\\",\\n        \\\"confidence\\\": 0.9,\\n        \\\"classification_not_possible\\\": false,\\n        \\\"classification_not_possible_reason\\\": null,\\n        \\\"notes\\\": \\\"The user hint indicates the vendor sells cars, which falls under Retail Trade.\\\"\\n      },\\n      \\\"level2\\\": {\\n        \\\"category_id\\\": \\\"441\\\",\\n        \\\"category_name\\\": \\\"Motor Vehicle and Parts Dealers\\\",\\n        \\\"confidence\\\": 0.9,\\n        \\\"classification_not_possible\\\": false,\\n        \\\"classification_not_possible_reason\\\": null,\\n        \\\"notes\\\": \\\"Selling cars is specifically classified under Motor Vehicle and Parts Dealers.\\\"\\n      }\\n    }\\n  ]\\n}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"usage\":{\"prompt_tokens\":1145,\"completion_tokens\":222,\"total_tokens\":1367}}\n-------", "correlation_id": "review_54211b280aab", "job_id": "review_54211b280aab", "module": "llm_service", "function": "_call_llm_endpoint", "line": 580, "process_id": 24, "thread_id": 281473872154656, "host": "30c76f4cb50a", "job_type": "REVIEW", "company_name": "aaa", "creator": "admin", "parent_job_id": "b861503d-832f-43f9-8f45-f8534fafe99b", "review_job_id": "review_54211b280aab", "current_vendor": "Brian Loebig"}
+{"timestamp": "2025-04-15T14:03:20.734716Z", "level": "DEBUG", "logger": "llm_api_trace", "message": "LLM_TRACE: LLM Parsed Response (Generic prompt call, Job ID: review_54211b280aab):\n{\n  \"level\": 2,\n  \"attempt_id\": \"review_54211b280aab-Brian Loebig\",\n  \"vendor_name\": \"Brian Loebig\",\n  \"classifications\": [\n    {\n      \"vendor_name\": \"Brian Loebig\",\n      \"level1\": {\n        \"category_id\": \"44-45\",\n        \"category_name\": \"Retail Trade\",\n        \"confidence\": 0.9,\n        \"classification_not_possible\": false,\n        \"classification_not_possible_reason\": null,\n        \"notes\": \"The user hint indicates the vendor sells cars, which falls under Retail Trade.\"\n      },\n      \"level2\": {\n        \"category_id\": \"441\",\n        \"category_name\": \"Motor Vehicle and Parts Dealers\",\n        \"confidence\": 0.9,\n        \"classification_not_possible\": false,\n        \"classification_not_possible_reason\": null,\n        \"notes\": \"Selling cars is specifically classified under Motor Vehicle and Parts Dealers.\"\n      }\n    }\n  ]\n}", "correlation_id": "review_54211b280aab", "job_id": "review_54211b280aab", "module": "llm_service", "function": "_call_llm_endpoint", "line": 610, "process_id": 24, "thread_id": 281473872154656, "host": "30c76f4cb50a", "job_type": "REVIEW", "company_name": "aaa", "creator": "admin", "parent_job_id": "b861503d-832f-43f9-8f45-f8534fafe99b", "review_job_id": "review_54211b280aab", "current_vendor": "Brian Loebig"}
+
+
+</backend log of reclasify job>
+</goal or issue to address>
+
+
+<output instruction>
+1) Reflect on 5-7 different possible sources of the problem based on the code provided and the goal/issue description.
+2) Distill those down to the most likely root cause.
+3) Provide the COMPLETE UPDATED VERSION of *only* the files that need changes to fix the likely root cause.
+   Use the format: <file path='relative/path/to/file.ext'>
+```[language]
+[COMPLETE FILE CONTENT]
+```
+</file>
+   Ensure the file path is relative to the project root and the content is enclosed in markdown code fences.
+</output instruction>
+
+
+<Tree of Included Files>
+- app/schemas/job.py
+- app/schemas/review.py
+- app/tasks/classification_tasks.py
+- app/tasks/reclassification_logic.py
+- app/tasks/reclassification_prompts.py
+- frontend/vue_frontend/src/components/ReviewResultsTable.vue
+- frontend/vue_frontend/src/stores/job.ts
+
+(Note: .log files were present but excluded from this context based on selection.)
+</Tree of Included Files>
+
+
+<Concatenated Source Code>
+
+<file path='app/schemas/job.py'>
+# <file path='app/schemas/job.py'>
+# app/schemas/job.py
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, Dict, Any, List, Union # <<< ADDED Union
+from datetime import datetime
+from enum import Enum as PyEnum
+
+from models.job import JobStatus, ProcessingStage, JobType # Import enums from model
+from .review import ReviewResultItem # Import the review result schema
+
+# --- UPDATED: Schema for a single detailed result item (for CLASSIFICATION jobs) ---
+class JobResultItem(BaseModel):
+    vendor_name: str = Field(..., description="Original vendor name")
+    level1_id: Optional[str] = Field(None, description="Level 1 Category ID")
+    level1_name: Optional[str] = Field(None, description="Level 1 Category Name")
+    level2_id: Optional[str] = Field(None, description="Level 2 Category ID")
+    level2_name: Optional[str] = Field(None, description="Level 2 Category Name")
+    level3_id: Optional[str] = Field(None, description="Level 3 Category ID")
+    level3_name: Optional[str] = Field(None, description="Level 3 Category Name")
+    level4_id: Optional[str] = Field(None, description="Level 4 Category ID")
+    level4_name: Optional[str] = Field(None, description="Level 4 Category Name")
+    level5_id: Optional[str] = Field(None, description="Level 5 Category ID")
+    level5_name: Optional[str] = Field(None, description="Level 5 Category Name")
+    final_confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Confidence score of the final classification level achieved (0.0 if not possible)")
+    final_status: str = Field(..., description="Overall status ('Classified', 'Not Possible', 'Error')")
+    classification_source: Optional[str] = Field(None, description="Source of the final classification ('Initial', 'Search')")
+    classification_notes_or_reason: Optional[str] = Field(None, description="LLM notes or reason for failure/low confidence")
+    achieved_level: Optional[int] = Field(None, ge=0, le=5, description="Deepest level successfully classified (0 if none)")
+
+    class Config:
+        from_attributes = True # For potential future ORM mapping if results move to separate table
+# --- END UPDATED ---
+
+
+class JobBase(BaseModel):
+    company_name: str = Field(..., example="Example Corp")
+    target_level: int = Field(default=5, ge=1, le=5, example=5) # Add target_level here
+    notification_email: Optional[EmailStr] = Field(None, example="user@example.com")
+
+class JobCreate(JobBase):
+    # Fields required specifically on creation, if any (handled by JobBase for now)
+    pass
+
+class JobResponse(JobBase):
+    id: str = Field(..., example="job_abc123")
+    input_file_name: str = Field(..., example="vendors.xlsx")
+    output_file_name: Optional[str] = Field(None, example="results_job_abc123.xlsx")
+    status: JobStatus = Field(..., example=JobStatus.PROCESSING)
+    current_stage: ProcessingStage = Field(..., example=ProcessingStage.CLASSIFICATION_L2)
+    progress: float = Field(..., example=0.75)
+    created_at: datetime = Field(...)
+    updated_at: datetime = Field(...)
+    completed_at: Optional[datetime] = None
+    error_message: Optional[str] = Field(None, example="Failed during search phase.")
+    stats: Dict[str, Any] = Field(default={}, example={"total_vendors": 100, "unique_vendors": 95})
+    created_by: str = Field(..., example="user@example.com")
+
+    # --- ADDED: Job Type and Parent Link ---
+    job_type: JobType = Field(..., example=JobType.CLASSIFICATION)
+    parent_job_id: Optional[str] = Field(None, example="job_xyz789")
+    # --- END ADDED ---
+
+    # NOTE: We don't include detailed_results here by default to keep this response smaller.
+    # It will be fetched via a separate endpoint if needed.
+
+    class Config:
+        from_attributes = True # Enable ORM mode for automatic mapping from Job model
+        use_enum_values = True # Ensure enum values (strings) are used in the response
+
+
+# --- ADDED: Schema for the detailed results endpoint response ---
+# This allows the endpoint to return either type of result list based on job type
+class JobResultsResponse(BaseModel):
+    job_id: str
+    job_type: JobType
+    results: Union[List[JobResultItem], List[ReviewResultItem]] = Field(..., description="List of detailed results, structure depends on job_type")
+# --- END ADDED ---
+</file>
+
+<file path='app/schemas/review.py'>
+# app/schemas/review.py
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any
+
+# Schema for items in the reclassify request payload
+class ReclassifyRequestItem(BaseModel):
+    vendor_name: str = Field(..., description="The exact vendor name to reclassify")
+    hint: str = Field(..., description="User-provided hint for reclassification")
+
+# Schema for the reclassify request payload
+class ReclassifyPayload(BaseModel):
+    items: List[ReclassifyRequestItem] = Field(..., description="List of vendors and hints to reclassify")
+
+# Schema for the reclassify response
+class ReclassifyResponse(BaseModel):
+    review_job_id: str = Field(..., description="The ID of the newly created review job")
+    message: str = Field(default="Re-classification job started.", description="Status message")
+
+# Schema for a single item in the detailed_results of a REVIEW job
+# It stores the original result (as a dict) and the new result (as a dict)
+class ReviewResultItem(BaseModel):
+    vendor_name: str = Field(..., description="Original vendor name")
+    hint: str = Field(..., description="Hint provided by the user for this reclassification")
+    # Store the full original result structure (which should match JobResultItem)
+    original_result: Dict[str, Any] = Field(..., description="The original classification result for this vendor")
+    # Store the full new result structure (which should also match JobResultItem)
+    new_result: Dict[str, Any] = Field(..., description="The new classification result after applying the hint")
+
+    class Config:
+        from_attributes = True # For potential future ORM mapping if results move to separate table
+</file>
+
+<file path='app/tasks/classification_tasks.py'>
+# <file path='app/tasks/classification_tasks.py'>
+# app/tasks/classification_tasks.py
+import os
+import asyncio
+import logging
+from datetime import datetime
+from celery import shared_task
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from typing import Dict, Any, List, Optional # <<< ADDED List, Optional
+
+from core.database import SessionLocal
+from core.config import settings
+from core.logging_config import get_logger
+# Import context functions from the new module
+from core.log_context import set_correlation_id, set_job_id, set_log_context, clear_all_context
+# Import log helpers from utils
+from utils.log_utils import LogTimer, log_duration
+
+from models.job import Job, JobStatus, ProcessingStage, JobType # <<< ADDED JobType
+from services.file_service import read_vendor_file, normalize_vendor_data, generate_output_file
+from services.llm_service import LLMService
+from services.search_service import SearchService
+from utils.taxonomy_loader import load_taxonomy
+
+# Import the refactored logic
+from .classification_logic import process_vendors
+# Import the schema for type hinting
+from schemas.job import JobResultItem
+# Import review schemas/logic if needed (likely handled by separate task)
+from schemas.review import ReviewResultItem
+
+
+# Configure logger
+logger = get_logger("vendor_classification.tasks")
+# --- ADDED: Log confirmation ---
+logger.debug("Successfully imported Dict and Any from typing for classification tasks.")
+# --- END ADDED ---
+
+
+# --- UPDATED: Helper function to process results for DB storage ---
+def _prepare_detailed_results_for_storage(
+    results_dict: Dict[str, Dict],
+    target_level: int # Keep target_level for reference if needed, but we store all levels now
+) -> List[Dict[str, Any]]:
+    """
+    Processes the complex results dictionary (containing level1, level2... sub-dicts)
+    into a flat list of dictionaries, where each dictionary represents a vendor
+    and contains fields for all L1-L5 classifications, plus final status details.
+    Matches the JobResultItem schema.
+    THIS IS FOR **CLASSIFICATION** JOBS. Review jobs store results differently.
+    """
+    processed_list = []
+    logger.info(f"Preparing detailed results for CLASSIFICATION job storage. Processing {len(results_dict)} vendors.")
+
+    for vendor_name, vendor_results in results_dict.items():
+        # Initialize the flat structure for this vendor
+        flat_result: Dict[str, Any] = {
+            "vendor_name": vendor_name,
+            "level1_id": None, "level1_name": None,
+            "level2_id": None, "level2_name": None,
+            "level3_id": None, "level3_name": None,
+            "level4_id": None, "level4_name": None,
+            "level5_id": None, "level5_name": None,
+            "final_confidence": None,
+            "final_status": "Not Possible", # Default status
+            "classification_source": "Initial", # Default source
+            "classification_notes_or_reason": None,
+            "achieved_level": 0 # Default achieved level
+        }
+
+        deepest_successful_level = 0
+        final_level_data = None
+        final_source = "Initial" # Track the source of the final decision point
+        final_notes_or_reason = None
+
+        # Iterate through levels 1 to 5 to populate the flat structure
+        for level in range(1, 6):
+            level_key = f"level{level}"
+            level_data = vendor_results.get(level_key)
+
+            if level_data and isinstance(level_data, dict):
+                # Populate the corresponding fields in flat_result
+                flat_result[f"level{level}_id"] = level_data.get("category_id")
+                flat_result[f"level{level}_name"] = level_data.get("category_name")
+
+                # Track the deepest successful classification
+                if not level_data.get("classification_not_possible", True):
+                    deepest_successful_level = level
+                    final_level_data = level_data # Store data of the deepest successful level
+                    # Update source based on the source recorded *at that level*
+                    final_source = level_data.get("classification_source", final_source)
+                    final_notes_or_reason = level_data.get("notes") # Get notes from successful level
+                elif deepest_successful_level == 0: # If no level succeeded yet, track potential failure reasons/notes from L1
+                    if level == 1:
+                        final_notes_or_reason = level_data.get("classification_not_possible_reason") or level_data.get("notes")
+                        # Update source based on L1 source if it exists
+                        final_source = level_data.get("classification_source", final_source)
+
+            # If a level wasn't processed (e.g., stopped early), its fields remain None
+
+        # Determine final status, confidence, and notes based on the deepest successful level
+        if final_level_data:
+            flat_result["final_status"] = "Classified"
+            flat_result["final_confidence"] = final_level_data.get("confidence")
+            flat_result["achieved_level"] = deepest_successful_level
+            flat_result["classification_notes_or_reason"] = final_notes_or_reason # Use notes from final level
+        else:
+            # No level was successfully classified
+            flat_result["final_status"] = "Not Possible"
+            flat_result["final_confidence"] = 0.0
+            flat_result["achieved_level"] = 0
+            # Use the reason/notes captured from L1 failure or search failure
+            flat_result["classification_notes_or_reason"] = final_notes_or_reason
+
+        # Set the final determined source
+        flat_result["classification_source"] = final_source
+
+        # Handle potential ERROR states explicitly (e.g., if L1 failed with ERROR)
+        l1_data = vendor_results.get("level1")
+        if l1_data and l1_data.get("category_id") == "ERROR":
+            flat_result["final_status"] = "Error"
+            flat_result["classification_notes_or_reason"] = l1_data.get("classification_not_possible_reason") or "Processing error occurred"
+            # Override source if error occurred
+            final_source = l1_data.get("classification_source", "Initial")
+            flat_result["classification_source"] = final_source
+
+
+        # Validate against Pydantic model (optional, but good practice)
+        try:
+            JobResultItem.model_validate(flat_result)
+            processed_list.append(flat_result)
+        except Exception as validation_err:
+            logger.error(f"Validation failed for prepared result of vendor '{vendor_name}'",
+                         exc_info=True, extra={"result_data": flat_result})
+            # Optionally append a placeholder error entry or skip
+            # For now, let's skip invalid entries
+            continue
+
+    logger.info(f"Finished preparing {len(processed_list)} detailed result items for CLASSIFICATION job storage.")
+    return processed_list
+# --- END UPDATED ---
+
+
+@shared_task(bind=True)
+# --- UPDATED: Added target_level parameter ---
+def process_vendor_file(self, job_id: str, file_path: str, target_level: int):
+# --- END UPDATED ---
+    """
+    Celery task entry point for processing a vendor file (CLASSIFICATION job type).
+    Orchestrates the overall process by calling the main async helper.
+
+    Args:
+        job_id: Job ID
+        file_path: Path to vendor file
+        target_level: The desired maximum classification level (1-5)
+    """
+    task_id = self.request.id if self.request and self.request.id else "UnknownTaskID"
+    logger.info(f"***** process_vendor_file TASK RECEIVED (CLASSIFICATION) *****",
+                extra={
+                    "celery_task_id": task_id,
+                    "job_id_arg": job_id,
+                    "file_path_arg": file_path,
+                    "target_level_arg": target_level # Log received target level
+                })
+
+    set_correlation_id(job_id) # Set correlation ID early
+    set_job_id(job_id)
+    set_log_context({"target_level": target_level, "job_type": JobType.CLASSIFICATION.value}) # Add target level and type to context
+    logger.info(f"Starting vendor file processing task (inside function)",
+                extra={"job_id": job_id, "file_path": file_path, "target_level": target_level})
+
+    # Validate target_level
+    if not 1 <= target_level <= 5:
+        logger.error(f"Invalid target_level received: {target_level}. Must be between 1 and 5.")
+        # Fail the job immediately if level is invalid
+        db_fail = SessionLocal()
+        try:
+            job_fail = db_fail.query(Job).filter(Job.id == job_id).first()
+            if job_fail:
+                job_fail.fail(f"Invalid target level specified: {target_level}. Must be 1-5.")
+                db_fail.commit()
+        except Exception as db_err:
+            logger.error("Failed to mark job as failed due to invalid target level", exc_info=db_err)
+            db_fail.rollback()
+        finally:
+            db_fail.close()
+        clear_all_context() # Clear context before returning
+        return # Stop task execution
+
+    # Initialize loop within the task context
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    logger.debug(f"Created and set new asyncio event loop for job {job_id}")
+
+    db = SessionLocal()
+    job = None # Initialize job to None
+
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if job:
+            # Verify the target level matches the job record (optional sanity check)
+            if job.target_level != target_level:
+                logger.warning(f"Task received target_level {target_level} but job record has {job.target_level}. Using task value: {target_level}.")
+                # Optionally update job record here if desired, or just proceed with task value
+
+            # Ensure job type is CLASSIFICATION
+            if job.job_type != JobType.CLASSIFICATION.value:
+                 logger.error(f"process_vendor_file task called for a non-CLASSIFICATION job.", extra={"job_id": job_id, "job_type": job.job_type})
+                 raise ValueError(f"Job {job_id} is not a CLASSIFICATION job.")
+
+
+            set_log_context({
+                "company_name": job.company_name,
+                "creator": job.created_by,
+                "file_name": job.input_file_name
+                # target_level and job_type already set above
+            })
+            logger.info(f"Processing file for company",
+                        extra={"company": job.company_name})
+        else:
+            logger.error("Job not found in database at start of task!", extra={"job_id": job_id})
+            loop.close() # Close loop if job not found
+            db.close() # Close db session
+            clear_all_context() # Clear context before returning
+            return # Exit task if job doesn't exist
+
+        logger.info(f"About to run async processing for job {job_id}")
+        with LogTimer(logger, "Complete file processing", level=logging.INFO, include_in_stats=True):
+            # Run the async function within the loop created for this task
+            # --- UPDATED: Pass target_level to async helper ---
+            loop.run_until_complete(_process_vendor_file_async(job_id, file_path, db, target_level))
+            # --- END UPDATED ---
+
+        logger.info(f"Vendor file processing completed successfully (async part finished)")
+
+    except Exception as e:
+        logger.error(f"Error processing vendor file task (in main try block)", exc_info=True, extra={"job_id": job_id})
+        try:
+            # Re-query the job within this exception handler if it wasn't fetched initially or became None
+            db_error_session = SessionLocal()
+            try:
+                job_in_error = db_error_session.query(Job).filter(Job.id == job_id).first()
+                if job_in_error:
+                    if job_in_error.status != JobStatus.COMPLETED.value:
+                        err_msg = f"Task failed: {type(e).__name__}: {str(e)}"
+                        job_in_error.fail(err_msg[:2000]) # Limit error message length
+                        db_error_session.commit()
+                        logger.info(f"Job status updated to failed due to task error",
+                                    extra={"error": str(e)})
+                    else:
+                        logger.warning(f"Task error occurred after job was marked completed, status not changed.",
+                                        extra={"error": str(e)})
+                else:
+                    logger.error("Job not found when trying to mark as failed.", extra={"job_id": job_id})
+            except Exception as db_error:
+                logger.error(f"Error updating job status during task failure handling", exc_info=True,
+                            extra={"original_error": str(e), "db_error": str(db_error)})
+                db_error_session.rollback()
+            finally:
+                    db_error_session.close()
+        except Exception as final_db_error:
+                logger.critical(f"CRITICAL: Failed even to handle database update in task error handler.", exc_info=final_db_error)
+
+    finally:
+        if db: # Close the main session used by the async function
+            db.close()
+            logger.debug(f"Main database session closed for task.")
+        if loop and not loop.is_closed():
+            loop.close()
+            logger.debug(f"Event loop closed for task.")
+        clear_all_context()
+        logger.info(f"***** process_vendor_file TASK FINISHED (CLASSIFICATION) *****", extra={"job_id": job_id})
+
+
+# --- UPDATED: Added target_level parameter ---
+async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, target_level: int):
+# --- END UPDATED ---
+    """
+    Asynchronous part of the vendor file processing (CLASSIFICATION job type).
+    Sets up services, initializes stats, calls the core processing logic,
+    and handles final result generation and job status updates.
+    """
+    logger.info(f"[_process_vendor_file_async] Starting async processing for job {job_id} to target level {target_level}")
+
+    llm_service = LLMService()
+    search_service = SearchService()
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+
+    if not job:
+        logger.error(f"[_process_vendor_file_async] Job not found in database", extra={"job_id": job_id})
+        return
+
+    # --- Initialize stats (Updated for L5) ---
+    start_time = datetime.now()
+    # --- MODIFIED: Type hints added ---
+    stats: Dict[str, Any] = {
+        "job_id": job.id,
+        "company_name": job.company_name,
+        "target_level": target_level, # Store target level in stats
+        "start_time": start_time.isoformat(),
+        "end_time": None,
+        "processing_duration_seconds": None,
+        "total_vendors": 0,
+        "unique_vendors": 0,
+        "successfully_classified_l4": 0, # Keep L4 count for reference
+        "successfully_classified_l5": 0, # Count successful classifications reaching L5 (if target >= 5)
+        "classification_not_possible_initial": 0, # Count initially unclassifiable before search
+        "invalid_category_errors": 0, # Track validation errors
+        "search_attempts": 0, # Count how many vendors needed search
+        "search_successful_classifications_l1": 0, # Count successful L1 classifications *after* search
+        "search_successful_classifications_l5": 0, # Count successful L5 classifications *after* search (if target >= 5)
+        "api_usage": {
+            "openrouter_calls": 0,
+            "openrouter_prompt_tokens": 0,
+            "openrouter_completion_tokens": 0,
+            "openrouter_total_tokens": 0,
+            "tavily_search_calls": 0,
+            "cost_estimate_usd": 0.0
+        }
+    }
+    # --- END MODIFIED ---
+    # --- End Initialize stats ---
+
+    # --- Initialize results dictionary ---
+    # This will be populated by process_vendors
+    results_dict: Dict[str, Dict] = {}
+    # --- UPDATED: This will hold the processed results for DB storage (List[JobResultItem]) ---
+    detailed_results_for_db: Optional[List[Dict[str, Any]]] = None
+    # --- END UPDATED ---
+    # --- End Initialize results dictionary ---
+
+    try:
+        job.status = JobStatus.PROCESSING.value
+        job.current_stage = ProcessingStage.INGESTION.value
+        job.progress = 0.05
+        logger.info(f"[_process_vendor_file_async] Committing initial status update: {job.status}, {job.current_stage}, {job.progress}")
+        db.commit()
+        logger.info(f"Job status updated",
+                    extra={"status": job.status, "stage": job.current_stage, "progress": job.progress})
+
+        logger.info(f"Reading vendor file")
+        with log_duration(logger, "Reading vendor file"):
+            vendors_data = read_vendor_file(file_path)
+        logger.info(f"Vendor file read successfully",
+                    extra={"vendor_count": len(vendors_data)})
+
+        job.current_stage = ProcessingStage.NORMALIZATION.value
+        job.progress = 0.1
+        logger.info(f"[_process_vendor_file_async] Committing status update: {job.status}, {job.current_stage}, {job.progress}")
+        db.commit()
+        logger.info(f"Job status updated",
+                    extra={"stage": job.current_stage, "progress": job.progress})
+
+        logger.info(f"Normalizing vendor data")
+        with log_duration(logger, "Normalizing vendor data"):
+            normalized_vendors_data = normalize_vendor_data(vendors_data)
+        logger.info(f"Vendor data normalized",
+                    extra={"normalized_count": len(normalized_vendors_data)})
+
+        logger.info(f"Identifying unique vendors")
+        # --- MODIFIED: Type hints added ---
+        unique_vendors_map: Dict[str, Dict[str, Any]] = {}
+        # --- END MODIFIED ---
+        for entry in normalized_vendors_data:
+            name = entry.get('vendor_name')
+            if name and name not in unique_vendors_map:
+                unique_vendors_map[name] = entry
+        logger.info(f"Unique vendors identified",
+                    extra={"unique_count": len(unique_vendors_map)})
+
+        stats["total_vendors"] = len(normalized_vendors_data)
+        stats["unique_vendors"] = len(unique_vendors_map)
+
+        logger.info(f"Loading taxonomy")
+        with log_duration(logger, "Loading taxonomy"):
+            taxonomy = load_taxonomy() # Can raise exceptions
+        logger.info(f"Taxonomy loaded",
+                    extra={"taxonomy_version": taxonomy.version})
+
+        # Initialize the results dict structure before passing to process_vendors
+        results_dict = {vendor_name: {} for vendor_name in unique_vendors_map.keys()}
+
+        logger.info(f"Starting vendor classification process by calling classification_logic.process_vendors up to Level {target_level}")
+        # --- Call the refactored logic, passing target_level ---
+        # process_vendors will populate the results_dict in place
+        await process_vendors(
+            unique_vendors_map=unique_vendors_map,
+            taxonomy=taxonomy,
+            results=results_dict, # Pass the dict to be populated
+            stats=stats,
+            job=job,
+            db=db,
+            llm_service=llm_service,
+            search_service=search_service,
+            target_level=target_level # Pass the target level
+        )
+        # --- End call to refactored logic ---
+        logger.info(f"Vendor classification process completed (returned from classification_logic.process_vendors)")
+
+        logger.info("Starting result generation phase.")
+
+        job.current_stage = ProcessingStage.RESULT_GENERATION.value
+        job.progress = 0.98 # Progress after all classification/search
+        logger.info(f"[_process_vendor_file_async] Committing status update before result generation: {job.status}, {job.current_stage}, {job.progress}")
+        db.commit()
+        logger.info(f"Job status updated",
+                    extra={"stage": job.current_stage, "progress": job.progress})
+
+        output_file_name = None # Initialize
+
+        # --- Process results for DB Storage ---
+        try:
+            logger.info("Processing detailed results for database storage.")
+            with log_duration(logger, "Processing detailed results"):
+                 # --- UPDATED: Call the preparation function ---
+                 detailed_results_for_db = _prepare_detailed_results_for_storage(results_dict, target_level)
+                 # --- END UPDATED ---
+            logger.info(f"Processed {len(detailed_results_for_db)} items for detailed results storage.")
+        except Exception as proc_err:
+            logger.error("Failed during detailed results processing for DB", exc_info=True)
+            # Continue to generate Excel, but log the error. The job won't store detailed results.
+            detailed_results_for_db = None # Ensure it's None if processing failed
+        # --- End Process results for DB Storage ---
+
+        # --- Generate Excel File ---
+        try:
+                logger.info(f"Generating output file")
+                with log_duration(logger, "Generating output file"):
+                    # Pass the original complex results_dict to generate_output_file
+                    # generate_output_file needs to be updated if its logic depends on the old flattened structure
+                    # For now, assume it can handle the complex results_dict or adapt it internally
+                    output_file_name = generate_output_file(normalized_vendors_data, results_dict, job_id)
+                logger.info(f"Output file generated", extra={"output_file": output_file_name})
+        except Exception as gen_err:
+                logger.error("Failed during output file generation", exc_info=True)
+                job.fail(f"Failed to generate output file: {str(gen_err)}")
+                db.commit()
+                return # Stop processing
+        # --- End Generate Excel File ---
+
+        # --- Finalize stats ---
+        end_time = datetime.now()
+        processing_duration = (end_time - datetime.fromisoformat(stats["start_time"])).total_seconds()
+        stats["end_time"] = end_time.isoformat()
+        stats["processing_duration_seconds"] = round(processing_duration, 2)
+        # Cost calculation remains the same
+        cost_input_per_1k = 0.0005
+        cost_output_per_1k = 0.0015
+        estimated_cost = (stats["api_usage"]["openrouter_prompt_tokens"] / 1000) * cost_input_per_1k + \
+                            (stats["api_usage"]["openrouter_completion_tokens"] / 1000) * cost_output_per_1k
+        estimated_cost += (stats["api_usage"]["tavily_search_calls"] / 1000) * 4.0
+        stats["api_usage"]["cost_estimate_usd"] = round(estimated_cost, 4)
+        # --- End Finalize stats ---
+
+        # --- Final Commit Block ---
+        try:
+            logger.info("Attempting final job completion update in database.")
+            # --- UPDATED: Pass the processed detailed_results_for_db to the complete method ---
+            job.complete(output_file_name, stats, detailed_results_for_db)
+            # --- END UPDATED ---
+            job.progress = 1.0 # Ensure progress is 1.0 on completion
+            logger.info(f"[_process_vendor_file_async] Committing final job completion status.")
+            db.commit()
+            logger.info(f"Job completed successfully",
+                        extra={
+                            "processing_duration": processing_duration,
+                            "output_file": output_file_name,
+                            "target_level": target_level,
+                            # --- UPDATED: Log if detailed results were stored ---
+                            "detailed_results_stored": bool(detailed_results_for_db),
+                            "detailed_results_count": len(detailed_results_for_db) if detailed_results_for_db else 0,
+                            # --- END UPDATED ---
+                            "openrouter_calls": stats["api_usage"]["openrouter_calls"],
+                            "tokens_used": stats["api_usage"]["openrouter_total_tokens"],
+                            "tavily_calls": stats["api_usage"]["tavily_search_calls"],
+                            "estimated_cost": stats["api_usage"]["cost_estimate_usd"],
+                            "invalid_category_errors": stats.get("invalid_category_errors", 0),
+                            "successfully_classified_l5_total": stats.get("successfully_classified_l5", 0)
+                        })
+        except Exception as final_commit_err:
+            logger.error("CRITICAL: Failed to commit final job completion status!", exc_info=True)
+            db.rollback()
+            try:
+                # Re-fetch job in new session to attempt marking as failed
+                db_fail_final = SessionLocal()
+                job_fail_final = db_fail_final.query(Job).filter(Job.id == job_id).first()
+                if job_fail_final:
+                    err_msg = f"Failed during final commit: {type(final_commit_err).__name__}: {str(final_commit_err)}"
+                    job_fail_final.fail(err_msg[:2000])
+                    db_fail_final.commit()
+                else:
+                    logger.error("Job not found when trying to mark as failed after final commit error.")
+                db_fail_final.close()
+            except Exception as fail_err:
+                logger.error("CRITICAL: Also failed to mark job as failed after final commit error.", exc_info=fail_err)
+                # db.rollback() # Already rolled back original session
+        # --- End Final Commit Block ---
+
+    except (ValueError, FileNotFoundError, IOError) as file_err:
+        logger.error(f"[_process_vendor_file_async] File reading or writing error", exc_info=True,
+                    extra={"error": str(file_err)})
+        if job:
+            err_msg = f"File processing error: {type(file_err).__name__}: {str(file_err)}"
+            job.fail(err_msg[:2000])
+            db.commit()
+        else:
+            logger.error("Job object was None during file error handling.")
+    except SQLAlchemyError as db_err:
+        logger.error(f"[_process_vendor_file_async] Database error during processing", exc_info=True,
+                    extra={"error": str(db_err)})
+        db.rollback() # Rollback on DB error
+        if job:
+            # Re-fetch job in new session to attempt marking as failed
+            db_fail_db = SessionLocal()
+            job_fail_db = db_fail_db.query(Job).filter(Job.id == job_id).first()
+            if job_fail_db and job_fail_db.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
+                    err_msg = f"Database error: {type(db_err).__name__}: {str(db_err)}"
+                    job_fail_db.fail(err_msg[:2000])
+                    db_fail_db.commit()
+            elif job_fail_db:
+                    logger.warning(f"Database error occurred but job status was already {job_fail_db.status}. Error: {db_err}")
+            else:
+                logger.error("Job not found when trying to mark as failed after database error.")
+            db_fail_db.close()
+        else:
+            logger.error("Job object was None during database error handling.")
+    except Exception as async_err:
+        logger.error(f"[_process_vendor_file_async] Unexpected error during async processing", exc_info=True,
+                    extra={"error": str(async_err)})
+        db.rollback() # Rollback on unexpected error
+        if job:
+            # Re-fetch job in new session to attempt marking as failed
+            db_fail_unexpected = SessionLocal()
+            job_fail_unexpected = db_fail_unexpected.query(Job).filter(Job.id == job_id).first()
+            if job_fail_unexpected and job_fail_unexpected.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
+                err_msg = f"Unexpected error: {type(async_err).__name__}: {str(async_err)}"
+                job_fail_unexpected.fail(err_msg[:2000])
+                db_fail_unexpected.commit()
+            elif job_fail_unexpected:
+                logger.warning(f"Unexpected error occurred but job status was already {job_fail_unexpected.status}. Error: {async_err}")
+            else:
+                logger.error("Job not found when trying to mark as failed after unexpected error.")
+            db_fail_unexpected.close()
+        else:
+            logger.error("Job object was None during unexpected error handling.")
+    finally:
+        logger.info(f"[_process_vendor_file_async] Finished async processing for job {job_id}")
+
+
+# --- ADDED: Reclassification Task ---
+@shared_task(bind=True)
+def reclassify_flagged_vendors_task(self, review_job_id: str):
+    """
+    Celery task entry point for re-classifying flagged vendors (REVIEW job type).
+    Orchestrates the reclassification process.
+
+    Args:
+        review_job_id: The ID of the REVIEW job.
+    """
+    task_id = self.request.id if self.request and self.request.id else "UnknownTaskID"
+    logger.info(f"***** reclassify_flagged_vendors_task TASK RECEIVED *****",
+                extra={"celery_task_id": task_id, "review_job_id": review_job_id})
+
+    set_correlation_id(review_job_id) # Use review job ID as correlation ID
+    set_job_id(review_job_id)
+    set_log_context({"job_type": JobType.REVIEW.value})
+    logger.info(f"Starting reclassification task", extra={"review_job_id": review_job_id})
+
+    # Initialize loop within the task context
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    logger.debug(f"Created and set new asyncio event loop for review job {review_job_id}")
+
+    db = SessionLocal()
+    review_job = None
+
+    try:
+        review_job = db.query(Job).filter(Job.id == review_job_id).first()
+        if not review_job:
+            logger.error("Review job not found in database at start of task!", extra={"review_job_id": review_job_id})
+            raise ValueError("Review job not found.")
+
+        # Ensure job type is REVIEW
+        if review_job.job_type != JobType.REVIEW.value:
+            logger.error(f"reclassify_flagged_vendors_task called for a non-REVIEW job.", extra={"review_job_id": review_job_id, "job_type": review_job.job_type})
+            raise ValueError(f"Job {review_job_id} is not a REVIEW job.")
+
+        set_log_context({
+            "company_name": review_job.company_name,
+            "creator": review_job.created_by,
+            "parent_job_id": review_job.parent_job_id
+        })
+        logger.info(f"Processing review for company", extra={"company": review_job.company_name})
+
+        # --- Call the async reclassification logic ---
+        logger.info(f"About to run async reclassification processing for review job {review_job_id}")
+        with LogTimer(logger, "Complete reclassification processing", level=logging.INFO, include_in_stats=True):
+            loop.run_until_complete(_process_reclassification_async(review_job_id, db))
+
+        logger.info(f"Reclassification processing completed successfully (async part finished)")
+
+    except Exception as e:
+        logger.error(f"Error processing reclassification task", exc_info=True, extra={"review_job_id": review_job_id})
+        try:
+            # Re-query the job within this exception handler
+            db_error_session = SessionLocal()
+            try:
+                job_in_error = db_error_session.query(Job).filter(Job.id == review_job_id).first()
+                if job_in_error:
+                    if job_in_error.status != JobStatus.COMPLETED.value:
+                        err_msg = f"Reclassification task failed: {type(e).__name__}: {str(e)}"
+                        job_in_error.fail(err_msg[:2000])
+                        db_error_session.commit()
+                        logger.info(f"Review job status updated to failed due to task error", extra={"error": str(e)})
+                    else:
+                        logger.warning(f"Task error occurred after review job was marked completed, status not changed.", extra={"error": str(e)})
+                else:
+                    logger.error("Review job not found when trying to mark as failed.", extra={"review_job_id": review_job_id})
+            except Exception as db_error:
+                logger.error(f"Error updating review job status during task failure handling", exc_info=True,
+                            extra={"original_error": str(e), "db_error": str(db_error)})
+                db_error_session.rollback()
+            finally:
+                db_error_session.close()
+        except Exception as final_db_error:
+            logger.critical(f"CRITICAL: Failed even to handle database update in reclassification task error handler.", exc_info=final_db_error)
+
+    finally:
+        if db:
+            db.close()
+            logger.debug(f"Main database session closed for reclassification task.")
+        if loop and not loop.is_closed():
+            loop.close()
+            logger.debug(f"Event loop closed for reclassification task.")
+        clear_all_context()
+        logger.info(f"***** reclassify_flagged_vendors_task TASK FINISHED *****", extra={"review_job_id": review_job_id})
+
+
+async def _process_reclassification_async(review_job_id: str, db: Session):
+    """
+    Asynchronous part of the reclassification task.
+    Sets up services, calls the core reclassification logic, stores results.
+    """
+    logger.info(f"[_process_reclassification_async] Starting async processing for review job {review_job_id}")
+
+    llm_service = LLMService()
+    # search_service is not needed for reclassification
+
+    review_job = db.query(Job).filter(Job.id == review_job_id).first()
+    if not review_job:
+        logger.error(f"[_process_reclassification_async] Review job not found in database", extra={"review_job_id": review_job_id})
+        return
+
+    # Import the core logic function here to avoid circular imports at module level
+    from .reclassification_logic import process_reclassification
+
+    review_results_list = None
+    final_stats = {}
+
+    try:
+        review_job.status = JobStatus.PROCESSING.value
+        review_job.current_stage = ProcessingStage.RECLASSIFICATION.value
+        review_job.progress = 0.1 # Start progress
+        logger.info(f"[_process_reclassification_async] Committing initial status update: {review_job.status}, {review_job.current_stage}, {review_job.progress}")
+        db.commit()
+        logger.info(f"Review job status updated",
+                    extra={"status": review_job.status, "stage": review_job.current_stage, "progress": review_job.progress})
+
+        # --- Call the reclassification logic ---
+        # This function will handle fetching parent data, calling LLM, etc.
+        review_results_list, final_stats = await process_reclassification(
+            review_job=review_job,
+            db=db,
+            llm_service=llm_service
+        )
+        # --- End call ---
+
+        logger.info(f"Reclassification logic completed. Processed {final_stats.get('total_items_processed', 0)} items.")
+        review_job.progress = 0.95 # Mark logic as complete
+
+        # --- Final Commit Block ---
+        try:
+            logger.info("Attempting final review job completion update in database.")
+            # Pass None for output_file_name as review jobs don't generate one
+            review_job.complete(output_file_name=None, stats=final_stats, detailed_results=review_results_list)
+            review_job.progress = 1.0
+            logger.info(f"[_process_reclassification_async] Committing final review job completion status.")
+            db.commit()
+            logger.info(f"Review job completed successfully",
+                        extra={
+                            "processing_duration": final_stats.get("processing_duration_seconds"),
+                            "items_processed": final_stats.get("total_items_processed"),
+                            "successful": final_stats.get("successful_reclassifications"),
+                            "failed": final_stats.get("failed_reclassifications"),
+                            "openrouter_calls": final_stats.get("api_usage", {}).get("openrouter_calls"),
+                            "tokens_used": final_stats.get("api_usage", {}).get("openrouter_total_tokens"),
+                            "estimated_cost": final_stats.get("api_usage", {}).get("cost_estimate_usd")
+                        })
+        except Exception as final_commit_err:
+            logger.error("CRITICAL: Failed to commit final review job completion status!", exc_info=True)
+            db.rollback()
+            # Attempt to mark as failed (similar logic as in main task handler)
+            try:
+                db_fail_final = SessionLocal()
+                job_fail_final = db_fail_final.query(Job).filter(Job.id == review_job_id).first()
+                if job_fail_final:
+                    err_msg = f"Failed during final commit: {type(final_commit_err).__name__}: {str(final_commit_err)}"
+                    job_fail_final.fail(err_msg[:2000])
+                    db_fail_final.commit()
+                db_fail_final.close()
+            except Exception as fail_err:
+                logger.error("CRITICAL: Also failed to mark review job as failed after final commit error.", exc_info=fail_err)
+        # --- End Final Commit Block ---
+
+    # Handle specific errors from process_reclassification or other issues
+    except (ValueError, FileNotFoundError) as logic_err:
+        logger.error(f"[_process_reclassification_async] Data or File error during reclassification logic", exc_info=True,
+                    extra={"error": str(logic_err)})
+        if review_job:
+            err_msg = f"Reclassification data error: {type(logic_err).__name__}: {str(logic_err)}"
+            review_job.fail(err_msg[:2000])
+            db.commit()
+    except SQLAlchemyError as db_err:
+         logger.error(f"[_process_reclassification_async] Database error during reclassification processing", exc_info=True,
+                     extra={"error": str(db_err)})
+         db.rollback()
+         # Attempt to mark as failed (similar logic as in main task handler)
+         try:
+            db_fail_db = SessionLocal()
+            job_fail_db = db_fail_db.query(Job).filter(Job.id == review_job_id).first()
+            if job_fail_db and job_fail_db.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
+                 err_msg = f"Database error: {type(db_err).__name__}: {str(db_err)}"
+                 job_fail_db.fail(err_msg[:2000])
+                 db_fail_db.commit()
+            db_fail_db.close()
+         except Exception as fail_err:
+            logger.error("CRITICAL: Also failed to mark review job as failed after database error.", exc_info=fail_err)
+
+    except Exception as async_err:
+        logger.error(f"[_process_reclassification_async] Unexpected error during async reclassification processing", exc_info=True,
+                    extra={"error": str(async_err)})
+        db.rollback()
+        # Attempt to mark as failed (similar logic as in main task handler)
+        try:
+            db_fail_unexpected = SessionLocal()
+            job_fail_unexpected = db_fail_unexpected.query(Job).filter(Job.id == review_job_id).first()
+            if job_fail_unexpected and job_fail_unexpected.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
+                err_msg = f"Unexpected error: {type(async_err).__name__}: {str(async_err)}"
+                job_fail_unexpected.fail(err_msg[:2000])
+                db_fail_unexpected.commit()
+            db_fail_unexpected.close()
+        except Exception as fail_err:
+            logger.error("CRITICAL: Also failed to mark review job as failed after unexpected error.", exc_info=fail_err)
+    finally:
+        logger.info(f"[_process_reclassification_async] Finished async processing for review job {review_job_id}")
+
+# --- END ADDED ---
+</file>
+
+<file path='app/tasks/reclassification_logic.py'>
+# app/tasks/reclassification_logic.py
+import os # Keep the import
+import asyncio
+import logging
+from datetime import datetime
+from sqlalchemy.orm import Session
+from typing import Dict, Any, List, Tuple, Optional
+
+from core.database import SessionLocal # Assuming SessionLocal might be needed
+from core.logging_config import get_logger
+from core.log_context import set_log_context, clear_log_context # Assuming context might be used
+from utils.log_utils import LogTimer, log_duration # Assuming logging utils might be used
+from utils.taxonomy_loader import load_taxonomy, Taxonomy # Assuming taxonomy is needed
+from models.job import Job, JobStatus, ProcessingStage, JobType # Assuming Job model is needed
+from services.llm_service import LLMService # Assuming LLM service is needed
+from schemas.review import ReclassifyRequestItem, ReviewResultItem # Assuming review schemas are needed
+from schemas.job import JobResultItem # Assuming job result schema is needed for structure
+
+# Import classification prompts if needed for reclassification
+from .reclassification_prompts import generate_reclassification_prompt # Example: Assuming a specific prompt exists
+
+logger = get_logger("vendor_classification.reclassification_logic")
+
+async def process_reclassification(
+    review_job: Job,
+    db: Session,
+    llm_service: LLMService
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Processes the reclassification request based on the review job details.
+    Fetches original results, applies hints using LLM, and generates new results.
+    """
+    logger.info(f"Starting reclassification logic for review job {review_job.id}")
+    set_log_context({"review_job_id": review_job.id, "parent_job_id": review_job.parent_job_id})
+
+    start_time = datetime.now()
+    # Initialize stats structure similar to classification, but focused on review
+    final_stats: Dict[str, Any] = {
+        "job_id": review_job.id,
+        "parent_job_id": review_job.parent_job_id,
+        "company_name": review_job.company_name,
+        "target_level": review_job.target_level,
+        "start_time": start_time.isoformat(),
+        "end_time": None,
+        "processing_duration_seconds": None,
+        "total_items_processed": 0,
+        "successful_reclassifications": 0,
+        "failed_reclassifications": 0,
+        "api_usage": {
+            "openrouter_calls": 0,
+            "openrouter_prompt_tokens": 0,
+            "openrouter_completion_tokens": 0,
+            "openrouter_total_tokens": 0,
+            "tavily_search_calls": 0, # Should remain 0
+            "cost_estimate_usd": 0.0
+        }
+    }
+    review_results_list: List[Dict[str, Any]] = [] # Holds ReviewResultItem dicts
+
+    try:
+        # 1. Validate Input
+        if not review_job or not review_job.parent_job_id or not review_job.stats or 'reclassify_input' not in review_job.stats:
+            logger.error("Review job is missing parent job ID or input hints.", extra={"job_stats": review_job.stats if review_job else None})
+            raise ValueError("Review job is missing parent job ID or input hints.")
+
+        # --- FIX: Handle potential non-list or invalid items in reclassify_input ---
+        input_items = review_job.stats['reclassify_input']
+        items_to_reclassify: List[ReclassifyRequestItem] = []
+        if isinstance(input_items, list):
+            for item in input_items:
+                try:
+                    # Validate each item conforms to the Pydantic model
+                    items_to_reclassify.append(ReclassifyRequestItem.model_validate(item))
+                except Exception as item_validation_err:
+                    logger.warning(f"Skipping invalid item in reclassify_input: {item}. Error: {item_validation_err}", exc_info=False)
+        else:
+            logger.error(f"reclassify_input in job stats is not a list: {type(input_items)}", extra={"job_id": review_job.id})
+            raise ValueError("Invalid format for reclassify_input in job stats.")
+        # --- END FIX ---
+
+        final_stats["total_items_processed"] = len(items_to_reclassify)
+        if not items_to_reclassify:
+             logger.warning("No valid items found in reclassify_input stats.")
+             # Complete the job successfully but with 0 items processed
+             end_time = datetime.now()
+             final_stats["end_time"] = end_time.isoformat()
+             final_stats["processing_duration_seconds"] = (end_time - start_time).total_seconds()
+             return [], final_stats # Return empty results and stats
+
+        logger.info(f"Found {len(items_to_reclassify)} items to reclassify.")
+
+        # 2. Fetch Parent Job's Detailed Results
+        # Use a separate session or ensure the passed `db` session is robust
+        parent_job = db.query(Job).filter(Job.id == review_job.parent_job_id).first()
+        if not parent_job:
+             logger.error(f"Parent job {review_job.parent_job_id} not found.")
+             raise ValueError(f"Parent job {review_job.parent_job_id} not found.")
+        if not parent_job.detailed_results:
+             logger.error(f"Parent job {review_job.parent_job_id} has no detailed results.")
+             # Decide how to handle this: fail or process items as failures?
+             raise ValueError(f"Parent job {review_job.parent_job_id} has no detailed results.")
+
+        original_results_map: Dict[str, JobResultItem] = {}
+        try:
+            for item_dict in parent_job.detailed_results:
+                 # Validate each item conforms to JobResultItem before adding
+                 validated_item = JobResultItem.model_validate(item_dict)
+                 original_results_map[validated_item.vendor_name] = validated_item
+        except Exception as validation_err:
+             logger.error(f"Error validating original results from parent job {parent_job.id}", exc_info=True)
+             raise ValueError("Failed to parse original results from parent job.")
+
+        logger.info(f"Loaded {len(original_results_map)} original results from parent job.")
+
+        # 3. Load Taxonomy
+        taxonomy = load_taxonomy()
+
+        # 4. Iterate and Reclassify each item
+        update_interval = max(1, len(items_to_reclassify) // 10)
+        processed_count = 0
+
+        # Prepare batch for LLM if applicable (might call LLM per item or in batches)
+        # For simplicity, let's assume one call per item for now
+        for item_data in items_to_reclassify:
+            vendor_name = item_data.vendor_name
+            hint = item_data.hint
+            logger.info(f"Reclassifying vendor: '{vendor_name}' with hint: '{hint}'")
+            set_log_context({"current_vendor": vendor_name}) # Add vendor to context
+
+            original_result_model = original_results_map.get(vendor_name)
+            if not original_result_model:
+                logger.warning(f"Vendor '{vendor_name}' from review request not found in parent job results. Skipping.")
+                final_stats["failed_reclassifications"] += 1
+                # Create a failure entry for this item
+                failed_result_item = ReviewResultItem(
+                    vendor_name=vendor_name,
+                    hint=hint,
+                    original_result={"error": "Original result not found in parent job"}, # Indicate error source
+                    new_result=JobResultItem( # Use JobResultItem for structure consistency
+                        vendor_name=vendor_name,
+                        level1_id="ERROR", level1_name="ERROR",
+                        level2_id=None, level2_name=None, level3_id=None, level3_name=None,
+                        level4_id=None, level4_name=None, level5_id=None, level5_name=None,
+                        final_confidence=0.0, final_status="Error", classification_source="Review",
+                        classification_notes_or_reason="Original result not found in parent job",
+                        achieved_level=0
+                    ).model_dump()
+                )
+                review_results_list.append(failed_result_item.model_dump())
+                clear_log_context(["current_vendor"])
+                continue
+
+            # --- Actual Reclassification LLM Call ---
+            new_result_model = None
+            try:
+                # Fetch original vendor data (assuming it's stored appropriately or derivable)
+                # For this example, let's assume original data might be part of the original_result_model
+                # or needs fetching separately. We'll use a placeholder if not readily available.
+                # A better approach would be to ensure the parent job stores original vendor input data.
+                original_vendor_input_data = original_result_model.model_dump() # Use the stored result as a proxy for now
+                original_vendor_input_data['vendor_name'] = vendor_name # Ensure name is correct
+
+                # Generate the specific prompt for reclassification
+                prompt = generate_reclassification_prompt(
+                    original_vendor_data=original_vendor_input_data, # Pass original data
+                    user_hint=hint,
+                    original_classification=original_result_model.model_dump(), # Pass previous result dict
+                    taxonomy=taxonomy, # Pass the whole taxonomy object
+                    target_level=review_job.target_level, # Pass the target level for reclassification
+                    attempt_id=f"{review_job.id}-{vendor_name}" # Create a unique ID for this attempt
+                )
+
+                logger.debug(f"Generated reclassification prompt for '{vendor_name}'") # Prompt content logged by LLM service now
+
+                # --- UPDATED: Call the new LLM service method ---
+                # Pass the nested api_usage dict directly for updates
+                parsed_llm_output = await llm_service.call_llm_with_prompt(
+                    prompt=prompt,
+                    stats_dict=final_stats["api_usage"], # Pass the nested dict
+                    job_id=review_job.id, # Pass review job ID for logging/cache key
+                    max_tokens=1024 # Adjust if needed for reclassification output size
+                )
+                # --- END UPDATED ---
+
+                # Remove the old parse call:
+                # parsed_llm_output = llm_service.parse_json_response(llm_response_str, ...)
+
+                logger.debug(f"Parsed LLM response dictionary for '{vendor_name}': {parsed_llm_output}")
+
+                # Extract the classification result for this vendor
+                # The prompt asks for a specific JSON output format, so parse that
+                # Expecting format like: {"batch_id": "...", "level": N, "classifications": [...]}
+                # Or potentially just the classification dict directly if the prompt asks for single output
+                llm_output_data = None # Initialize
+                if parsed_llm_output and isinstance(parsed_llm_output, dict):
+                    # Check if the response has the expected 'classifications' list structure
+                    if "classifications" in parsed_llm_output and isinstance(parsed_llm_output["classifications"], list) and len(parsed_llm_output["classifications"]) > 0:
+                        llm_output_data = parsed_llm_output["classifications"][0]
+                        logger.debug(f"Extracted classification data from 'classifications' list for '{vendor_name}': {llm_output_data}")
+                    # Fallback: Check if the root object itself looks like the classification structure
+                    elif "vendor_name" in parsed_llm_output and "level1" in parsed_llm_output:
+                         llm_output_data = parsed_llm_output
+                         logger.debug(f"Using root LLM response object as classification data for '{vendor_name}': {llm_output_data}")
+                    else:
+                        logger.warning(f"Parsed LLM output for '{vendor_name}' does not match expected structures ('classifications' list or direct result). Output: {parsed_llm_output}")
+                else:
+                     logger.warning(f"Failed to get valid dictionary from LLM response for '{vendor_name}'. Response: {parsed_llm_output}")
+
+
+                # --- More robust check for L1 data from parsed output ---
+                l1_data = llm_output_data.get("level1") if llm_output_data else None
+                l1_category_id = l1_data.get("category_id") if l1_data else None
+                l1_category_name = l1_data.get("category_name") if l1_data else None
+                classification_not_possible = l1_data.get("classification_not_possible", True) if l1_data else True
+
+                # Check if we got valid L1 classification data
+                if l1_data and l1_category_id and l1_category_name and l1_category_id not in ["ERROR", "N/A"] and not classification_not_possible:
+                     # --- Recursive Classification based on Hint ---
+                     achieved_level = 0
+                     final_confidence = 0.0
+                     final_notes = None
+                     final_status = "Not Possible" # Default
+
+                     new_result_data = {
+                         "vendor_name": vendor_name,
+                         "level1_id": None, "level1_name": None,
+                         "level2_id": None, "level2_name": None,
+                         "level3_id": None, "level3_name": None,
+                         "level4_id": None, "level4_name": None,
+                         "level5_id": None, "level5_name": None,
+                         "final_confidence": 0.0,
+                         "final_status": "Not Possible",
+                         "classification_source": "Review", # Mark as reviewed
+                         "classification_notes_or_reason": None,
+                         "achieved_level": 0
+                     }
+
+                     # Populate levels from LLM output
+                     for level in range(1, review_job.target_level + 1):
+                         level_key = f"level{level}"
+                         level_data = llm_output_data.get(level_key)
+                         if level_data and isinstance(level_data, dict):
+                             cat_id = level_data.get("category_id")
+                             cat_name = level_data.get("category_name")
+                             level_not_possible = level_data.get("classification_not_possible", True)
+
+                             if cat_id and cat_name and cat_id not in ["N/A", "ERROR"] and not level_not_possible:
+                                 new_result_data[f"level{level}_id"] = cat_id
+                                 new_result_data[f"level{level}_name"] = cat_name
+                                 achieved_level = level
+                                 final_confidence = level_data.get("confidence", 0.0)
+                                 final_notes = level_data.get("notes") # Store notes from the deepest successful level
+                                 final_status = "Classified"
+                             else:
+                                 # Stop populating further levels if this one failed or wasn't possible
+                                 if achieved_level == 0 and level == 1: # Capture reason from L1 failure
+                                     final_notes = level_data.get("classification_not_possible_reason") or level_data.get("notes")
+                                 break # Stop processing levels for this vendor
+                         else:
+                             # Stop if expected level data is missing
+                             if achieved_level == 0 and level == 1:
+                                 final_notes = "LLM response missing Level 1 data."
+                             break
+
+                     # Finalize the result item
+                     new_result_data["achieved_level"] = achieved_level
+                     new_result_data["final_status"] = final_status
+                     new_result_data["final_confidence"] = final_confidence
+                     new_result_data["classification_notes_or_reason"] = final_notes or f"Reclassified based on hint: {hint}"
+
+
+                     new_result_model = JobResultItem(**new_result_data)
+                     final_stats["successful_reclassifications"] += 1
+                     logger.info(f"Successfully reclassified '{vendor_name}' to Level {achieved_level}: '{new_result_model.level1_name}{' -> ' + new_result_model.level2_name if achieved_level > 1 else ''}...'.")
+
+                else:
+                     # Handle classification_not_possible or ERROR from LLM or missing L1 data
+                     reason = "LLM response did not include valid Level 1 data." # Default reason
+                     if l1_data:
+                         if l1_category_id in ["ERROR", "N/A"]:
+                             reason = l1_data.get("classification_not_possible_reason", f"LLM returned '{l1_category_id}' for Level 1")
+                         elif classification_not_possible:
+                             reason = l1_data.get("classification_not_possible_reason", "LLM indicated Level 1 classification not possible")
+                         elif not l1_category_id or not l1_category_name:
+                             reason = "LLM response missing Level 1 category_id or category_name."
+                     elif llm_output_data is None:
+                         # Reason is based on why llm_output_data became None earlier
+                         if parsed_llm_output is None:
+                             reason = "LLM call failed or response parsing failed."
+                         else:
+                             reason = "LLM response structure did not match expected format."
+                     else: # llm_output_data exists but no l1_data
+                         reason = "LLM response missing 'level1' field."
+
+
+                     logger.warning(f"LLM could not reclassify '{vendor_name}' with hint. Reason: {reason}")
+                     final_stats["failed_reclassifications"] += 1
+                     new_result_model = JobResultItem(
+                         vendor_name=vendor_name,
+                         level1_id=None, level1_name=None, # Or ERROR if appropriate
+                         level2_id=None, level2_name=None, level3_id=None, level3_name=None,
+                         level4_id=None, level4_name=None, level5_id=None, level5_name=None,
+                         final_confidence=0.0,
+                         final_status="Not Possible", # Or "Error"
+                         classification_source="Review",
+                         classification_notes_or_reason=f"Reclassification failed: {reason}", # Store the specific reason
+                         achieved_level=0
+                     )
+
+            except Exception as llm_err:
+                logger.error(f"Error during LLM reclassification call or processing for '{vendor_name}'", exc_info=True)
+                final_stats["failed_reclassifications"] += 1
+                new_result_model = JobResultItem( # Create error result
+                    vendor_name=vendor_name,
+                    level1_id="ERROR", level1_name="ERROR",
+                    level2_id=None, level2_name=None, level3_id=None, level3_name=None,
+                    level4_id=None, level4_name=None, level5_id=None, level5_name=None,
+                    final_confidence=0.0, final_status="Error", classification_source="Review",
+                    classification_notes_or_reason=f"Error during reclassification processing: {llm_err}",
+                    achieved_level=0
+                )
+            # --- End Actual Reclassification LLM Call ---
+
+            # Store the result (original + new)
+            review_item = ReviewResultItem(
+                vendor_name=vendor_name,
+                hint=hint,
+                original_result=original_result_model.model_dump(), # Store as dict
+                new_result=new_result_model.model_dump() # Store as dict
+            )
+            review_results_list.append(review_item.model_dump()) # Append the dict representation
+
+            processed_count += 1
+            if processed_count % update_interval == 0 or processed_count == len(items_to_reclassify):
+                 progress = 0.1 + 0.85 * (processed_count / len(items_to_reclassify))
+                 # Use try-except for update_progress as the session might become invalid
+                 try:
+                     review_job.update_progress(progress=min(0.95, progress), stage=ProcessingStage.RECLASSIFICATION, db_session=db)
+                     logger.debug(f"Updated review job progress: {progress:.2f}")
+                 except Exception as db_update_err:
+                      logger.error("Failed to update job progress during reclassification loop", exc_info=db_update_err)
+                      db.rollback() # Rollback potential partial commit within update_progress
+
+            clear_log_context(["current_vendor"]) # Clear vendor from context
+
+
+        # 5. Finalize Stats
+        end_time = datetime.now()
+        processing_duration = (end_time - start_time).total_seconds()
+        final_stats["end_time"] = end_time.isoformat()
+        final_stats["processing_duration_seconds"] = round(processing_duration, 2)
+        # Calculate final cost based on accumulated API usage
+        cost_input_per_1k = 0.0005
+        cost_output_per_1k = 0.0015
+        api_usage = final_stats["api_usage"]
+        estimated_cost = (api_usage["openrouter_prompt_tokens"] / 1000) * cost_input_per_1k + \
+                           (api_usage["openrouter_completion_tokens"] / 1000) * cost_output_per_1k
+        # No Tavily cost expected here
+        api_usage["cost_estimate_usd"] = round(estimated_cost, 4)
+
+        logger.info(f"Reclassification logic finished for review job {review_job.id}. Results: {final_stats}")
+
+    except Exception as e:
+        logger.error(f"Error during reclassification logic for review job {review_job.id}", exc_info=True)
+        # Ensure the job is marked as failed by the caller (_process_reclassification_async)
+        final_stats["error_message"] = f"Reclassification logic failed: {type(e).__name__}: {str(e)}"
+        # Attempt to add an overall error marker to results if possible
+        if not review_results_list: # If no results were added yet
+             review_results_list.append({"error": final_stats["error_message"]})
+        # Return potentially partial results and error stats
+        return review_results_list, final_stats
+    finally:
+        clear_log_context() # Clear job-specific context
+
+    return review_results_list, final_stats
+</file>
+
+<file path='app/tasks/reclassification_prompts.py'>
+# app/tasks/reclassification_prompts.py
+import json
+import logging
+from typing import Dict, Any, Optional
+
+from models.taxonomy import Taxonomy, TaxonomyCategory
+from schemas.job import JobResultItem # To understand the structure of original_result
+
+logger = logging.getLogger("vendor_classification.reclassification_prompts")
+
+def generate_reclassification_prompt(
+    original_vendor_data: Dict[str, Any],
+    user_hint: str,
+    original_classification: Optional[Dict[str, Any]], # Dict matching JobResultItem
+    taxonomy: Taxonomy,
+    target_level: int, # The target level for this reclassification attempt
+    attempt_id: str = "unknown-attempt"
+) -> str:
+    """
+    Create a prompt for re-classifying a single vendor based on original data,
+    user hint, and previous classification attempt. Aims for the target_level.
+    """
+    vendor_name = original_vendor_data.get('vendor_name', 'UnknownVendor')
+    logger.debug(f"Generating reclassification prompt for vendor: {vendor_name}",
+                extra={"target_level": target_level, "attempt_id": attempt_id})
+
+    # --- Build Original Vendor Data Section ---
+    vendor_data_xml = "<original_vendor_data>\n"
+    vendor_data_xml += f"  <name>{vendor_name}</name>\n"
+    # Include all available fields from the original data
+    optional_fields = [
+        'example_goods_services', 'address', 'website',
+        'internal_category', 'parent_company', 'spend_category'
+    ]
+    # Map internal keys to XML tags if needed (adjust based on original_vendor_data structure)
+    field_map = {
+        'example_goods_services': 'example_goods_services',
+        'address': 'address',
+        'website': 'website',
+        'internal_category': 'internal_category',
+        'parent_company': 'parent_company',
+        'spend_category': 'spend_category',
+        # Add mappings if keys in original_vendor_data are different
+        'example': 'example_goods_services',
+        'vendor_address': 'address',
+        'vendor_website': 'website',
+    }
+    for field_key, xml_tag in field_map.items():
+        value = original_vendor_data.get(field_key)
+        if value:
+            vendor_data_xml += f"  <{xml_tag}>{str(value)[:300]}</{xml_tag}>\n" # Limit length
+    vendor_data_xml += "</original_vendor_data>"
+
+    # --- Build User Hint Section ---
+    user_hint_xml = f"<user_hint>{user_hint}</user_hint>"
+
+    # --- Build Original Classification Section (Optional but helpful) ---
+    original_classification_xml = "<original_classification_attempt>\n"
+    if original_classification:
+        original_status = original_classification.get('final_status', 'Unknown')
+        original_level = original_classification.get('achieved_level', 0)
+        original_reason = original_classification.get('classification_notes_or_reason', 'N/A')
+        original_classification_xml += f"  <status>{original_status}</status>\n"
+        original_classification_xml += f"  <achieved_level>{original_level}</achieved_level>\n"
+        original_classification_xml += f"  <reason_or_notes>{original_reason}</reason_or_notes>\n"
+        # Include original L1-L5 IDs/Names if available
+        for i in range(1, 6):
+             id_key = f'level{i}_id'
+             name_key = f'level{i}_name'
+             cat_id = original_classification.get(id_key)
+             cat_name = original_classification.get(name_key)
+             if cat_id and cat_name:
+                 original_classification_xml += f"  <level_{i}_result id=\"{cat_id}\" name=\"{cat_name}\"/>\n"
+    else:
+        original_classification_xml += "  <message>No previous classification data available.</message>\n"
+    original_classification_xml += "</original_classification_attempt>"
+
+    # --- Define Output Format Section (Standard Classification Result) ---
+    # We want the LLM to output the *new* classification in the standard format
+    # It needs to perform the hierarchical classification again based on the hint.
+    output_format_xml = f"""<output_format>
+Respond *only* with a valid JSON object containing the *new* classification result for this vendor, based *primarily* on the <user_hint> and <original_vendor_data>.
+The JSON object should represent the full classification attempt up to Level {target_level}, following the standard structure used previously.
+
+json
+{{
+  "level": {target_level}, // The target level for this reclassification
+  "attempt_id": "{attempt_id}", // ID for this specific attempt
+  "vendor_name": "{vendor_name}", // Exact vendor name
+  "classifications": [ // Array with ONE entry for this vendor
+    {{
+      "vendor_name": "{vendor_name}", // Vendor name again
+      // --- L1 Result ---
+      "level1": {{
+        "category_id": "string", // L1 ID from taxonomy or "N/A"
+        "category_name": "string", // L1 Name or "N/A"
+        "confidence": "float", // 0.0-1.0
+        "classification_not_possible": "boolean",
+        "classification_not_possible_reason": "string | null",
+        "notes": "string | null" // Justification based on hint/data
+      }},
+      // --- L2 Result (if L1 possible and target_level >= 2) ---
+      "level2": {{ // Include ONLY if L1 was possible AND target_level >= 2
+        "category_id": "string", // L2 ID or "N/A"
+        "category_name": "string", // L2 Name or "N/A"
+        "confidence": "float",
+        "classification_not_possible": "boolean",
+        "classification_not_possible_reason": "string | null",
+        "notes": "string | null"
+      }} // , ... include level3, level4, level5 similarly if possible and target_level allows
+      // --- L3 Result (if L2 possible and target_level >= 3) ---
+      // --- L4 Result (if L3 possible and target_level >= 4) ---
+      // --- L5 Result (if L4 possible and target_level >= 5) ---
+    }}
+  ]
+}}
+
+</output_format>"""
+
+    # --- Assemble Final Prompt ---
+    prompt = f"""
+<role>You are a precise vendor classification expert using the NAICS taxonomy. You are re-evaluating a previous classification based on new user input.</role>
+
+<task>Re-classify the vendor described in `<original_vendor_data>` using the crucial information provided in `<user_hint>`. The previous attempt is in `<original_classification_attempt>` for context. Your goal is to determine the most accurate NAICS classification up to **Level {target_level}** based *primarily* on the user hint combined with the original data.</task>
+
+<instructions>
+1.  **Prioritize the `<user_hint>`**. Assume it provides the most accurate context about the vendor's primary business activity for the user's purposes.
+2.  Use the `<original_vendor_data>` to supplement the hint if necessary.
+3.  Refer to the `<original_classification_attempt>` only for context on why the previous classification might have been incorrect or insufficient. Do not simply repeat the old result unless the hint strongly confirms it.
+4.  Perform a hierarchical classification starting from Level 1 up to the target Level {target_level}.
+5.  For **each level**:
+    a.  Determine the most appropriate category based on the hint and data. Use the provided taxonomy structure (implicitly known or explicitly provided if needed in future versions).
+    b.  If a confident classification for the current level is possible, provide the `category_id`, `category_name`, `confidence` (> 0.0), set `classification_not_possible` to `false`, and optionally add `notes`. Proceed to the next level if the target level allows.
+    c.  If classification for the current level is **not possible** (due to ambiguity even with the hint, or the hint pointing to an activity outside the available subcategories), set `classification_not_possible` to `true`, `confidence` to `0.0`, provide a `classification_not_possible_reason`, set `category_id`/`category_name` to "N/A", and **stop** the classification process for this vendor (do not include results for subsequent levels).
+6.  Structure your response as a **single JSON object** matching the schema in `<output_format>`. Ensure it contains results for all levels attempted up to the point of success or failure.
+7.  The output JSON should represent the *new* classification attempt based on the hint.
+8.  Respond *only* with the valid JSON object.
+</instructions>
+
+{vendor_data_xml}
+
+{user_hint_xml}
+
+{original_classification_xml}
+
+{output_format_xml}
+"""
+    # Note: This prompt implicitly relies on the LLM having access to the taxonomy structure
+    # or being trained on it. For dynamic taxonomies, the relevant category options for each
+    # level would need to be injected similar to the original batch prompt.
+    # For now, we assume the LLM can infer the hierarchy and valid IDs based on the target level and task.
+    # A future enhancement could involve passing the relevant taxonomy branches.
+
+    return prompt
+</file>
+
+<file path='frontend/vue_frontend/src/components/ReviewResultsTable.vue'>
+<template>
+  <div class="mt-8 p-4 sm:p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner">
+    <h5 class="text-lg font-semibold text-gray-800 mb-4">Reviewed Classification Results</h5>
+    <p class="text-sm text-gray-600 mb-4">
+      Showing results after applying user hints. You can flag items again for further review if needed.
+    </p>
+
+    <!-- Search Input -->
+    <div class="mb-4">
+      <label for="review-results-search" class="sr-only">Search Reviewed Results</label>
+      <div class="relative rounded-md shadow-sm">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <MagnifyingGlassIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
+        </div>
+        <input
+          type="text"
+          id="review-results-search"
+          v-model="searchTerm"
+          placeholder="Search Vendor, Hint, Category, ID, Notes..."
+          class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+        />
+      </div>
+    </div>
+
+     <!-- Action Buttons (Submit Flags) -->
+    <div class="mb-4 text-right" v-if="jobStore.hasFlaggedItems">
+        <button
+          type="button"
+          @click="submitFlags"
+          :disabled="jobStore.reclassifyLoading"
+          class="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+        >
+          <ArrowPathIcon v-if="jobStore.reclassifyLoading" class="animate-spin -ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
+          <PaperAirplaneIcon v-else class="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
+          Submit {{ jobStore.flaggedForReview.size }} Flag{{ jobStore.flaggedForReview.size !== 1 ? 's' : '' }} for Re-classification
+        </button>
+        <p v-if="jobStore.reclassifyError" class="text-xs text-red-600 mt-1 text-right">{{ jobStore.reclassifyError }}</p>
+    </div>
+
+    <!-- Loading/Error States -->
+    <div v-if="loading" class="text-center py-5 text-gray-500">
+      <svg class="animate-spin h-6 w-6 text-primary mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <p class="mt-2 text-sm">Loading reviewed results...</p>
+    </div>
+    <div v-else-if="error" class="p-4 bg-red-100 border border-red-300 text-red-800 rounded-md text-sm">
+      Error loading reviewed results: {{ error }}
+    </div>
+    <div v-else-if="!results || results.length === 0" class="text-center py-5 text-gray-500">
+      No reviewed results found for this job.
+    </div>
+
+    <!-- Results Table -->
+    <div v-else class="overflow-x-auto border border-gray-200 rounded-md">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-100">
+          <tr>
+            <!-- Flag Column -->
+            <th scope="col" class="px-2 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-12">Flag</th>
+            <!-- Dynamically generate headers -->
+            <th v-for="header in headers" :key="header.key"
+                scope="col"
+                @click="header.sortable ? sortBy(header.key) : null"
+                :class="[
+                  'px-3 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider',
+                   header.sortable ? 'cursor-pointer hover:bg-gray-200' : '',
+                   header.minWidth ? `min-w-[${header.minWidth}]` : ''
+                ]">
+              {{ header.label }}
+              <SortIcon v-if="header.sortable" :direction="sortKey === header.key ? sortDirection : null" />
+            </th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr v-if="filteredAndSortedResults.length === 0">
+            <td :colspan="headers.length + 1" class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No results match your search criteria.</td>
+          </tr>
+          <tr v-for="(item, index) in filteredAndSortedResults" :key="item.vendor_name + '-' + index" class="hover:bg-gray-50 align-top" :class="{'bg-blue-50': jobStore.isFlagged(item.vendor_name)}">
+            <!-- Flag Button Cell -->
+            <td class="px-2 py-2 text-center align-middle">
+                 <button
+                    @click="toggleFlag(item.vendor_name)"
+                    :title="jobStore.isFlagged(item.vendor_name) ? 'Remove flag and hint' : 'Flag for re-classification'"
+                    class="p-1 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary"
+                    :class="jobStore.isFlagged(item.vendor_name) ? 'text-primary' : 'text-gray-400 hover:text-primary-dark'"
+                  >
+                    <FlagIconSolid v-if="jobStore.isFlagged(item.vendor_name)" class="h-5 w-5" aria-hidden="true" />
+                    <FlagIconOutline v-else class="h-5 w-5" aria-hidden="true" />
+                    <span class="sr-only">Flag item</span>
+                  </button>
+            </td>
+            <!-- Data Cells -->
+            <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.vendor_name }}</td>
+            <td class="px-3 py-2 text-xs text-gray-600 max-w-xs break-words">
+                <span v-if="!jobStore.isFlagged(item.vendor_name)">{{ item.hint }}</span>
+                 <!-- Inline Hint Editor when Flagged -->
+                <textarea v-else
+                          rows="2"
+                          :value="jobStore.getHint(item.vendor_name)"
+                          @input="updateHint(item.vendor_name, ($event.target as HTMLTextAreaElement).value)"
+                          placeholder="Enter new hint..."
+                          class="block w-full text-xs rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                ></textarea>
+            </td>
+            <!-- Original Classification -->
+            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-500">{{ item.original_result?.level1_id || '-' }}</td>
+            <td class="px-3 py-2 text-xs text-gray-500">{{ item.original_result?.level1_name || '-' }}</td>
+            <!-- ... Add other original levels L2-L5 similarly ... -->
+            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-500">{{ item.original_result?.level5_id || '-' }}</td>
+            <td class="px-3 py-2 text-xs text-gray-500">{{ item.original_result?.level5_name || '-' }}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-xs text-center text-gray-500">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                      :class="getStatusClass(item.original_result?.final_status)">
+                    {{ item.original_result?.final_status }}
+                </span>
+            </td>
+
+            <!-- New Classification -->
+            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item.new_result, 1)">{{ item.new_result?.level1_id || '-' }}</td>
+            <td class="px-3 py-2 text-xs" :class="getCellClass(item.new_result, 1)">{{ item.new_result?.level1_name || '-' }}</td>
+            <!-- ... Add other new levels L2-L5 similarly ... -->
+            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item.new_result, 5)">{{ item.new_result?.level5_id || '-' }}</td>
+            <td class="px-3 py-2 text-xs" :class="getCellClass(item.new_result, 5)">{{ item.new_result?.level5_name || '-' }}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-sm text-center">
+              <span v-if="item.new_result?.final_confidence !== null && item.new_result?.final_confidence !== undefined"
+                    :class="getConfidenceClass(item.new_result.final_confidence)">
+                {{ (item.new_result.final_confidence * 100).toFixed(1) }}%
+              </span>
+              <span v-else class="text-gray-400 text-xs">N/A</span>
+            </td>
+            <td class="px-3 py-2 whitespace-nowrap text-xs text-center">
+               <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                    :class="getStatusClass(item.new_result?.final_status)">
+                {{ item.new_result?.final_status }}
+              </span>
+            </td>
+            <td class="px-3 py-2 text-xs text-gray-500 max-w-xs break-words">
+              {{ item.new_result?.classification_notes_or_reason || '-' }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+     <!-- Row Count -->
+    <div class="mt-3 text-xs text-gray-500">
+      Showing {{ filteredAndSortedResults.length }} of {{ results?.length || 0 }} reviewed results.
+    </div>
+
+    <!-- Hint Input Modal -->
+    <!-- <HintInputModal
+        :open="showHintModal"
+        :vendor-name="selectedVendorForHint"
+        :initial-hint="jobStore.getHint(selectedVendorForHint)"
+        @close="showHintModal = false"
+        @save="saveHint"
+    /> -->
+     <!-- Note: Using inline editor instead of modal for now -->
+
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, type PropType } from 'vue';
+import { useJobStore, type ReviewResultItem, type JobResultItem } from '@/stores/job';
+import { FlagIcon as FlagIconOutline, MagnifyingGlassIcon, PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/vue/24/outline';
+import { FlagIcon as FlagIconSolid, ChevronUpIcon, ChevronDownIcon, ChevronUpDownIcon } from '@heroicons/vue/20/solid';
+// import HintInputModal from './HintInputModal.vue'; // Import if using modal
+
+// --- Define Header Interface ---
+interface ReviewTableHeader {
+  key: string; // Use string for complex/nested keys
+  label: string;
+  sortable: boolean;
+  minWidth?: string;
+  isOriginal?: boolean; // Flag for styling/grouping
+  isNew?: boolean;      // Flag for styling/grouping
+}
+// --- END Define Header Interface ---
+
+// --- Props ---
+const props = defineProps({
+  results: {
+    type: Array as PropType<ReviewResultItem[] | null>,
+    required: true,
+  },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
+  error: {
+    type: String as PropType<string | null>,
+    default: null,
+  },
+  targetLevel: { // Pass the job's target level
+    type: Number,
+    required: true,
+  }
+});
+
+const emit = defineEmits(['submit-flags']); // Emit event when submit button is clicked
+
+// --- Store ---
+const jobStore = useJobStore();
+
+// --- Internal State ---
+const searchTerm = ref('');
+const sortKey = ref<string | null>('vendor_name'); // Default sort by vendor name
+const sortDirection = ref<'asc' | 'desc' | null>('asc'); // Default sort direction
+// const showHintModal = ref(false); // State for modal
+// const selectedVendorForHint = ref(''); // State for modal
+
+// --- Table Headers Definition ---
+const headers = ref<ReviewTableHeader[]>([
+  { key: 'vendor_name', label: 'Vendor Name', sortable: true, minWidth: '150px' },
+  { key: 'hint', label: 'User Hint', sortable: true, minWidth: '180px' },
+  // Original Results
+  { key: 'original_result.level1_id', label: 'Orig L1 ID', sortable: true, minWidth: '80px', isOriginal: true },
+  { key: 'original_result.level1_name', label: 'Orig L1 Name', sortable: true, minWidth: '120px', isOriginal: true },
+  // Add L2-L4 original if needed
+  { key: 'original_result.level5_id', label: 'Orig L5 ID', sortable: true, minWidth: '80px', isOriginal: true },
+  { key: 'original_result.level5_name', label: 'Orig L5 Name', sortable: true, minWidth: '120px', isOriginal: true },
+  { key: 'original_result.final_status', label: 'Orig Status', sortable: true, minWidth: '100px', isOriginal: true },
+  // New Results
+  { key: 'new_result.level1_id', label: 'New L1 ID', sortable: true, minWidth: '80px', isNew: true },
+  { key: 'new_result.level1_name', label: 'New L1 Name', sortable: true, minWidth: '120px', isNew: true },
+   // Add L2-L4 new if needed
+  { key: 'new_result.level5_id', label: 'New L5 ID', sortable: true, minWidth: '80px', isNew: true },
+  { key: 'new_result.level5_name', label: 'New L5 Name', sortable: true, minWidth: '120px', isNew: true },
+  { key: 'new_result.final_confidence', label: 'New Confidence', sortable: true, minWidth: '100px', isNew: true },
+  { key: 'new_result.final_status', label: 'New Status', sortable: true, minWidth: '100px', isNew: true },
+  { key: 'new_result.classification_notes_or_reason', label: 'New Notes / Reason', sortable: false, minWidth: '200px', isNew: true },
+]);
+
+// --- Computed Properties ---
+
+// Helper to get nested values for sorting/filtering
+const getNestedValue = (obj: any, path: string): any => {
+  return path.split('.').reduce((value, key) => (value && value[key] !== undefined ? value[key] : null), obj);
+};
+
+
+const filteredAndSortedResults = computed(() => {
+  if (!props.results) return [];
+
+  let filtered = props.results;
+
+  // Filtering
+  if (searchTerm.value) {
+    const lowerSearchTerm = searchTerm.value.toLowerCase();
+    filtered = filtered.filter(item =>
+      item.vendor_name?.toLowerCase().includes(lowerSearchTerm) ||
+      item.hint?.toLowerCase().includes(lowerSearchTerm) ||
+      // Search within original results
+      item.original_result?.level1_id?.toLowerCase().includes(lowerSearchTerm) ||
+      item.original_result?.level1_name?.toLowerCase().includes(lowerSearchTerm) ||
+      // ... add other original levels ...
+      item.original_result?.level5_id?.toLowerCase().includes(lowerSearchTerm) ||
+      item.original_result?.level5_name?.toLowerCase().includes(lowerSearchTerm) ||
+      item.original_result?.final_status?.toLowerCase().includes(lowerSearchTerm) ||
+      // Search within new results
+      item.new_result?.level1_id?.toLowerCase().includes(lowerSearchTerm) ||
+      item.new_result?.level1_name?.toLowerCase().includes(lowerSearchTerm) ||
+      // ... add other new levels ...
+      item.new_result?.level5_id?.toLowerCase().includes(lowerSearchTerm) ||
+      item.new_result?.level5_name?.toLowerCase().includes(lowerSearchTerm) ||
+      item.new_result?.final_status?.toLowerCase().includes(lowerSearchTerm) ||
+      item.new_result?.classification_notes_or_reason?.toLowerCase().includes(lowerSearchTerm)
+    );
+  }
+
+  // Sorting
+  if (sortKey.value && sortDirection.value) {
+    const key = sortKey.value;
+    const direction = sortDirection.value === 'asc' ? 1 : -1;
+
+    filtered = filtered.slice().sort((a, b) => {
+      const valA = getNestedValue(a, key);
+      const valB = getNestedValue(b, key);
+
+      const aIsNull = valA === null || valA === undefined || valA === '';
+      const bIsNull = valB === null || valB === undefined || valB === '';
+
+      if (aIsNull && bIsNull) return 0;
+      if (aIsNull) return 1 * direction;
+      if (bIsNull) return -1 * direction;
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return valA.localeCompare(valB) * direction;
+      }
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return (valA - valB) * direction;
+      }
+
+      const strA = String(valA).toLowerCase();
+      const strB = String(valB).toLowerCase();
+      if (strA < strB) return -1 * direction;
+      if (strA > strB) return 1 * direction;
+      return 0;
+    });
+  }
+
+  return filtered;
+});
+
+// --- Methods ---
+
+function sortBy(key: string) { // Key is now string due to nesting
+  if (sortKey.value === key) {
+    if (sortDirection.value === 'asc') {
+        sortDirection.value = 'desc';
+    } else if (sortDirection.value === 'desc') {
+        sortDirection.value = null;
+        sortKey.value = null;
+    } else {
+        sortDirection.value = 'asc';
+    }
+  } else {
+    sortKey.value = key;
+    sortDirection.value = 'asc';
+  }
+}
+
+function getConfidenceClass(confidence: number | null | undefined): string {
+  if (confidence === null || confidence === undefined) return 'text-gray-400';
+  if (confidence >= 0.8) return 'text-green-700 font-medium';
+  if (confidence >= 0.5) return 'text-yellow-700';
+  return 'text-red-700';
+}
+
+function getStatusClass(status: string | null | undefined): string {
+    switch(status?.toLowerCase()){
+        case 'classified': return 'bg-green-100 text-green-800';
+        case 'not possible': return 'bg-yellow-100 text-yellow-800';
+        case 'error': return 'bg-red-100 text-red-800';
+        default: return 'bg-gray-100 text-gray-800';
+    }
+}
+
+// Highlight cells beyond the target classification depth in the *new* result
+function getCellClass(item: JobResultItem | null | undefined, level: number): string {
+    const baseClass = 'text-gray-700';
+    const beyondDepthClass = 'text-gray-400 italic';
+
+    if (!item) return baseClass; // Handle case where new_result might be null
+
+    const levelIdKey = `level${level}_id` as keyof JobResultItem;
+    const hasId = item[levelIdKey] !== null && item[levelIdKey] !== undefined && item[levelIdKey] !== '';
+
+    if (level > props.targetLevel && hasId) {
+        return beyondDepthClass;
+    }
+    return baseClass;
+}
+
+// --- Flagging and Hint Handling ---
+function toggleFlag(vendorName: string) {
+    if (jobStore.isFlagged(vendorName)) {
+        jobStore.unflagVendor(vendorName);
+    } else {
+        jobStore.flagVendor(vendorName);
+        // Optionally open modal here if using one
+        // selectedVendorForHint.value = vendorName;
+        // showHintModal.value = true;
+    }
+}
+
+function updateHint(vendorName: string, hint: string) {
+    jobStore.setHint(vendorName, hint);
+}
+
+// function saveHint(hint: string) {
+//     if (selectedVendorForHint.value) {
+//         jobStore.setHint(selectedVendorForHint.value, hint);
+//     }
+//     selectedVendorForHint.value = ''; // Clear selection
+// }
+
+async function submitFlags() {
+    emit('submit-flags'); // Notify parent (JobStatus) to handle submission logic
+}
+
+// --- Helper Component for Sort Icons ---
+const SortIcon = {
+  props: {
+    direction: {
+      type: String as PropType<'asc' | 'desc' | null>,
+      default: null,
+    },
+  },
+  components: { ChevronUpIcon, ChevronDownIcon, ChevronUpDownIcon },
+  template: `
+    <span class="inline-block ml-1 w-4 h-4 align-middle">
+      <ChevronUpIcon v-if="direction === 'asc'" class="w-4 h-4 text-gray-700" />
+      <ChevronDownIcon v-else-if="direction === 'desc'" class="w-4 h-4 text-gray-700" />
+      <ChevronUpDownIcon v-else class="w-4 h-4 text-gray-400 opacity-50" />
+    </span>
+  `,
+};
+
+</script>
+
+<style scoped>
+/* Add styles for visually separating original vs new columns if desired */
+/* e.g., a subtle border or background */
+/* th[isOriginal="true"], td[isOriginal="true"] { ... } */
+/* th[isNew="true"], td[isNew="true"] { ... } */
+</style>
+</file>
+
+<file path='frontend/vue_frontend/src/stores/job.ts'>
+// <file path='frontend/vue_frontend/src/stores/job.ts'>
+import { defineStore } from 'pinia';
+import { ref, reactive, computed } from 'vue'; // <<< Added reactive, computed
+import apiService, { type JobResponse, type JobResultsResponse } from '@/services/api'; // Import JobResponse type
+
+// Define the structure of the job details object based on your API response
+// Should align with app/schemas/job.py -> JobResponse
+export interface JobDetails {
+    id: string; // Changed from job_id to match JobResponse schema
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    progress: number;
+    current_stage: string; // Consider using specific stage literals if known
+    created_at: string | null; // Use string for ISO date
+    updated_at: string | null; // Use string for ISO date
+    completed_at?: string | null; // Optional completion time
+    estimated_completion?: string | null; // Added optional field (backend doesn't provide this explicitly yet)
+    error_message: string | null;
+    target_level: number; // ADDED: Ensure target_level is part of the details
+    company_name?: string;
+    input_file_name?: string;
+    output_file_name?: string | null;
+    created_by?: string;
+    // --- ADDED: Job Type and Parent Link ---
+    job_type: 'CLASSIFICATION' | 'REVIEW';
+    parent_job_id: string | null;
+    // --- END ADDED ---
+}
+
+// --- UPDATED: Interface for a single detailed result item (for CLASSIFICATION jobs) ---
+// Should align with app/schemas/job.py -> JobResultItem
+export interface JobResultItem {
+    vendor_name: string;
+    level1_id: string | null;
+    level1_name: string | null;
+    level2_id: string | null;
+    level2_name: string | null;
+    level3_id: string | null;
+    level3_name: string | null;
+    level4_id: string | null;
+    level4_name: string | null;
+    level5_id: string | null;
+    level5_name: string | null;
+    final_confidence: number | null;
+    final_status: string; // 'Classified', 'Not Possible', 'Error'
+    classification_source: string | null; // 'Initial', 'Search', 'Review'
+    classification_notes_or_reason: string | null;
+    achieved_level: number | null; // 0-5
+}
+// --- END UPDATED ---
+
+// --- ADDED: Interface for a single detailed result item (for REVIEW jobs) ---
+// Should align with app/schemas/review.py -> ReviewResultItem
+export interface ReviewResultItem {
+    vendor_name: string;
+    hint: string;
+    // Store the original result (as a dict matching JobResultItem)
+    original_result: JobResultItem; // Use JobResultItem type for structure
+    // Store the new result (as a dict matching JobResultItem)
+    new_result: JobResultItem; // Use JobResultItem type for structure
+}
+// --- END ADDED ---
+
+
+export const useJobStore = defineStore('job', () => {
+    // --- State ---
+    const currentJobId = ref<string | null>(null);
+    const jobDetails = ref<JobDetails | null>(null);
+    const isLoading = ref(false); // For tracking polling/loading state for CURRENT job
+    const error = ref<string | null>(null); // For storing errors related to fetching CURRENT job status
+
+    // --- ADDED: Job History State ---
+    const jobHistory = ref<JobResponse[]>([]);
+    const historyLoading = ref(false);
+    const historyError = ref<string | null>(null);
+    // --- END ADDED ---
+
+    // --- ADDED: Detailed Job Results State ---
+    // Use Union type to hold either result type
+    const jobResults = ref<JobResultItem[] | ReviewResultItem[] | null>(null);
+    const resultsLoading = ref(false);
+    const resultsError = ref<string | null>(null);
+    // --- END ADDED ---
+
+    // --- ADDED: Reclassification State ---
+    // Map vendor name to its flagged state and hint
+    const flaggedForReview = reactive<Map<string, { hint: string | null }>>(new Map());
+    const reclassifyLoading = ref(false);
+    const reclassifyError = ref<string | null>(null);
+    const lastReviewJobId = ref<string | null>(null); // Store ID of the last created review job
+    // --- END ADDED ---
+
+    // --- Computed ---
+    const hasFlaggedItems = computed(() => flaggedForReview.size > 0);
+
+    // --- Actions ---
+    function setCurrentJobId(jobId: string | null): void {
+        console.log(`JobStore: Setting currentJobId from '${currentJobId.value}' to '${jobId}'`); // LOGGING
+        if (currentJobId.value !== jobId) {
+            currentJobId.value = jobId;
+            // Clear details when ID changes (to null or a new ID) to force refresh
+            jobDetails.value = null;
+            console.log(`JobStore: Cleared jobDetails due to ID change.`); // LOGGING
+            error.value = null; // Clear errors
+            isLoading.value = false; // Reset loading state
+            // --- ADDED: Clear detailed results when job changes ---
+            jobResults.value = null;
+            resultsLoading.value = false;
+            resultsError.value = null;
+            console.log(`JobStore: Cleared detailed jobResults due to ID change.`); // LOGGING
+            // --- END ADDED ---
+            // --- ADDED: Clear flagging state when job changes ---
+            flaggedForReview.clear();
+            reclassifyLoading.value = false;
+            reclassifyError.value = null;
+            lastReviewJobId.value = null;
+            console.log(`JobStore: Cleared flagging state due to ID change.`); // LOGGING
+            // --- END ADDED ---
+
+            // Update URL to reflect the current job ID or clear it
+            try {
+                 const url = new URL(window.location.href);
+                 if (jobId) {
+                     url.searchParams.set('job_id', jobId);
+                     console.log(`JobStore: Updated URL searchParam 'job_id' to ${jobId}`); // LOGGING
+                 } else {
+                     url.searchParams.delete('job_id');
+                     console.log(`JobStore: Removed 'job_id' from URL searchParams.`); // LOGGING
+                 }
+                 // Use replaceState to avoid polluting history
+                 window.history.replaceState({}, '', url.toString());
+            } catch (e) {
+                 console.error("JobStore: Failed to update URL:", e);
+            }
+        }
+         // If the same job ID is set again, force a refresh of details
+         else if (jobId !== null) {
+             console.log(`JobStore: Re-setting same job ID ${jobId}, clearing details and results to force refresh.`); // LOGGING
+             jobDetails.value = null;
+             error.value = null;
+             isLoading.value = false;
+             // --- ADDED: Clear detailed results on re-select too ---
+             jobResults.value = null;
+             resultsLoading.value = false;
+             resultsError.value = null;
+             // --- END ADDED ---
+             // --- ADDED: Clear flagging state on re-select too ---
+             flaggedForReview.clear();
+             reclassifyLoading.value = false;
+             reclassifyError.value = null;
+             lastReviewJobId.value = null;
+             // --- END ADDED ---
+         }
+    }
+
+    function updateJobDetails(details: JobDetails): void {
+        // Only update if the details are for the currently tracked job
+        if (details && details.id === currentJobId.value) { // Match 'id' field from JobResponse/JobDetails
+            // LOGGING: Include target_level in log
+            console.log(`JobStore: Updating jobDetails for ${currentJobId.value} with status ${details.status}, progress ${details.progress}, target_level ${details.target_level}, job_type ${details.job_type}`);
+            jobDetails.value = { ...details }; // Create new object for reactivity
+            error.value = null; // Clear error on successful update
+        } else if (details) {
+            console.warn(`JobStore: Received details for job ${details.id}, but currently tracking ${currentJobId.value}. Ignoring update.`); // LOGGING
+        } else {
+            console.warn(`JobStore: updateJobDetails called with invalid details object.`); // LOGGING
+        }
+    }
+
+    function setLoading(loading: boolean): void {
+        isLoading.value = loading;
+    }
+
+    function setError(errorMessage: string | null): void {
+        error.value = errorMessage;
+    }
+
+    function clearJob(): void {
+        console.log('JobStore: Clearing job state.'); // LOGGING
+        setCurrentJobId(null); // This also clears details, error, loading, results and URL param
+        // --- ADDED: Clear history too on full clear? Optional. ---
+        // jobHistory.value = [];
+        // historyLoading.value = false;
+        // historyError.value = null;
+        // --- END ADDED ---
+    }
+
+    // --- ADDED: Job History Actions ---
+    async function fetchJobHistory(params = {}): Promise<void> {
+        console.log('JobStore: Fetching job history with params:', params); // LOGGING
+        historyLoading.value = true;
+        historyError.value = null;
+        try {
+            const jobs = await apiService.getJobs(params);
+            jobHistory.value = jobs;
+            console.log(`JobStore: Fetched ${jobs.length} jobs.`); // LOGGING
+        } catch (err: any) {
+            console.error('JobStore: Failed to fetch job history:', err); // LOGGING
+            historyError.value = err.message || 'Failed to load job history.';
+            jobHistory.value = []; // Clear history on error
+        } finally {
+            historyLoading.value = false;
+        }
+    }
+    // --- END ADDED ---
+
+    // --- ADDED: Detailed Job Results Actions ---
+    async function fetchJobResults(jobId: string): Promise<void> {
+        // Only fetch if the jobId matches the current job
+        if (jobId !== currentJobId.value) {
+            console.log(`JobStore: fetchJobResults called for ${jobId}, but current job is ${currentJobId.value}. Skipping.`);
+            return;
+        }
+        // Avoid redundant fetches if already loading
+        if (resultsLoading.value) {
+             console.log(`JobStore: fetchJobResults called for ${jobId}, but already loading. Skipping.`);
+             return;
+        }
+
+        console.log(`JobStore: Fetching detailed results for job ${jobId}...`);
+        resultsLoading.value = true;
+        resultsError.value = null;
+        jobResults.value = null; // Clear previous results before fetching
+        try {
+            // API now returns { job_id, job_type, results: [...] }
+            const response: JobResultsResponse = await apiService.getJobResults(jobId);
+            // Double-check the job ID hasn't changed *during* the API call
+            if (jobId === currentJobId.value) {
+                // Store the results array. The type (JobResultItem[] or ReviewResultItem[])
+                // is implicitly handled by the Union type and determined by job_type.
+                jobResults.value = response.results;
+                // Update jobDetails with the job_type from the response if needed
+                if (jobDetails.value && jobDetails.value.job_type !== response.job_type) {
+                    console.log(`JobStore: Updating job_type in details from results response for ${jobId}`);
+                    jobDetails.value.job_type = response.job_type;
+                }
+                console.log(`JobStore: Successfully fetched ${response.results.length} detailed results for ${jobId} (Type: ${response.job_type}).`);
+            } else {
+                 console.log(`JobStore: Job ID changed while fetching results for ${jobId}. Discarding fetched results.`);
+            }
+        } catch (err: any) {
+            console.error(`JobStore: Failed to fetch detailed results for ${jobId}:`, err);
+            // Only set error if it's for the currently selected job
+            if (jobId === currentJobId.value) {
+                resultsError.value = err.message || 'Failed to load detailed results.';
+                jobResults.value = null; // Clear results on error
+            }
+        } finally {
+             // Only stop loading if it's for the currently selected job
+            if (jobId === currentJobId.value) {
+                resultsLoading.value = false;
+            }
+        }
+    }
+    // --- END ADDED ---
+
+    // --- ADDED: Reclassification Actions ---
+    function isFlagged(vendorName: string): boolean {
+        return flaggedForReview.has(vendorName);
+    }
+
+    function getHint(vendorName: string): string | null {
+        return flaggedForReview.get(vendorName)?.hint ?? null;
+    }
+
+    function flagVendor(vendorName: string): void {
+        if (!flaggedForReview.has(vendorName)) {
+            flaggedForReview.set(vendorName, { hint: null });
+            console.log(`JobStore: Flagged vendor '${vendorName}' for review.`);
+        }
+    }
+
+    function unflagVendor(vendorName: string): void {
+        if (flaggedForReview.has(vendorName)) {
+            flaggedForReview.delete(vendorName);
+            console.log(`JobStore: Unflagged vendor '${vendorName}'.`);
+        }
+    }
+
+    function setHint(vendorName: string, hint: string | null): void {
+        if (flaggedForReview.has(vendorName)) {
+            flaggedForReview.set(vendorName, { hint });
+            console.log(`JobStore: Set hint for '${vendorName}': ${hint ? `'${hint}'` : 'cleared'}`);
+        } else {
+            console.warn(`JobStore: Tried to set hint for unflagged vendor '${vendorName}'.`);
+        }
+    }
+
+    async function submitFlagsForReview(): Promise<string | null> {
+        const originalJobId = currentJobId.value;
+        if (!originalJobId || flaggedForReview.size === 0) {
+            console.warn("JobStore: submitFlagsForReview called with no job ID or no flagged items.");
+            reclassifyError.value = "No items flagged for review.";
+            return null;
+        }
+
+        const itemsToReclassify = Array.from(flaggedForReview.entries())
+            .filter(([_, data]) => data.hint && data.hint.trim() !== '') // Only submit items with a non-empty hint
+            .map(([vendorName, data]) => ({
+                vendor_name: vendorName,
+                hint: data.hint!, // Assert non-null because we filtered
+            }));
+
+        if (itemsToReclassify.length === 0) {
+            console.warn("JobStore: submitFlagsForReview called, but no flagged items have valid hints.");
+            reclassifyError.value = "Please provide hints for the flagged items before submitting.";
+            // Clear flags that have no hint? Maybe not, let user clear them.
+            return null;
+        }
+
+
+        console.log(`JobStore: Submitting ${itemsToReclassify.length} flags for reclassification for job ${originalJobId}...`);
+        reclassifyLoading.value = true;
+        reclassifyError.value = null;
+        lastReviewJobId.value = null;
+
+        try {
+            const response = await apiService.reclassifyJob(originalJobId, itemsToReclassify);
+            console.log(`JobStore: Reclassification job started successfully. Review Job ID: ${response.review_job_id}`);
+            lastReviewJobId.value = response.review_job_id;
+            // Clear the flags after successful submission
+            flaggedForReview.clear();
+            // Optionally: Fetch job history again to show the new PENDING review job
+            // await fetchJobHistory();
+            // Optionally: Navigate to the new review job? Or just show a success message.
+            // setCurrentJobId(response.review_job_id); // This would switch view immediately
+            return response.review_job_id; // Return the new job ID for potential navigation
+        } catch (err: any) {
+            console.error('JobStore: Failed to submit flags for reclassification:', err);
+            reclassifyError.value = err.message || 'Failed to start reclassification job.';
+            return null;
+        } finally {
+            reclassifyLoading.value = false;
+        }
+    }
+    // --- END ADDED ---
+
+
+    return {
+        currentJobId,
+        jobDetails,
+        isLoading,
+        error,
+        // History state & actions
+        jobHistory,
+        historyLoading,
+        historyError,
+        fetchJobHistory,
+        // Detailed Results state & actions
+        jobResults, // Can be JobResultItem[] or ReviewResultItem[]
+        resultsLoading,
+        resultsError,
+        fetchJobResults,
+        // Reclassification state & actions
+        flaggedForReview,
+        reclassifyLoading,
+        reclassifyError,
+        lastReviewJobId,
+        hasFlaggedItems,
+        isFlagged,
+        getHint,
+        flagVendor,
+        unflagVendor,
+        setHint,
+        submitFlagsForReview,
+        // Existing actions
+        setCurrentJobId,
+        updateJobDetails,
+        setLoading,
+        setError,
+        clearJob,
+    };
+});
+</file>
+
+</Concatenated Source Code>
