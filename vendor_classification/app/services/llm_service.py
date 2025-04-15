@@ -166,7 +166,7 @@ class LLMService:
                         "provisioning_key_count": len(self.provisioning_keys),
                         "cache_enabled": settings.USE_LLM_CACHE,
                         "initial_cache_size": len(self.cache)})
-        
+
     def _get_current_provisioning_key(self) -> Optional[str]:
         """Gets the current provisioning key based on the index."""
         if not self.provisioning_keys:
@@ -232,16 +232,27 @@ class LLMService:
 
                 response_data = response.json()
                 new_key = response_data.get("key")
-                key_hash = response_data.get("hash") # Get the hash too
+                # --- FIX START: Access hash correctly from nested 'data' object ---
+                response_data_inner = response_data.get("data", {}) # Get inner dict, default {}
+                key_hash = response_data_inner.get("hash") if isinstance(response_data_inner, dict) else None
+                # --- FIX END ---
 
                 if not new_key:
                     logger.error("Key generation response did not contain a 'key' field.", extra={"response": response_data})
                     raise ValueError("Invalid response format from key generation API")
+                # --- FIX START: Check key_hash before slicing for logging ---
+                if not key_hash:
+                    logger.warning("Key generation response did not contain a 'hash' field within 'data'.", extra={"response": response_data})
+                    # Decide if this is critical. For now, proceed without hash.
+                    # raise ValueError("Invalid response format from key generation API (missing hash)") # Or raise error
 
                 self.active_generated_key = new_key
-                self.active_generated_key_hash = key_hash # Store the hash
-                logger.info(f"Successfully generated new OpenRouter API key (hash: {key_hash[:8]}...) using provisioning key index {self.current_provisioning_key_index}")
-                llm_trace_logger.info(f"LLM_TRACE: Successfully generated key {key_hash[:8]}...", extra={'correlation_id': get_correlation_id()})
+                self.active_generated_key_hash = key_hash # Store the hash (could be None)
+
+                key_hash_prefix = f"{key_hash[:8]}..." if key_hash else "N/A" # Use N/A if hash is None
+                logger.info(f"Successfully generated new OpenRouter API key (hash: {key_hash_prefix}) using provisioning key index {self.current_provisioning_key_index}")
+                llm_trace_logger.info(f"LLM_TRACE: Successfully generated key {key_hash_prefix}", extra={'correlation_id': get_correlation_id()})
+                # --- FIX END ---
                 return True # Success
 
         except httpx.HTTPStatusError as e:
@@ -262,9 +273,12 @@ class LLMService:
                  return False # Don't retry for e.g. bad request format
 
         except (httpx.RequestError, json.JSONDecodeError, ValueError, Exception) as e:
+            # --- FIX START: Log hash prefix safely in exception ---
+            key_hash_prefix = f"{self.active_generated_key_hash[:8]}..." if self.active_generated_key_hash else "N/A"
             logger.error(f"Error during API key generation: {e}", exc_info=True,
-                         extra={"provisioning_key_index": self.current_provisioning_key_index})
-            llm_trace_logger.error(f"LLM_TRACE: Key Generation Error: {e}", exc_info=True, extra={'correlation_id': get_correlation_id()})
+                         extra={"provisioning_key_index": self.current_provisioning_key_index, "key_hash_used": key_hash_prefix})
+            llm_trace_logger.error(f"LLM_TRACE: Key Generation Error: {e}", exc_info=True, extra={'correlation_id': get_correlation_id(), "key_hash_used": key_hash_prefix})
+            # --- FIX END ---
             # Rotate on general errors too, might be transient network issue or bad key
             rotated = self._rotate_provisioning_key()
             if not rotated and len(self.provisioning_keys) <= 1:
@@ -359,7 +373,10 @@ class LLMService:
         # Log Request Details (Trace Log)
         try:
             log_headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
-            log_headers['Authorization'] = f'Bearer [REDACTED_GENERATED_KEY_{self.active_generated_key_hash[:8] if self.active_generated_key_hash else "UNKNOWN"}]'
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else "UNKNOWN"
+            log_headers['Authorization'] = f'Bearer [REDACTED_GENERATED_KEY_{key_hash_prefix}]'
+            # --- FIX END ---
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Headers (Batch ID: {batch_id}):\n{json.dumps(log_headers, indent=2)}", extra={'correlation_id': correlation_id})
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Payload (Batch ID: {batch_id}):\n{json.dumps(payload, indent=2)}", extra={'correlation_id': correlation_id})
         except Exception as log_err:
@@ -367,7 +384,10 @@ class LLMService:
 
         response_data = None; raw_content = None; response = None; status_code = None; api_duration = 0.0
         try:
-            logger.debug(f"Sending request to OpenRouter API using generated key (hash: {self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'})")
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
+            logger.debug(f"Sending request to OpenRouter API using generated key (hash: {key_hash_prefix})")
+            # --- FIX END ---
             start_time = time.time()
             async with httpx.AsyncClient() as client:
                 response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=90.0)
@@ -391,8 +411,11 @@ class LLMService:
             usage = response_data.get("usage", {}) if response_data else {}
             prompt_tokens = usage.get("prompt_tokens", 0); completion_tokens = usage.get("completion_tokens", 0); total_tokens = usage.get("total_tokens", 0)
 
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
             logger.info(f"OpenRouter API response received successfully",
-                    extra={ "duration": api_duration, "batch_id": batch_id, "level": level, "status_code": status_code, "key_hash_used": self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A', "openrouter_prompt_tokens": prompt_tokens, "openrouter_completion_tokens": completion_tokens, "openrouter_total_tokens": total_tokens })
+                    extra={ "duration": api_duration, "batch_id": batch_id, "level": level, "status_code": status_code, "key_hash_used": key_hash_prefix, "openrouter_prompt_tokens": prompt_tokens, "openrouter_completion_tokens": completion_tokens, "openrouter_total_tokens": total_tokens })
+            # --- FIX END ---
 
             with LogTimer(logger, "JSON parsing and extraction", include_in_stats=True):
                 result = _extract_json_from_response(raw_content)
@@ -420,14 +443,16 @@ class LLMService:
         except httpx.HTTPStatusError as e:
             response_text = raw_content or (e.response.text[:500] if hasattr(e.response, 'text') else "[No Response Body]")
             status_code = e.response.status_code
-            key_hash_used = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_used_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
             logger.error(f"HTTP error during LLM batch classification", exc_info=False,
-                        extra={ "status_code": status_code, "response_text": response_text, "batch_id": batch_id, "level": level, "key_hash_used": key_hash_used })
-            llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Batch ID: {batch_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
+                        extra={ "status_code": status_code, "response_text": response_text, "batch_id": batch_id, "level": level, "key_hash_used": key_hash_used_prefix })
+            llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Batch ID: {batch_id}): Status={status_code}, Response='{response_text}', KeyHash={key_hash_used_prefix}", exc_info=True, extra={'correlation_id': correlation_id})
+            # --- FIX END ---
 
             # --- Key Invalidation Logic ---
             if status_code in GENERATED_KEY_INVALID_STATUS_CODES:
-                logger.warning(f"Generated key (hash: {key_hash_used}) may be invalid due to status {status_code}. Discarding and forcing regeneration on retry.")
+                logger.warning(f"Generated key (hash: {key_hash_used_prefix}) may be invalid due to status {status_code}. Discarding and forcing regeneration on retry.")
                 self.active_generated_key = None # Discard the key
                 self.active_generated_key_hash = None
                 # Let tenacity handle the retry, _get_active_key_or_generate will run again
@@ -439,10 +464,12 @@ class LLMService:
             raise # Re-raise for tenacity to handle retry based on status code or general failure
 
         except httpx.RequestError as e:
-            key_hash_used = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
+             # --- FIX START: Safely log key hash prefix ---
+            key_hash_used_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
             logger.error(f"Network error during LLM batch classification", exc_info=False,
-                        extra={ "error_details": str(e), "batch_id": batch_id, "level": level, "key_hash_used": key_hash_used })
-            llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
+                        extra={ "error_details": str(e), "batch_id": batch_id, "level": level, "key_hash_used": key_hash_used_prefix })
+            llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Batch ID: {batch_id}): {e}, KeyHash={key_hash_used_prefix}", exc_info=True, extra={'correlation_id': correlation_id})
+             # --- FIX END ---
             # Network errors might warrant discarding the key too, as its state is unknown
             # self.active_generated_key = None
             # self.active_generated_key_hash = None
@@ -455,10 +482,12 @@ class LLMService:
             raise # Re-raise for tenacity
 
         except Exception as e:
-            key_hash_used = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
-            error_context = { "batch_size": len(batch_data), "level": level, "parent_category_id": parent_category_id, "error": str(e), "model": self.model, "batch_id": batch_id, "key_hash_used": key_hash_used }
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_used_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
+            error_context = { "batch_size": len(batch_data), "level": level, "parent_category_id": parent_category_id, "error": str(e), "model": self.model, "batch_id": batch_id, "key_hash_used": key_hash_used_prefix }
             logger.error(f"Unexpected error during LLM batch classification", exc_info=True, extra=error_context)
-            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Batch ID: {batch_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
+            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Batch ID: {batch_id}): {e}, KeyHash={key_hash_used_prefix}", exc_info=True, extra={'correlation_id': correlation_id})
+            # --- FIX END ---
             raise # Re-raise for tenacity
 
 
@@ -528,7 +557,10 @@ class LLMService:
         # Log Request Details (Trace Log)
         try:
             log_headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
-            log_headers['Authorization'] = f'Bearer [REDACTED_GENERATED_KEY_{self.active_generated_key_hash[:8] if self.active_generated_key_hash else "UNKNOWN"}]'
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else "UNKNOWN"
+            log_headers['Authorization'] = f'Bearer [REDACTED_GENERATED_KEY_{key_hash_prefix}]'
+            # --- FIX END ---
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Headers (Attempt ID: {attempt_id}):\n{json.dumps(log_headers, indent=2)}", extra={'correlation_id': correlation_id})
             llm_trace_logger.debug(f"LLM_TRACE: LLM Request Payload (Attempt ID: {attempt_id}):\n{json.dumps(payload, indent=2)}", extra={'correlation_id': correlation_id})
         except Exception as log_err:
@@ -536,7 +568,10 @@ class LLMService:
 
         response_data = None; raw_content = None; response = None; status_code = None; api_duration = 0.0
         try:
-            logger.debug(f"Sending search results to OpenRouter API using generated key (hash: {self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'})")
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
+            logger.debug(f"Sending search results to OpenRouter API using generated key (hash: {key_hash_prefix})")
+            # --- FIX END ---
             start_time = time.time()
             async with httpx.AsyncClient() as client:
                 response = await client.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=60.0)
@@ -560,8 +595,11 @@ class LLMService:
             usage = response_data.get("usage", {}) if response_data else {}
             prompt_tokens = usage.get("prompt_tokens", 0); completion_tokens = usage.get("completion_tokens", 0); total_tokens = usage.get("total_tokens", 0)
 
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
             logger.info(f"OpenRouter API response received successfully for search results",
-                    extra={ "duration": api_duration, "vendor": vendor_name, "status_code": status_code, "key_hash_used": self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A', "openrouter_prompt_tokens": prompt_tokens, "openrouter_completion_tokens": completion_tokens, "openrouter_total_tokens": total_tokens, "attempt_id": attempt_id })
+                    extra={ "duration": api_duration, "vendor": vendor_name, "status_code": status_code, "key_hash_used": key_hash_prefix, "openrouter_prompt_tokens": prompt_tokens, "openrouter_completion_tokens": completion_tokens, "openrouter_total_tokens": total_tokens, "attempt_id": attempt_id })
+            # --- FIX END ---
 
             with LogTimer(logger, "JSON parsing and extraction (search)", include_in_stats=True):
                 result = _extract_json_from_response(raw_content)
@@ -589,14 +627,16 @@ class LLMService:
         except httpx.HTTPStatusError as e:
             response_text = raw_content or (e.response.text[:500] if hasattr(e.response, 'text') else "[No Response Body]")
             status_code = e.response.status_code
-            key_hash_used = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_used_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
             logger.error(f"HTTP error during search result processing", exc_info=False,
-                        extra={ "status_code": status_code, "response_text": response_text, "vendor": vendor_name, "attempt_id": attempt_id, "key_hash_used": key_hash_used })
-            llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Attempt ID: {attempt_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
+                        extra={ "status_code": status_code, "response_text": response_text, "vendor": vendor_name, "attempt_id": attempt_id, "key_hash_used": key_hash_used_prefix })
+            llm_trace_logger.error(f"LLM_TRACE: LLM API HTTP Error (Attempt ID: {attempt_id}): Status={status_code}, Response='{response_text}', KeyHash={key_hash_used_prefix}", exc_info=True, extra={'correlation_id': correlation_id})
+            # --- FIX END ---
 
             # --- Key Invalidation Logic ---
             if status_code in GENERATED_KEY_INVALID_STATUS_CODES:
-                logger.warning(f"Generated key (hash: {key_hash_used}) may be invalid due to status {status_code}. Discarding and forcing regeneration on retry.")
+                logger.warning(f"Generated key (hash: {key_hash_used_prefix}) may be invalid due to status {status_code}. Discarding and forcing regeneration on retry.")
                 self.active_generated_key = None
                 self.active_generated_key_hash = None
             elif status_code in PROVISIONING_RELATED_ERROR_CODES:
@@ -606,10 +646,12 @@ class LLMService:
             raise # Re-raise for tenacity
 
         except httpx.RequestError as e:
-            key_hash_used = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_used_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
             logger.error(f"Network error during search result processing", exc_info=False,
-                        extra={ "error_details": str(e), "vendor": vendor_name, "attempt_id": attempt_id, "key_hash_used": key_hash_used })
-            llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
+                        extra={ "error_details": str(e), "vendor": vendor_name, "attempt_id": attempt_id, "key_hash_used": key_hash_used_prefix })
+            llm_trace_logger.error(f"LLM_TRACE: LLM API Network Error (Attempt ID: {attempt_id}): {e}, KeyHash={key_hash_used_prefix}", exc_info=True, extra={'correlation_id': correlation_id})
+            # --- FIX END ---
             # self.active_generated_key = None # Optional: discard key on network error
             # self.active_generated_key_hash = None
             raise # Re-raise for tenacity
@@ -620,8 +662,10 @@ class LLMService:
             raise # Re-raise for tenacity
 
         except Exception as e:
-            key_hash_used = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
-            error_context = { "vendor": vendor_name, "error": str(e), "model": self.model, "attempt_id": attempt_id, "key_hash_used": key_hash_used }
+            # --- FIX START: Safely log key hash prefix ---
+            key_hash_used_prefix = self.active_generated_key_hash[:8] if self.active_generated_key_hash else 'N/A'
+            error_context = { "vendor": vendor_name, "error": str(e), "model": self.model, "attempt_id": attempt_id, "key_hash_used": key_hash_used_prefix }
             logger.error(f"Unexpected error during search result processing", exc_info=True, extra=error_context)
-            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Attempt ID: {attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
+            llm_trace_logger.error(f"LLM_TRACE: LLM Unexpected Error (Attempt ID: {attempt_id}): {e}, KeyHash={key_hash_used_prefix}", exc_info=True, extra={'correlation_id': correlation_id})
+            # --- FIX END ---
             raise # Re-raise for tenacity

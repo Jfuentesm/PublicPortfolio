@@ -1,7 +1,7 @@
 # <file path='app/models/taxonomy.py'>
 # --- file path='app/models/taxonomy.py' ---
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any # <<< ADDED Any
 import re # Added import
 
 # --- ADDED: Import logger ---
@@ -276,4 +276,70 @@ class Taxonomy(BaseModel):
             TaxonomyCategory(id=cat_id, name=cat.name, description=cat.description)
             for cat_id, cat in level4_cat.children.items()
         ]
+    # --- END ADDED ---
+
+    # --- ADDED: get_level_dict method ---
+    def get_level_dict(self, parent_id_path: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Returns a dictionary of the direct children categories for a given parent ID path.
+        Path format: L1_ID.L2_ID.L3_ID etc. If None, returns Level 1 categories.
+        Keys are child IDs, values are dicts with 'name' and 'description'.
+        """
+        logger.debug(f"get_level_dict called for parent_id_path: {parent_id_path}")
+        if not parent_id_path:
+            # Return Level 1 categories dictionary
+            try:
+                return {
+                    cat_id: {"name": cat.name, "description": cat.description}
+                    for cat_id, cat in self.categories.items()
+                }
+            except Exception as e:
+                logger.error(f"Error formatting Level 1 categories for get_level_dict: {e}", exc_info=True)
+                return {}
+
+        parts = parent_id_path.split('.')
+        current_level_nodes = self.categories
+        node = None
+
+        try:
+            # Traverse to the parent node specified by the path
+            for i, part_id in enumerate(parts):
+                # Ensure we are traversing a dictionary structure
+                if not isinstance(current_level_nodes, dict):
+                    logger.warning(f"get_level_dict: Structure error - Expected dict, got {type(current_level_nodes)} at level {i} for path '{parent_id_path}'.")
+                    return {}
+
+                # Check if the ID exists at the current level
+                if part_id not in current_level_nodes:
+                    logger.warning(f"get_level_dict: ID '{part_id}' not found at level {i+1} in path '{parent_id_path}'.")
+                    return {}
+
+                node = current_level_nodes[part_id]
+
+                # If not the last part, move down to children, checking structure
+                if i < len(parts) - 1:
+                    if not hasattr(node, 'children') or not isinstance(node.children, dict):
+                        logger.warning(f"get_level_dict: Node '{part_id}' at level {i+1} has no valid children dictionary for path '{parent_id_path}'.")
+                        return {}
+                    current_level_nodes = node.children
+                    # Check if children dict is empty, stop if so
+                    if not current_level_nodes:
+                        logger.warning(f"get_level_dict: Node '{part_id}' at level {i+1} has an empty children dictionary for path '{parent_id_path}'.")
+                        return {}
+
+            # After the loop, 'node' is the parent whose children we need
+            if node and hasattr(node, 'children') and isinstance(node.children, dict):
+                # Return the dictionary of children
+                return {
+                    child_id: {"name": child.name, "description": child.description}
+                    for child_id, child in node.children.items()
+                }
+            else:
+                 # The final node exists but has no children dict or is None
+                 logger.warning(f"get_level_dict: Final node for path '{parent_id_path}' either not found, has no children attribute, or children is not a dict.")
+                 return {}
+
+        except Exception as e:
+             logger.error(f"get_level_dict: Unexpected error traversing path '{parent_id_path}'", exc_info=True)
+             return {}
     # --- END ADDED ---

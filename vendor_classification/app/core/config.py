@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     GENERATED_KEY_LABEL: Optional[str] = None
     GENERATED_KEY_CREDIT_LIMIT: Optional[float] = None
     BATCH_SIZE: int = 5
-    MAX_RETRIES: int = 3
+    MAX_RETRIES: int = 10
     RETRY_DELAY: int = 1
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = 587

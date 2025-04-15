@@ -141,17 +141,26 @@ async def process_reclassification(
             # --- Actual Reclassification LLM Call ---
             new_result_model = None
             try:
+                # Fetch original vendor data (assuming it's stored appropriately or derivable)
+                # For this example, let's assume original data might be part of the original_result_model
+                # or needs fetching separately. We'll use a placeholder if not readily available.
+                # A better approach would be to ensure the parent job stores original vendor input data.
+                original_vendor_input_data = original_result_model.model_dump() # Use the stored result as a proxy for now
+                original_vendor_input_data['vendor_name'] = vendor_name # Ensure name is correct
+
                 # Generate the specific prompt for reclassification
                 # This prompt needs access to the taxonomy structure
+                # --- UPDATED CALL to get_level_dict ---
                 prompt = generate_reclassification_prompt(
-                    vendor_name=vendor_name,
-                    hint=hint,
-                    taxonomy_level=1, # Start at level 1
-                    taxonomy_tree=taxonomy.get_level_dict(1),
-                    target_level=review_job.target_level,
-                    # Optionally include original classification attempt details if helpful
-                    # original_classification=original_result_model.model_dump()
+                    original_vendor_data=original_vendor_input_data, # Pass original data
+                    user_hint=hint,
+                    original_classification=original_result_model.model_dump(), # Pass previous result dict
+                    taxonomy=taxonomy, # Pass the whole taxonomy object
+                    target_level=review_job.target_level, # Pass the target level for reclassification
+                    attempt_id=f"{review_job.id}-{vendor_name}" # Create a unique ID for this attempt
                 )
+                # --- END UPDATED CALL ---
+
                 # --- ADDED LOGGING ---
                 logger.debug(f"Generated reclassification prompt for '{vendor_name}':\n{prompt}")
                 # --- END LOGGING ---
@@ -159,64 +168,115 @@ async def process_reclassification(
                 # Call LLM (using classify_batch for consistency, even if batch size is 1)
                 # Note: classify_batch might need adaptation to handle hints effectively
                 # Or create a new llm_service method like `reclassify_single`
-                batch_results = await llm_service.classify_batch(
-                    batch_prompt=prompt, # Assuming prompt is structured for batch call
-                    vendor_list=[vendor_name], # List with single vendor
-                    level=1, # Start reclassification at L1
+                # The prompt now asks for a specific JSON output format, so parse that
+                llm_response_str = await llm_service.call_llm(
+                    prompt=prompt,
                     stats=final_stats["api_usage"], # Pass the nested dict
                     job_id=review_job.id # Pass review job ID for logging/cache key
                 )
 
                 # --- ADDED LOGGING ---
-                llm_output_data = batch_results.get(vendor_name)
-                logger.debug(f"Raw LLM output for '{vendor_name}': {llm_output_data}")
+                logger.debug(f"Raw LLM string response for '{vendor_name}': {llm_response_str}")
                 # --- END LOGGING ---
 
-                # --- UPDATED: More robust check for L1 data ---
-                l1_category_id = llm_output_data.get("category_id") if llm_output_data else None
-                l1_category_name = llm_output_data.get("category_name") if llm_output_data else None
-                classification_not_possible = llm_output_data.get("classification_not_possible", True) if llm_output_data else True
+                # Parse the LLM response JSON
+                parsed_llm_output = llm_service.parse_json_response(llm_response_str, job_id=review_job.id, vendor_name=vendor_name)
+
+                # Extract the classification result for this vendor
+                # Based on the prompt's output_format, it should be in classifications[0]
+                if parsed_llm_output and "classifications" in parsed_llm_output and isinstance(parsed_llm_output["classifications"], list) and len(parsed_llm_output["classifications"]) > 0:
+                     llm_output_data = parsed_llm_output["classifications"][0]
+                     logger.debug(f"Parsed LLM classification data for '{vendor_name}': {llm_output_data}")
+                else:
+                     logger.warning(f"Failed to parse valid classification structure from LLM response for '{vendor_name}'. Response: {llm_response_str}")
+                     llm_output_data = None # Ensure it's None if parsing failed
+
+
+                # --- UPDATED: More robust check for L1 data from parsed output ---
+                l1_data = llm_output_data.get("level1") if llm_output_data else None
+                l1_category_id = l1_data.get("category_id") if l1_data else None
+                l1_category_name = l1_data.get("category_name") if l1_data else None
+                classification_not_possible = l1_data.get("classification_not_possible", True) if l1_data else True
+
                 # Check if we got valid L1 classification data
-                if l1_category_id and l1_category_name and l1_category_id != "ERROR" and not classification_not_possible:
+                if l1_data and l1_category_id and l1_category_name and l1_category_id not in ["ERROR", "N/A"] and not classification_not_possible:
                 # --- END UPDATED ---
                      # --- Recursive Classification based on Hint ---
-                     # Similar logic to classification_logic.process_batch but adapted for reclassification
-                     # This part needs careful implementation based on how you want hints to influence subsequent levels
-                     # For now, let's assume the first LLM call gives the final result for simplicity
+                     # The prompt asks the LLM to perform hierarchical classification.
+                     # We need to construct the JobResultItem from the potentially multi-level data returned by the LLM.
 
-                     # Create the JobResultItem from the LLM output
-                     # This needs to map the LLM output fields correctly
+                     achieved_level = 0
+                     final_confidence = 0.0
+                     final_notes = None
+                     final_status = "Not Possible" # Default
+
                      new_result_data = {
                          "vendor_name": vendor_name,
-                         "level1_id": l1_category_id, # Use checked variable
-                         "level1_name": l1_category_name, # Use checked variable
-                         # Populate other levels if the LLM provides them or if recursive calls are made
+                         "level1_id": None, "level1_name": None,
                          "level2_id": None, "level2_name": None,
                          "level3_id": None, "level3_name": None,
                          "level4_id": None, "level4_name": None,
                          "level5_id": None, "level5_name": None,
-                         "final_confidence": llm_output_data.get("confidence"),
-                         "final_status": "Classified",
+                         "final_confidence": 0.0,
+                         "final_status": "Not Possible",
                          "classification_source": "Review", # Mark as reviewed
-                         "classification_notes_or_reason": llm_output_data.get("reasoning") or f"Reclassified based on hint: {hint}",
-                         "achieved_level": 1 # Update based on actual depth achieved
+                         "classification_notes_or_reason": None,
+                         "achieved_level": 0
                      }
+
+                     # Populate levels from LLM output
+                     for level in range(1, review_job.target_level + 1):
+                         level_key = f"level{level}"
+                         level_data = llm_output_data.get(level_key)
+                         if level_data and isinstance(level_data, dict):
+                             cat_id = level_data.get("category_id")
+                             cat_name = level_data.get("category_name")
+                             level_not_possible = level_data.get("classification_not_possible", True)
+
+                             if cat_id and cat_name and cat_id not in ["N/A", "ERROR"] and not level_not_possible:
+                                 new_result_data[f"level{level}_id"] = cat_id
+                                 new_result_data[f"level{level}_name"] = cat_name
+                                 achieved_level = level
+                                 final_confidence = level_data.get("confidence", 0.0)
+                                 final_notes = level_data.get("notes") # Store notes from the deepest successful level
+                                 final_status = "Classified"
+                             else:
+                                 # Stop populating further levels if this one failed or wasn't possible
+                                 if achieved_level == 0 and level == 1: # Capture reason from L1 failure
+                                     final_notes = level_data.get("classification_not_possible_reason") or level_data.get("notes")
+                                 break # Stop processing levels for this vendor
+                         else:
+                             # Stop if expected level data is missing
+                             if achieved_level == 0 and level == 1:
+                                 final_notes = "LLM response missing Level 1 data."
+                             break
+
+                     # Finalize the result item
+                     new_result_data["achieved_level"] = achieved_level
+                     new_result_data["final_status"] = final_status
+                     new_result_data["final_confidence"] = final_confidence
+                     new_result_data["classification_notes_or_reason"] = final_notes or f"Reclassified based on hint: {hint}"
+
+
                      new_result_model = JobResultItem(**new_result_data)
                      final_stats["successful_reclassifications"] += 1
-                     logger.info(f"Successfully reclassified '{vendor_name}' to '{new_result_model.level1_name}'.")
+                     logger.info(f"Successfully reclassified '{vendor_name}' to Level {achieved_level}: '{new_result_model.level1_name}{' -> ' + new_result_model.level2_name if achieved_level > 1 else ''}...'.")
 
                 else:
                      # Handle classification_not_possible or ERROR from LLM or missing L1 data
-                     reason = "LLM response did not include Level 1 data." # Default reason
-                     if llm_output_data:
-                         if l1_category_id == "ERROR":
-                             reason = llm_output_data.get("classification_not_possible_reason", "LLM returned ERROR")
+                     reason = "LLM response did not include valid Level 1 data." # Default reason
+                     if l1_data:
+                         if l1_category_id in ["ERROR", "N/A"]:
+                             reason = l1_data.get("classification_not_possible_reason", f"LLM returned '{l1_category_id}' for Level 1")
                          elif classification_not_possible:
-                             reason = llm_output_data.get("classification_not_possible_reason", "LLM indicated classification not possible")
+                             reason = l1_data.get("classification_not_possible_reason", "LLM indicated Level 1 classification not possible")
                          elif not l1_category_id or not l1_category_name:
                              reason = "LLM response missing Level 1 category_id or category_name."
-                     else:
-                         reason = "No response data received from LLM."
+                     elif llm_output_data is None:
+                         reason = "Failed to parse classification data from LLM response."
+                     else: # llm_output_data exists but no l1_data
+                         reason = "LLM response missing 'level1' field."
+
 
                      logger.warning(f"LLM could not reclassify '{vendor_name}' with hint. Reason: {reason}")
                      final_stats["failed_reclassifications"] += 1
@@ -233,7 +293,7 @@ async def process_reclassification(
                      )
 
             except Exception as llm_err:
-                logger.error(f"Error during LLM reclassification call for '{vendor_name}'", exc_info=True)
+                logger.error(f"Error during LLM reclassification call or processing for '{vendor_name}'", exc_info=True)
                 final_stats["failed_reclassifications"] += 1
                 new_result_model = JobResultItem( # Create error result
                     vendor_name=vendor_name,
