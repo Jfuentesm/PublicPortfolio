@@ -13,7 +13,7 @@
       </div>
       <div class="p-6 sm:p-8 space-y-6"> <!-- Increased spacing -->
 
-        <!-- Error Message -->
+        <!-- Error Message (Polling/General) -->
         <div v-if="errorMessage" class="p-3 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-md text-sm flex items-center">
             <ExclamationTriangleIcon class="h-5 w-5 mr-2 text-yellow-600 flex-shrink-0"/>
             <span>{{ errorMessage }}</span>
@@ -33,14 +33,13 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm border-b border-gray-100 pb-4">
           <div>
              <strong class="text-gray-600 block mb-1">Job ID:</strong>
-             <!-- Display the full ID for clarity during debugging -->
              <span class="text-gray-900 font-mono text-xs bg-gray-100 px-2 py-1 rounded break-all">{{ jobStore.currentJobId }}</span>
              <span v-if="jobDetails?.job_type === 'REVIEW'" class="ml-2 inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800 align-middle">REVIEW</span>
+             <span v-else-if="jobDetails?.job_type === 'CLASSIFICATION'" class="ml-2 inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 align-middle">CLASSIFICATION</span>
           </div>
            <div class="flex items-center space-x-2">
              <strong class="text-gray-600">Status:</strong>
              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide" :class="statusBadgeClass">
-                 <!-- Use jobDetails.status directly -->
                  {{ jobDetails?.status || 'Loading...' }}
              </span>
            </div>
@@ -50,7 +49,6 @@
         <div class="text-sm">
             <strong class="text-gray-600 block mb-1">Current Stage:</strong>
             <span class="text-gray-800 font-medium">{{ formattedStage }}</span>
-            <!-- Use jobDetails.error_message -->
             <div v-if="jobDetails?.status === 'failed' && jobDetails?.error_message" class="mt-3 p-4 bg-red-50 border border-red-200 text-red-800 rounded-md text-xs shadow-sm">
               <strong class="block mb-1 font-semibold">Error Details:</strong>
               <p class="whitespace-pre-wrap">{{ jobDetails.error_message }}</p> <!-- Preserve whitespace -->
@@ -74,9 +72,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-500 border-t border-gray-100 pt-5">
             <div>
                  <strong class="block text-gray-600 mb-0.5">Created:</strong>
-                 <!-- --- FIX: Use formattedCreatedAt computed property --- -->
                  <span>{{ formattedCreatedAt }}</span>
-                 <!-- --- END FIX --- -->
             </div>
             <div>
                  <strong class="block text-gray-600 mb-0.5">Updated:</strong>
@@ -121,27 +117,25 @@
           <button @click="downloadResults"
                   class="w-full flex justify-center items-center px-4 py-2.5 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   :disabled="isDownloadLoading">
-             <!-- Spinner SVG -->
              <svg v-if="isDownloadLoading" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
              </svg>
-             <!-- Download Icon -->
              <ArrowDownTrayIcon v-else class="h-5 w-5 mr-2 -ml-1" />
-            {{ isDownloadLoading ? ' Preparing Download...' : 'Download Excel Results' }} <!-- Updated Text -->
+            {{ isDownloadLoading ? ' Preparing Download...' : 'Download Excel Results' }}
           </button>
           <p v-if="downloadError" class="mt-2 text-xs text-red-600 text-center">{{ downloadError }}</p>
         </div>
 
         <!-- Stats Section (Rendered within JobStatus when complete) -->
-         <!-- Use jobDetails.id -->
          <JobStats v-if="jobDetails?.status === 'completed' && jobDetails?.id" :job-id="jobDetails.id" />
 
         <!-- ***** UPDATED: Conditional Detailed Results Table Section ***** -->
-        <!-- Show CLASSIFICATION results table -->
+        <!-- Show CLASSIFICATION results table (potentially integrated view) -->
         <JobResultsTable
             v-if="jobDetails?.status === 'completed' && jobDetails?.id && jobDetails?.job_type === 'CLASSIFICATION'"
-            :results="jobStore.jobResults as JobResultItem[] | null"
+            :original-results="jobStore.jobResults as JobResultItem[] | null"
+            :review-results="jobStore.relatedReviewResults"
             :loading="jobStore.resultsLoading"
             :error="jobStore.resultsError"
             :target-level="jobDetails.target_level || 5"
@@ -168,16 +162,17 @@
   <script setup lang="ts">
   import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
   import apiService from '@/services/api';
-  import { useJobStore, type JobDetails, type JobResultItem, type ReviewResultItem } from '@/stores/job';
+  // Import store and types (Removed JobDetails from here)
+  import { useJobStore, type JobResultItem, type ReviewResultItem } from '@/stores/job';
   import JobStats from './JobStats.vue';
+  // Import both results tables
   import JobResultsTable from './JobResultsTable.vue';
-  import ReviewResultsTable from './ReviewResultsTable.vue'; // Import the new component
+  import ReviewResultsTable from './ReviewResultsTable.vue';
   import { EnvelopeIcon, ArrowDownTrayIcon, ExclamationTriangleIcon, ArrowUturnLeftIcon, CheckCircleIcon } from '@heroicons/vue/20/solid';
 
   const POLLING_INTERVAL = 5000; // Poll every 5 seconds
   const jobStore = useJobStore();
-  // Use jobDetails directly from the store
-  const jobDetails = computed(() => jobStore.jobDetails);
+  const jobDetails = computed(() => jobStore.jobDetails); // Use jobDetails directly from the store
   const isLoading = ref(false); // Tracks if a poll request is currently in flight
   const errorMessage = ref<string | null>(null); // Stores polling or general errors
   const pollingIntervalId = ref<number | null>(null); // Stores the ID from setInterval
@@ -201,30 +196,22 @@
     if (status === 'failed') return 'Failed';
     if (status === 'pending') return 'Pending Start';
     if (!stage) return 'Loading...';
-
-    // Map internal stage names to user-friendly display names
     const stageNames: { [key: string]: string } = {
-      'ingestion': 'Ingesting File',
-      'normalization': 'Normalizing Data',
-      'classification_level_1': 'Classifying (L1)',
-      'classification_level_2': 'Classifying (L2)',
-      'classification_level_3': 'Classifying (L3)',
-      'classification_level_4': 'Classifying (L4)',
-      'classification_level_5': 'Classifying (L5)',
-      'search_unknown_vendors': 'Researching Vendors',
-      'reclassification': 'Re-classifying', // Added stage
-      'result_generation': 'Generating Results',
-      'pending': 'Pending Start', // Added pending stage mapping
+      'ingestion': 'Ingesting File', 'normalization': 'Normalizing Data',
+      'classification_level_1': 'Classifying (L1)', 'classification_level_2': 'Classifying (L2)',
+      'classification_level_3': 'Classifying (L3)', 'classification_level_4': 'Classifying (L4)',
+      'classification_level_5': 'Classifying (L5)', 'search_unknown_vendors': 'Researching Vendors',
+      'reclassification': 'Re-classifying', 'result_generation': 'Generating Results',
+      'pending': 'Pending Start',
     };
-    return stageNames[stage] || stage; // Fallback to raw stage name if not mapped
+    return stageNames[stage] || stage;
   });
 
   const progressPercent = computed(() => {
     const status = jobDetails.value?.status;
     const progress = jobDetails.value?.progress ?? 0;
     if (status === 'completed') return 100;
-    if (status === 'pending') return 0; // Show 0% for pending
-    // Ensure progress is between 0 and 100
+    if (status === 'pending') return 0;
     return Math.max(0, Math.min(100, Math.round(progress * 100)));
   });
 
@@ -232,8 +219,8 @@
       switch (jobDetails.value?.status) {
           case 'completed': return 'bg-green-100 text-green-800';
           case 'failed': return 'bg-red-100 text-red-800';
-          case 'processing': return 'bg-blue-100 text-blue-800 animate-pulse'; // Add pulse for processing
-          default: return 'bg-gray-100 text-gray-800'; // Pending or loading
+          case 'processing': return 'bg-blue-100 text-blue-800 animate-pulse';
+          default: return 'bg-gray-100 text-gray-800';
       }
   });
 
@@ -241,26 +228,20 @@
     const status = jobDetails.value?.status;
     if (status === 'completed') return 'bg-green-500';
     if (status === 'failed') return 'bg-red-500';
-    // Use primary color and pulse animation for processing/pending
     return 'bg-primary animate-pulse';
   });
 
   const formatDateTime = (isoString: string | null | undefined): string => {
       if (!isoString) return 'N/A';
       try {
-          // Use user's locale and common options
           return new Date(isoString).toLocaleString(undefined, {
               year: 'numeric', month: 'short', day: 'numeric',
               hour: 'numeric', minute: '2-digit', hour12: true
           });
-      } catch {
-          return 'Invalid Date';
-      }
+      } catch { return 'Invalid Date'; }
   };
 
-  // --- FIX: Re-add formattedCreatedAt ---
   const formattedCreatedAt = computed(() => formatDateTime(jobDetails.value?.created_at));
-  // --- END FIX ---
   const formattedUpdatedAt = computed(() => formatDateTime(jobDetails.value?.updated_at));
 
   const formattedEstimatedCompletion = computed(() => {
@@ -268,14 +249,10 @@
       if (status === 'completed' && jobDetails.value?.completed_at) {
           return formatDateTime(jobDetails.value.completed_at);
       }
-      // Assuming backend provides 'estimated_completion' during processing
-      // --- CHECK FIELD NAME ---
-      // Check if the field is 'estimated_completion' or something else in JobDetails
-      const estCompletion = jobDetails.value?.estimated_completion; // Use the actual field name
+      const estCompletion = jobDetails.value?.estimated_completion;
       if (status === 'processing' && estCompletion) {
           return `${formatDateTime(estCompletion)} (est.)`;
       }
-      // --- END CHECK ---
       if (status === 'processing') return 'Calculating...';
       if (status === 'failed') return 'N/A';
       if (status === 'pending') return 'Pending Start';
@@ -289,59 +266,53 @@
 
   // --- Methods ---
   const pollJobStatus = async (jobId: string | null | undefined) => {
-     // Check if we should still be polling this job
      if (!jobId || jobStore.currentJobId !== jobId) {
-         console.log(`JobStatus: [pollJobStatus] Stopping polling because jobId (${jobId}) doesn't match store (${jobStore.currentJobId}) or is null.`); // LOGGING
+         console.log(`JobStatus: [pollJobStatus] Stopping polling. Reason: Job ID mismatch or null. (Poll ID: ${jobId}, Store ID: ${jobStore.currentJobId})`);
          stopPolling();
          return;
      }
-
-     // Avoid concurrent polls
      if (isLoading.value) {
-         console.log(`JobStatus: [pollJobStatus] Skipping poll for ${jobId} as another poll is already in progress.`); // LOGGING
+         console.log(`JobStatus: [pollJobStatus] Skipping poll for ${jobId} - already in progress.`);
          return;
      }
 
      isLoading.value = true;
-     console.log(`JobStatus: [pollJobStatus] Polling status for job ${jobId}...`); // LOGGING
+     console.log(`JobStatus: [pollJobStatus] Polling status for job ${jobId}...`);
     try {
         const data = await apiService.getJobStatus(jobId);
-        // IMPORTANT: Check if the job ID is still the current one *after* the API call returns
         if (jobStore.currentJobId === jobId) {
-            console.log(`JobStatus: [pollJobStatus] Received status data for ${jobId}: Status=${data.status}, Progress=${data.progress}, Stage=${data.current_stage}, Type=${data.job_type}`); // LOGGING
-            jobStore.updateJobDetails(data); // Update the store
-            errorMessage.value = null; // Clear previous errors on successful poll
+            console.log(`JobStatus: [pollJobStatus] Received status for ${jobId}: Status=${data.status}, Progress=${data.progress}, Type=${data.job_type}`);
+            const previousStatus = jobStore.jobDetails?.status; // Store previous status before update
+            jobStore.updateJobDetails(data);
+            errorMessage.value = null;
 
-            // Stop polling if job is completed or failed
-            if (data.status === 'completed' || data.status === 'failed') {
-                console.log(`JobStatus: [pollJobStatus] Job ${jobId} reached terminal state (${data.status}). Stopping polling.`); // LOGGING
+            // Check if job just completed or failed
+            const justCompleted = data.status === 'completed' && previousStatus !== 'completed';
+            const justFailed = data.status === 'failed' && previousStatus !== 'failed';
+
+            if (justCompleted || justFailed) {
+                console.log(`JobStatus: [pollJobStatus] Job ${jobId} reached terminal state (${data.status}). Stopping polling.`);
                 stopPolling();
-                // --- UPDATED: Trigger results fetch if completed ---
-                if (data.status === 'completed') {
-                    console.log(`JobStatus: [pollJobStatus] Job ${jobId} completed. Triggering fetchJobResults.`); // LOGGING
-                    // Check if results are already loading or present before fetching again
-                    if (!jobStore.resultsLoading && !jobStore.jobResults) {
-                        jobStore.fetchJobResults(jobId); // Fetch detailed results
+                if (justCompleted) {
+                    console.log(`JobStatus: [pollJobStatus] Job ${jobId} completed. Triggering fetchCurrentJobResults.`);
+                    // Use the new action to fetch results (handles both types)
+                    if (!jobStore.resultsLoading && !jobStore.jobResults && !jobStore.relatedReviewResults) { // Check both result states
+                         jobStore.fetchCurrentJobResults();
                     } else {
-                         console.log(`JobStatus: [pollJobStatus] Job ${jobId} completed, but results already loading or present. Skipping fetch.`); // LOGGING
+                         console.log(`JobStatus: [pollJobStatus] Job ${jobId} completed, but results already loading or present. Skipping fetch.`);
                     }
                 }
-                // --- END UPDATED ---
             }
         } else {
-             console.log(`JobStatus: [pollJobStatus] Job ID changed from ${jobId} to ${jobStore.currentJobId} during API call. Ignoring stale data.`); // LOGGING
-             // Don't update the store with stale data
+             console.log(`JobStatus: [pollJobStatus] Job ID changed during API call for ${jobId}. Ignoring stale data.`);
         }
     } catch (error: any) {
-        console.error(`JobStatus: [pollJobStatus] Error polling status for ${jobId}:`, error); // LOGGING
-        // Only set error if the failed poll was for the *current* job ID
+        console.error(`JobStatus: [pollJobStatus] Error polling status for ${jobId}:`, error);
         if (jobStore.currentJobId === jobId) {
             errorMessage.value = `Polling Error: ${error.message || 'Failed to fetch status.'}`;
         }
-        // Consider retrying after a longer interval before stopping completely
-        stopPolling(); // Stop polling on error for now
+        stopPolling();
     } finally {
-        // Only set isLoading to false if the poll was for the current job
         if (jobStore.currentJobId === jobId) {
             isLoading.value = false;
         }
@@ -350,21 +321,19 @@
 
   const startPolling = (jobId: string | null | undefined) => {
     if (!jobId) {
-        console.log("JobStatus: [startPolling] Cannot start polling, no jobId provided."); // LOGGING
+        console.log("JobStatus: [startPolling] Cannot start polling, no jobId provided.");
         return;
     }
-    stopPolling(); // Ensure any existing polling is stopped first
-    console.log(`JobStatus: [startPolling] Starting polling for job ${jobId}.`); // LOGGING
+    stopPolling();
+    console.log(`JobStatus: [startPolling] Starting polling for job ${jobId}.`);
     pollJobStatus(jobId); // Poll immediately
 
     pollingIntervalId.value = window.setInterval(() => {
-        console.log(`JobStatus: [setInterval] Checking poll condition for ${jobId}. Current store ID: ${jobStore.currentJobId}, Status: ${jobStore.jobDetails?.status}`); // LOGGING
-        // Check condition inside interval as well
+        console.log(`JobStatus: [setInterval] Checking poll condition for ${jobId}. Current store ID: ${jobStore.currentJobId}, Status: ${jobStore.jobDetails?.status}`);
         if (jobStore.currentJobId === jobId && jobStore.jobDetails?.status !== 'completed' && jobStore.jobDetails?.status !== 'failed') {
             pollJobStatus(jobId);
         } else {
-            console.log(`JobStatus: [setInterval] Condition not met, stopping polling.`); // LOGGING
-            // Stop if job ID changed or job finished between polls
+            console.log(`JobStatus: [setInterval] Condition not met for job ${jobId}, stopping polling.`);
             stopPolling();
         }
     }, POLLING_INTERVAL);
@@ -372,86 +341,72 @@
 
   const stopPolling = () => {
     if (pollingIntervalId.value !== null) {
-        console.log(`JobStatus: [stopPolling] Stopping polling interval ID ${pollingIntervalId.value}.`); // LOGGING
+        console.log(`JobStatus: [stopPolling] Stopping polling interval ID ${pollingIntervalId.value}.`);
         clearInterval(pollingIntervalId.value);
         pollingIntervalId.value = null;
-    } else {
-        // console.log(`JobStatus: [stopPolling] No active polling interval to stop.`); // LOGGING (Optional)
     }
   };
 
   const requestNotification = async () => {
-     // Use jobDetails.id
      const currentId = jobDetails.value?.id;
      if (!currentId || !notificationEmail.value) return;
      isNotifyLoading.value = true;
      notifyMessage.value = null;
      notifyMessageIsError.value = false;
-     console.log(`JobStatus: Requesting notification for ${currentId} to ${notificationEmail.value}`); // LOGGING
+     console.log(`JobStatus: Requesting notification for ${currentId} to ${notificationEmail.value}`);
     try {
         const response = await apiService.requestNotification(currentId, notificationEmail.value);
-        console.log(`JobStatus: Notification request successful:`, response); // LOGGING
+        console.log(`JobStatus: Notification request successful:`, response);
         notifyMessage.value = response.message || 'Notification request sent!';
-        notificationEmail.value = ''; // Clear input on success
+        notificationEmail.value = '';
     } catch (error: any) {
-        console.error(`JobStatus: Notification request failed:`, error); // LOGGING
+        console.error(`JobStatus: Notification request failed:`, error);
         notifyMessage.value = `Error: ${error.message || 'Failed to send request.'}`;
         notifyMessageIsError.value = true;
     } finally {
         isNotifyLoading.value = false;
-        // Clear message after a delay
         setTimeout(() => { notifyMessage.value = null; }, 5000);
     }
   };
 
   const downloadResults = async () => {
-     // Use jobDetails.id
      const currentId = jobDetails.value?.id;
      if (!currentId) return;
      isDownloadLoading.value = true;
      downloadError.value = null;
-     console.log(`JobStatus: Attempting download for ${currentId}`); // LOGGING
+     console.log(`JobStatus: Attempting download for ${currentId}`);
     try {
         const { blob, filename } = await apiService.downloadResults(currentId);
-        console.log(`JobStatus: Download blob received, filename: ${filename}`); // LOGGING
+        console.log(`JobStatus: Download blob received, filename: ${filename}`);
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        console.log(`JobStatus: Download triggered for ${filename}`); // LOGGING
+        a.style.display = 'none'; a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
+        window.URL.revokeObjectURL(url); document.body.removeChild(a);
+        console.log(`JobStatus: Download triggered for ${filename}`);
     } catch (error: any) {
-        console.error(`JobStatus: Download failed:`, error); // LOGGING
+        console.error(`JobStatus: Download failed:`, error);
         downloadError.value = `Download failed: ${error.message || 'Could not download results.'}`;
     } finally {
         isDownloadLoading.value = false;
     }
   };
 
-  // --- ADDED: Reclassification Submission ---
+  // --- Reclassification Submission Handler ---
   const handleSubmitFlags = async () => {
     console.log("JobStatus: Handling submit flags event...");
     const reviewJobId = await jobStore.submitFlagsForReview();
     if (reviewJobId) {
-        // Show success message
         showReclassifySuccessMessage.value = true;
-        // Hide message after a delay
         setTimeout(() => { showReclassifySuccessMessage.value = false; }, 7000);
-        // Optionally fetch history to update the list
-        jobStore.fetchJobHistory();
-        // Do NOT automatically navigate - let user click the link in the success message
-        // jobStore.setCurrentJobId(reviewJobId);
+        jobStore.fetchJobHistory(); // Refresh history list
     } else {
-        // Error is handled within the store and displayed by the table component
-        console.log("JobStatus: Flag submission failed (error handled in store).");
+        console.log("JobStatus: Flag submission failed (error handled in store/table).");
+        // Optionally show a generic error message here if needed, though specific errors are better shown near the button
     }
   };
 
-  // --- ADDED: Navigation ---
+  // --- Navigation ---
   const viewParentJob = () => {
       if (jobDetails.value?.parent_job_id) {
           jobStore.setCurrentJobId(jobDetails.value.parent_job_id);
@@ -463,104 +418,84 @@
        showReclassifySuccessMessage.value = false; // Hide message on navigation
   };
 
+  // --- Fetch Initial Data Function ---
+  const fetchInitialData = (jobId: string) => {
+      errorMessage.value = null; // Clear previous errors
+      const currentDetails = jobStore.jobDetails;
+
+      // Fetch details if they are missing OR if the ID matches but type/status might be stale
+      if (!currentDetails || currentDetails.id !== jobId) {
+           console.log(`JobStatus: Fetching initial details and starting polling for ${jobId}`);
+           startPolling(jobId); // Poll will fetch details
+      } else if (currentDetails.status === 'completed') {
+           console.log(`JobStatus: Job ${jobId} already completed. Fetching results if needed.`);
+           stopPolling();
+           // Use the new action to fetch results
+           if (!jobStore.resultsLoading && !jobStore.jobResults && !jobStore.relatedReviewResults) {
+                jobStore.fetchCurrentJobResults();
+           }
+      } else if (currentDetails.status === 'failed') {
+           console.log(`JobStatus: Job ${jobId} already failed. Not polling or fetching results.`);
+           stopPolling();
+      } else {
+           // Status is pending or processing, start polling
+           console.log(`JobStatus: Job ${jobId} is ${currentDetails.status}. Starting polling.`);
+           startPolling(jobId);
+      }
+  };
 
   // --- Lifecycle Hooks ---
   onMounted(() => {
-      console.log(`JobStatus: Mounted. Current job ID from store: ${jobStore.currentJobId}`); // LOGGING
+      console.log(`JobStatus: Mounted. Current job ID from store: ${jobStore.currentJobId}`);
       if (jobStore.currentJobId) {
-          errorMessage.value = null;
-          // Fetch initial details if not already present or if status is unknown/stale
-          // Use jobDetails.id for comparison
-          const currentDetails = jobStore.jobDetails;
-          // Fetch details if they are missing OR if the ID matches but type/status might be stale
-          if (!currentDetails || currentDetails.id !== jobStore.currentJobId) {
-              console.log(`JobStatus: Fetching initial details and starting polling for ${jobStore.currentJobId}`); // LOGGING
-              startPolling(jobStore.currentJobId);
-          } else if (currentDetails.status === 'completed') {
-              console.log(`JobStatus: Job ${jobStore.currentJobId} already completed. Fetching results if needed.`); // LOGGING
-              stopPolling(); // Ensure polling is stopped
-              // --- UPDATED: Fetch results only if not already present/loading ---
-              if (!jobStore.resultsLoading && !jobStore.jobResults) {
-                  jobStore.fetchJobResults(jobStore.currentJobId); // Fetch results if already completed on mount
-              }
-              // --- END UPDATED ---
-          } else if (currentDetails.status === 'failed') {
-              console.log(`JobStatus: Job ${jobStore.currentJobId} already failed. Not polling or fetching results.`); // LOGGING
-              stopPolling(); // Ensure polling is stopped
-          } else {
-              // Status is pending or processing, start polling
-              console.log(`JobStatus: Job ${jobStore.currentJobId} is ${currentDetails.status}. Starting polling.`); // LOGGING
-              startPolling(jobStore.currentJobId);
-          }
+          fetchInitialData(jobStore.currentJobId);
       }
   });
 
-
   onUnmounted(() => {
-      console.log("JobStatus: Unmounted, stopping polling."); // LOGGING
+      console.log("JobStatus: Unmounted, stopping polling.");
       stopPolling();
   });
 
   // --- Watchers ---
-  // Watch for changes in the store's currentJobId
-  watch(() => jobStore.currentJobId, (newJobId: string | null | undefined) => {
-      console.log(`JobStatus: Watched currentJobId changed to: ${newJobId}`); // LOGGING
+  watch(() => jobStore.currentJobId, (newJobId, oldJobId) => {
+      console.log(`JobStatus: Watched currentJobId changed from ${oldJobId} to: ${newJobId}`);
       showReclassifySuccessMessage.value = false; // Hide success message on job change
       if (newJobId) {
-          // Reset component state when job ID changes
+          // Reset component state related to the specific job
           errorMessage.value = null;
           downloadError.value = null;
           notifyMessage.value = null;
           notificationEmail.value = '';
           isDownloadLoading.value = false;
           isNotifyLoading.value = false;
-
-          // Fetch details or start polling if needed for the new job
-          const currentDetails = jobStore.jobDetails;
-          // Fetch details if they are missing OR if the ID matches but type/status might be stale
-          if (!currentDetails || currentDetails.id !== newJobId) {
-               console.log(`JobStatus: Fetching initial details and starting polling due to job ID change to ${newJobId}`); // LOGGING
-               startPolling(newJobId);
-          } else if (currentDetails.status === 'completed') {
-               console.log(`JobStatus: Job ${newJobId} already completed. Fetching results if needed.`); // LOGGING
-               stopPolling(); // Ensure polling is stopped
-               // --- UPDATED: Fetch results only if not already present/loading ---
-               if (!jobStore.resultsLoading && !jobStore.jobResults) {
-                    jobStore.fetchJobResults(newJobId); // Fetch results if already completed
-               }
-               // --- END UPDATED ---
-          } else if (currentDetails.status === 'failed') {
-               console.log(`JobStatus: Job ${newJobId} already failed. Not polling or fetching results.`); // LOGGING
-               stopPolling(); // Ensure polling is stopped
-          } else {
-               // Status is pending or processing, start polling
-               console.log(`JobStatus: Job ${newJobId} is ${currentDetails.status}. Starting polling.`); // LOGGING
-               startPolling(newJobId);
-          }
+          // Fetch data for the new job
+          fetchInitialData(newJobId);
       } else {
           // Job ID was cleared
-          console.log("JobStatus: Job ID cleared, stopping polling."); // LOGGING
+          console.log("JobStatus: Job ID cleared, stopping polling.");
           stopPolling();
       }
-  });
+  }, { immediate: false }); // Don't run immediately on mount, let onMounted handle initial load
 
-  // Watch for the job status changing to a terminal state (this handles updates from polling)
-  watch(() => jobStore.jobDetails?.status, (newStatus: JobDetails['status'] | undefined, oldStatus) => {
+  // Watch for the job status changing to completed (handles updates from polling)
+  // This watcher seems redundant now as the polling logic handles stopping and fetching results.
+  // Keep it for now as a potential backup, but consider removing if polling logic proves robust.
+  watch(() => jobStore.jobDetails?.status, (newStatus, oldStatus) => {
       const currentId = jobStore.currentJobId;
-      if (!currentId) return; // Don't do anything if no job is selected
+      if (!currentId || newStatus === oldStatus) return; // Only act on change for the current job
 
-      console.log(`JobStatus: Watched job status changed from ${oldStatus} to: ${newStatus} for job ${currentId}`); // LOGGING
+      console.log(`JobStatus: Watched job status changed from ${oldStatus} to: ${newStatus} for job ${currentId}`);
 
-      if (newStatus === 'completed' && oldStatus !== 'completed') {
-          console.log(`JobStatus: Job ${currentId} just completed. Stopping polling and fetching results if needed.`); // LOGGING
-          stopPolling();
-          // --- UPDATED: Fetch results only if not already present/loading ---
-          if (!jobStore.resultsLoading && !jobStore.jobResults) {
-            jobStore.fetchJobResults(currentId); // Fetch detailed results when status changes to completed
+      if (newStatus === 'completed') {
+          console.log(`JobStatus: Job ${currentId} completed (detected by status watcher). Ensuring results are fetched.`);
+          stopPolling(); // Ensure polling is stopped
+          // Use the new action to fetch results if not already loading/present
+          if (!jobStore.resultsLoading && !jobStore.jobResults && !jobStore.relatedReviewResults) {
+            jobStore.fetchCurrentJobResults();
           }
-          // --- END UPDATED ---
-      } else if (newStatus === 'failed' && oldStatus !== 'failed') {
-          console.log(`JobStatus: Job ${currentId} just failed. Stopping polling.`); // LOGGING
+      } else if (newStatus === 'failed') {
+          console.log(`JobStatus: Job ${currentId} failed (detected by status watcher). Ensuring polling is stopped.`);
           stopPolling();
       }
   });

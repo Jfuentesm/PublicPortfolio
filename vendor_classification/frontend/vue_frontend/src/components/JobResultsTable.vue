@@ -1,6 +1,14 @@
 <template>
   <div class="mt-8 p-4 sm:p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner">
-    <h5 class="text-lg font-semibold text-gray-800 mb-4">Detailed Classification Results</h5>
+    <h5 class="text-lg font-semibold text-gray-800 mb-4">
+      {{ isIntegratedView ? 'Integrated Classification Results' : 'Detailed Classification Results' }}
+    </h5>
+    <p v-if="isIntegratedView" class="text-sm text-gray-600 mb-4">
+      Showing original classification results alongside the latest reviewed results (if available). Target level: **Level {{ targetLevel }}**.
+    </p>
+     <p v-else class="text-sm text-gray-600 mb-4">
+      Target classification level for this job was **Level {{ targetLevel }}**.
+    </p>
 
     <!-- Search Input -->
     <div class="mb-4">
@@ -13,7 +21,7 @@
           type="text"
           id="results-search"
           v-model="searchTerm"
-          placeholder="Search Vendor, Category, ID, Notes..."
+          placeholder="Search Vendor, Category, ID, Hint, Notes..."
           class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
         />
       </div>
@@ -46,7 +54,7 @@
     <div v-else-if="error" class="p-4 bg-red-100 border border-red-300 text-red-800 rounded-md text-sm">
       Error loading results: {{ error }}
     </div>
-    <div v-else-if="!results || results.length === 0" class="text-center py-5 text-gray-500">
+    <div v-else-if="!originalResults || originalResults.length === 0" class="text-center py-5 text-gray-500">
       No detailed results found for this job.
     </div>
 
@@ -55,16 +63,19 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-100">
           <tr>
-            <!-- Flag Column -->
-            <th scope="col" class="px-2 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-12">Flag</th>
+            <!-- Flag Column (Sticky) -->
+            <th scope="col" class="sticky left-0 z-10 bg-gray-100 px-2 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-12">Flag</th>
             <!-- Dynamically generate headers -->
-            <th v-for="header in headers" :key="header.key"
+            <th v-for="header in dynamicHeaders" :key="header.key"
                 scope="col"
                 @click="header.sortable ? sortBy(header.key) : null"
                 :class="[
-                  'px-3 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider',
+                  'px-3 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider whitespace-nowrap',
                    header.sortable ? 'cursor-pointer hover:bg-gray-200' : '',
-                   header.minWidth ? `min-w-[${header.minWidth}]` : ''
+                   header.sticky ? 'sticky left-[48px] z-10 bg-gray-100' : '', // Adjusted left offset for flag column
+                   header.minWidth ? `min-w-[${header.minWidth}]` : '',
+                   header.isOriginal && isIntegratedView ? 'bg-blue-50' : '', // Style original columns only in integrated view
+                   header.isNew ? 'bg-green-50' : '', // Style new columns
                 ]">
               {{ header.label }}
               <SortIcon v-if="header.sortable" :direction="sortKey === header.key ? sortDirection : null" />
@@ -72,14 +83,15 @@
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-if="filteredAndSortedResults.length === 0">
-            <td :colspan="headers.length + 1" class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No results match your search criteria.</td>
+          <tr v-if="filteredAndSortedItems.length === 0">
+            <td :colspan="dynamicHeaders.length + 1" class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No results match your search criteria.</td>
           </tr>
-          <tr v-for="(item, index) in filteredAndSortedResults" :key="item.vendor_name + '-' + index" class="hover:bg-gray-50 align-top" :class="{'bg-blue-50': jobStore.isFlagged(item.vendor_name)}">
-             <!-- Flag Button Cell -->
-             <td class="px-2 py-2 text-center align-middle">
+          <!-- Iterate through combined/processed items -->
+          <tr v-for="(item, index) in filteredAndSortedItems" :key="item.vendor_name + '-' + index" class="hover:bg-gray-50 align-top" :class="{'bg-indigo-50': jobStore.isFlagged(item.vendor_name)}">
+             <!-- Flag Button Cell (Sticky) -->
+             <td class="sticky left-0 z-10 bg-white px-2 py-2 text-center align-middle" :class="{'bg-indigo-50': jobStore.isFlagged(item.vendor_name)}">
                  <button
-                    @click="toggleFlag(item.vendor_name)"
+                    @click="toggleFlag(item.vendor_name, item.review_hint)"
                     :title="jobStore.isFlagged(item.vendor_name) ? 'Edit hint or remove flag' : 'Flag for re-classification'"
                     class="p-1 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary"
                     :class="jobStore.isFlagged(item.vendor_name) ? 'text-primary' : 'text-gray-400 hover:text-primary-dark'"
@@ -89,46 +101,14 @@
                     <span class="sr-only">Flag item</span>
                   </button>
              </td>
-             <!-- Data Cells -->
-            <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.vendor_name }}</td>
-            <!-- Level 1 -->
-            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item, 1)">{{ item.level1_id || '-' }}</td>
-            <td class="px-3 py-2 text-xs" :class="getCellClass(item, 1)">{{ item.level1_name || '-' }}</td>
-            <!-- Level 2 -->
-            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item, 2)">{{ item.level2_id || '-' }}</td>
-            <td class="px-3 py-2 text-xs" :class="getCellClass(item, 2)">{{ item.level2_name || '-' }}</td>
-            <!-- Level 3 -->
-            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item, 3)">{{ item.level3_id || '-' }}</td>
-            <td class="px-3 py-2 text-xs" :class="getCellClass(item, 3)">{{ item.level3_name || '-' }}</td>
-            <!-- Level 4 -->
-            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item, 4)">{{ item.level4_id || '-' }}</td>
-            <td class="px-3 py-2 text-xs" :class="getCellClass(item, 4)">{{ item.level4_name || '-' }}</td>
-            <!-- Level 5 -->
-            <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="getCellClass(item, 5)">{{ item.level5_id || '-' }}</td>
-            <td class="px-3 py-2 text-xs" :class="getCellClass(item, 5)">{{ item.level5_name || '-' }}</td>
-            <!-- Other columns -->
-            <td class="px-3 py-2 whitespace-nowrap text-sm text-center">
-              <span v-if="item.final_confidence !== null && item.final_confidence !== undefined"
-                    :class="getConfidenceClass(item.final_confidence)">
-                {{ (item.final_confidence * 100).toFixed(1) }}%
-              </span>
-              <span v-else class="text-gray-400 text-xs">N/A</span>
-            </td>
-            <td class="px-3 py-2 whitespace-nowrap text-xs text-center">
-               <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                    :class="getStatusClass(item.final_status)">
-                {{ item.final_status }}
-              </span>
-            </td>
-             <td class="px-3 py-2 whitespace-nowrap text-xs text-center">
-              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                    :class="item.classification_source === 'Search' ? 'bg-blue-100 text-blue-800' : (item.classification_source === 'Review' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800')">
-                {{ item.classification_source }}
-              </span>
-            </td>
-            <td class="px-3 py-2 text-xs text-gray-500 max-w-xs break-words">
-                 <!-- Show hint input if flagged -->
-                 <div v-if="jobStore.isFlagged(item.vendor_name)">
+             <!-- Vendor Name Cell (Sticky) -->
+             <td class="sticky left-[48px] z-10 bg-white px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900" :class="{'bg-indigo-50': jobStore.isFlagged(item.vendor_name)}">{{ item.vendor_name }}</td>
+
+             <!-- Hint Cell (Only in Integrated View) -->
+             <td v-if="isIntegratedView" class="px-3 py-2 text-xs text-gray-600 max-w-xs break-words">
+                 <span v-if="!jobStore.isFlagged(item.vendor_name)">{{ item.review_hint || '-' }}</span>
+                 <!-- Inline Hint Editor when Flagged -->
+                 <div v-else>
                     <label :for="'hint-' + index" class="sr-only">Hint for {{ item.vendor_name }}</label>
                     <textarea :id="'hint-' + index"
                               rows="2"
@@ -139,9 +119,89 @@
                     ></textarea>
                     <p v-if="!jobStore.getHint(item.vendor_name)" class="text-red-600 text-xs mt-1">Hint required for submission.</p>
                  </div>
-                 <!-- Show notes/reason if not flagged -->
-                 <span v-else>{{ item.classification_notes_or_reason || '-' }}</span>
-            </td>
+             </td>
+
+             <!-- Original Classification Columns -->
+             <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="[getCellClass(item.original_result, 1), isIntegratedView ? 'bg-blue-50' : '']">{{ item.original_result?.level1_id || '-' }}</td>
+             <td class="px-3 py-2 text-xs" :class="[getCellClass(item.original_result, 1), isIntegratedView ? 'bg-blue-50' : '']">{{ item.original_result?.level1_name || '-' }}</td>
+             <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="[getCellClass(item.original_result, 2), isIntegratedView ? 'bg-blue-50' : '']">{{ item.original_result?.level2_id || '-' }}</td>
+             <td class="px-3 py-2 text-xs" :class="[getCellClass(item.original_result, 2), isIntegratedView ? 'bg-blue-50' : '']">{{ item.original_result?.level2_name || '-' }}</td>
+             <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="[getCellClass(item.original_result, 3), isIntegratedView ? 'bg-blue-50' : '']">{{ item.original_result?.level3_id || '-' }}</td>
+             <td class="px-3 py-2 text-xs" :class="[getCellClass(item.original_result, 3), isIntegratedView ? 'bg-blue-50' : '']">{{ item.original_result?.level3_name || '-' }}</td>
+             <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="[getCellClass(item.original_result, 4), isIntegratedView ? 'bg-blue-50' : '']">{{ item.original_result?.level4_id || '-' }}</td>
+             <td class="px-3 py-2 text-xs" :class="[getCellClass(item.original_result, 4), isIntegratedView ? 'bg-blue-50' : '']">{{ item.original_result?.level4_name || '-' }}</td>
+             <td class="px-3 py-2 whitespace-nowrap text-xs font-mono" :class="[getCellClass(item.original_result, 5), isIntegratedView ? 'bg-blue-50' : '']">{{ item.original_result?.level5_id || '-' }}</td>
+             <td class="px-3 py-2 text-xs" :class="[getCellClass(item.original_result, 5), isIntegratedView ? 'bg-blue-50' : '']">{{ item.original_result?.level5_name || '-' }}</td>
+             <td class="px-3 py-2 whitespace-nowrap text-sm text-center" :class="isIntegratedView ? 'bg-blue-50' : ''">
+               <span v-if="item.original_result?.final_confidence !== null && item.original_result?.final_confidence !== undefined"
+                     :class="getConfidenceClass(item.original_result.final_confidence)">
+                 {{ (item.original_result.final_confidence * 100).toFixed(1) }}%
+               </span>
+               <span v-else class="text-gray-400 text-xs">N/A</span>
+             </td>
+             <td class="px-3 py-2 whitespace-nowrap text-xs text-center" :class="isIntegratedView ? 'bg-blue-50' : ''">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                     :class="getStatusClass(item.original_result?.final_status)">
+                 {{ item.original_result?.final_status }}
+               </span>
+             </td>
+              <td class="px-3 py-2 whitespace-nowrap text-xs text-center" :class="isIntegratedView ? 'bg-blue-50' : ''">
+               <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                     :class="getSourceClass(item.original_result?.classification_source)">
+                 {{ item.original_result?.classification_source }}
+               </span>
+             </td>
+             <td class="px-3 py-2 text-xs text-gray-500 max-w-xs break-words" :class="isIntegratedView ? 'bg-blue-50' : ''">
+                  <!-- Show hint input if flagged, otherwise original notes -->
+                  <div v-if="jobStore.isFlagged(item.vendor_name) && !isIntegratedView">
+                     <label :for="'hint-' + index" class="sr-only">Hint for {{ item.vendor_name }}</label>
+                     <textarea :id="'hint-' + index"
+                               rows="2"
+                               :value="jobStore.getHint(item.vendor_name)"
+                               @input="updateHint(item.vendor_name, ($event.target as HTMLTextAreaElement).value)"
+                               placeholder="Enter hint..."
+                               class="block w-full text-xs rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                     ></textarea>
+                     <p v-if="!jobStore.getHint(item.vendor_name)" class="text-red-600 text-xs mt-1">Hint required for submission.</p>
+                  </div>
+                  <span v-else>{{ item.original_result?.classification_notes_or_reason || '-' }}</span>
+             </td>
+
+             <!-- New Classification Columns (Only in Integrated View) -->
+             <template v-if="isIntegratedView">
+                <td class="px-3 py-2 whitespace-nowrap text-xs font-mono bg-green-50" :class="getCellClass(item.new_result, 1)">{{ item.new_result?.level1_id || '-' }}</td>
+                <td class="px-3 py-2 text-xs bg-green-50" :class="getCellClass(item.new_result, 1)">{{ item.new_result?.level1_name || '-' }}</td>
+                <td class="px-3 py-2 whitespace-nowrap text-xs font-mono bg-green-50" :class="getCellClass(item.new_result, 2)">{{ item.new_result?.level2_id || '-' }}</td>
+                <td class="px-3 py-2 text-xs bg-green-50" :class="getCellClass(item.new_result, 2)">{{ item.new_result?.level2_name || '-' }}</td>
+                <td class="px-3 py-2 whitespace-nowrap text-xs font-mono bg-green-50" :class="getCellClass(item.new_result, 3)">{{ item.new_result?.level3_id || '-' }}</td>
+                <td class="px-3 py-2 text-xs bg-green-50" :class="getCellClass(item.new_result, 3)">{{ item.new_result?.level3_name || '-' }}</td>
+                <td class="px-3 py-2 whitespace-nowrap text-xs font-mono bg-green-50" :class="getCellClass(item.new_result, 4)">{{ item.new_result?.level4_id || '-' }}</td>
+                <td class="px-3 py-2 text-xs bg-green-50" :class="getCellClass(item.new_result, 4)">{{ item.new_result?.level4_name || '-' }}</td>
+                <td class="px-3 py-2 whitespace-nowrap text-xs font-mono bg-green-50" :class="getCellClass(item.new_result, 5)">{{ item.new_result?.level5_id || '-' }}</td>
+                <td class="px-3 py-2 text-xs bg-green-50" :class="getCellClass(item.new_result, 5)">{{ item.new_result?.level5_name || '-' }}</td>
+                <td class="px-3 py-2 whitespace-nowrap text-sm text-center bg-green-50">
+                  <span v-if="item.new_result?.final_confidence !== null && item.new_result?.final_confidence !== undefined"
+                        :class="getConfidenceClass(item.new_result.final_confidence)">
+                    {{ (item.new_result.final_confidence * 100).toFixed(1) }}%
+                  </span>
+                  <span v-else class="text-gray-400 text-xs">N/A</span>
+                </td>
+                <td class="px-3 py-2 whitespace-nowrap text-xs text-center bg-green-50">
+                   <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                        :class="getStatusClass(item.new_result?.final_status)">
+                    {{ item.new_result?.final_status }}
+                  </span>
+                </td>
+                 <td class="px-3 py-2 whitespace-nowrap text-xs text-center bg-green-50">
+                   <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                        :class="getSourceClass(item.new_result?.classification_source)">
+                    {{ item.new_result?.classification_source }}
+                  </span>
+                 </td>
+                <td class="px-3 py-2 text-xs text-gray-500 max-w-xs break-words bg-green-50">
+                  {{ item.new_result?.classification_notes_or_reason || '-' }}
+                </td>
+             </template>
           </tr>
         </tbody>
       </table>
@@ -149,45 +209,48 @@
 
      <!-- Row Count -->
     <div class="mt-3 text-xs text-gray-500">
-      Showing {{ filteredAndSortedResults.length }} of {{ results?.length || 0 }} results.
+      Showing {{ filteredAndSortedItems.length }} of {{ originalResults?.length || 0 }} results.
     </div>
-
-    <!-- Pagination (Placeholder - Implement if needed for very large datasets) -->
-    <!-- <div class="mt-4 flex justify-between items-center"> ... </div> -->
-
-     <!-- Hint Input Modal (Alternative to inline editor) -->
-    <!-- <HintInputModal
-        :open="showHintModal"
-        :vendor-name="selectedVendorForHint"
-        :initial-hint="jobStore.getHint(selectedVendorForHint)"
-        @close="showHintModal = false"
-        @save="saveHint"
-    /> -->
 
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type PropType } from 'vue';
-import { useJobStore, type JobResultItem } from '@/stores/job'; // Use the updated interface
+import { ref, computed, type PropType, watch } from 'vue';
+import { useJobStore, type JobResultItem, type ReviewResultItem } from '@/stores/job';
 import { FlagIcon as FlagIconOutline, MagnifyingGlassIcon, PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/vue/24/outline';
 import { FlagIcon as FlagIconSolid, ChevronUpIcon, ChevronDownIcon, ChevronUpDownIcon } from '@heroicons/vue/20/solid';
-// import HintInputModal from './HintInputModal.vue'; // Import if using modal
 
 // --- Define Header Interface ---
 interface TableHeader {
-  key: keyof JobResultItem; // Use keyof JobResultItem here
+  key: string; // Use string for complex/nested keys or combined fields
   label: string;
   sortable: boolean;
+  sticky?: boolean;
   minWidth?: string;
+  isOriginal?: boolean; // Flag for styling/grouping
+  isNew?: boolean;      // Flag for styling/grouping
 }
-// --- END Define Header Interface ---
+
+// --- Define Combined Item Interface for internal use ---
+interface CombinedResultItem {
+    vendor_name: string;
+    original_result: JobResultItem;
+    review_hint: string | null; // Hint from review job
+    new_result: JobResultItem | null; // New result from review job (can be null if not reviewed)
+}
 
 // --- Props ---
 const props = defineProps({
-  results: {
-    type: Array as PropType<JobResultItem[] | null>, // This table handles JobResultItem
+  // Use JobResultItem[] for original results (always expected for CLASSIFICATION job view)
+  originalResults: {
+    type: Array as PropType<JobResultItem[] | null>,
     required: true,
+  },
+  // Use ReviewResultItem[] for related review results (optional)
+  reviewResults: {
+    type: Array as PropType<ReviewResultItem[] | null>,
+    default: null,
   },
   loading: {
     type: Boolean,
@@ -197,75 +260,154 @@ const props = defineProps({
     type: String as PropType<string | null>,
     default: null,
   },
-  targetLevel: { // Pass the job's target level
+  targetLevel: {
     type: Number,
     required: true,
   }
 });
 
-const emit = defineEmits(['submit-flags']); // Emit event when submit button is clicked
+const emit = defineEmits(['submit-flags']);
 
 // --- Store ---
 const jobStore = useJobStore();
 
 // --- Internal State ---
 const searchTerm = ref('');
-const sortKey = ref<keyof JobResultItem | null>('vendor_name'); // Default sort
-const sortDirection = ref<'asc' | 'desc' | null>('asc'); // Default sort direction
-// const showHintModal = ref(false); // State for modal
-// const selectedVendorForHint = ref(''); // State for modal
-
-// --- Table Headers Definition ---
-// --- UPDATED: Apply TableHeader type ---
-const headers = ref<TableHeader[]>([
-  { key: 'vendor_name', label: 'Vendor Name', sortable: true, minWidth: '150px' },
-  { key: 'level1_id', label: 'L1 ID', sortable: true, minWidth: '80px' },
-  { key: 'level1_name', label: 'L1 Name', sortable: true, minWidth: '150px' },
-  { key: 'level2_id', label: 'L2 ID', sortable: true, minWidth: '80px' },
-  { key: 'level2_name', label: 'L2 Name', sortable: true, minWidth: '150px' },
-  { key: 'level3_id', label: 'L3 ID', sortable: true, minWidth: '80px' },
-  { key: 'level3_name', label: 'L3 Name', sortable: true, minWidth: '150px' },
-  { key: 'level4_id', label: 'L4 ID', sortable: true, minWidth: '80px' },
-  { key: 'level4_name', label: 'L4 Name', sortable: true, minWidth: '150px' },
-  { key: 'level5_id', label: 'L5 ID', sortable: true, minWidth: '80px' },
-  { key: 'level5_name', label: 'L5 Name', sortable: true, minWidth: '150px' },
-  { key: 'final_confidence', label: 'Confidence', sortable: true, minWidth: '100px' },
-  { key: 'final_status', label: 'Status', sortable: true, minWidth: '100px' },
-  { key: 'classification_source', label: 'Source', sortable: true, minWidth: '80px' },
-  { key: 'classification_notes_or_reason', label: 'Hint / Notes / Reason', sortable: false, minWidth: '200px' }, // Combined column
-]);
-// --- END UPDATED ---
+const sortKey = ref<string | null>('vendor_name'); // Default sort key
+const sortDirection = ref<'asc' | 'desc' | null>('asc');
 
 // --- Computed Properties ---
 
-const filteredAndSortedResults = computed(() => {
-  // Ensure results is JobResultItem[] for this table
-  const resultsData = props.results as JobResultItem[] | null;
-  if (!resultsData) return [];
+const isIntegratedView = computed(() => !!props.reviewResults && props.reviewResults.length > 0);
 
-  let filtered = resultsData;
+// Combine original and review results into a single structure for easier iteration/filtering/sorting
+const combinedItems = computed((): CombinedResultItem[] => {
+    if (!props.originalResults) return [];
 
-  // Filtering (case-insensitive, searches across multiple relevant fields)
+    const reviewMap = new Map<string, ReviewResultItem>();
+    if (props.reviewResults) {
+        props.reviewResults.forEach(reviewItem => {
+            reviewMap.set(reviewItem.vendor_name, reviewItem);
+        });
+    }
+
+    return props.originalResults.map(originalItem => {
+        const reviewItem = reviewMap.get(originalItem.vendor_name);
+        return {
+            vendor_name: originalItem.vendor_name,
+            original_result: originalItem,
+            review_hint: reviewItem ? reviewItem.hint : null,
+            new_result: reviewItem ? reviewItem.new_result : null,
+        };
+    });
+});
+
+// Generate dynamic headers based on whether it's an integrated view
+const dynamicHeaders = computed((): TableHeader[] => {
+    const baseHeaders: TableHeader[] = [
+        { key: 'vendor_name', label: 'Vendor Name', sortable: true, sticky: true, minWidth: '150px' },
+    ];
+
+    const originalResultHeaders: TableHeader[] = [
+        { key: 'original_result.level1_id', label: 'L1 ID', sortable: true, minWidth: '80px', isOriginal: true },
+        { key: 'original_result.level1_name', label: 'L1 Name', sortable: true, minWidth: '120px', isOriginal: true },
+        { key: 'original_result.level2_id', label: 'L2 ID', sortable: true, minWidth: '80px', isOriginal: true },
+        { key: 'original_result.level2_name', label: 'L2 Name', sortable: true, minWidth: '120px', isOriginal: true },
+        { key: 'original_result.level3_id', label: 'L3 ID', sortable: true, minWidth: '80px', isOriginal: true },
+        { key: 'original_result.level3_name', label: 'L3 Name', sortable: true, minWidth: '120px', isOriginal: true },
+        { key: 'original_result.level4_id', label: 'L4 ID', sortable: true, minWidth: '80px', isOriginal: true },
+        { key: 'original_result.level4_name', label: 'L4 Name', sortable: true, minWidth: '120px', isOriginal: true },
+        { key: 'original_result.level5_id', label: 'L5 ID', sortable: true, minWidth: '80px', isOriginal: true },
+        { key: 'original_result.level5_name', label: 'L5 Name', sortable: true, minWidth: '120px', isOriginal: true },
+        { key: 'original_result.final_confidence', label: 'Confidence', sortable: true, minWidth: '100px', isOriginal: true },
+        { key: 'original_result.final_status', label: 'Status', sortable: true, minWidth: '100px', isOriginal: true },
+        { key: 'original_result.classification_source', label: 'Source', sortable: true, minWidth: '80px', isOriginal: true },
+        { key: 'original_result.classification_notes_or_reason', label: 'Notes/Reason', sortable: false, minWidth: '200px', isOriginal: true }, // Combined column for original notes
+    ];
+
+    const reviewHintHeader: TableHeader = { key: 'review_hint', label: 'User Hint', sortable: true, minWidth: '180px' };
+
+    const newResultHeaders: TableHeader[] = [
+        { key: 'new_result.level1_id', label: 'New L1 ID', sortable: true, minWidth: '80px', isNew: true },
+        { key: 'new_result.level1_name', label: 'New L1 Name', sortable: true, minWidth: '120px', isNew: true },
+        { key: 'new_result.level2_id', label: 'New L2 ID', sortable: true, minWidth: '80px', isNew: true },
+        { key: 'new_result.level2_name', label: 'New L2 Name', sortable: true, minWidth: '120px', isNew: true },
+        { key: 'new_result.level3_id', label: 'New L3 ID', sortable: true, minWidth: '80px', isNew: true },
+        { key: 'new_result.level3_name', label: 'New L3 Name', sortable: true, minWidth: '120px', isNew: true },
+        { key: 'new_result.level4_id', label: 'New L4 ID', sortable: true, minWidth: '80px', isNew: true },
+        { key: 'new_result.level4_name', label: 'New L4 Name', sortable: true, minWidth: '120px', isNew: true },
+        { key: 'new_result.level5_id', label: 'New L5 ID', sortable: true, minWidth: '80px', isNew: true },
+        { key: 'new_result.level5_name', label: 'New L5 Name', sortable: true, minWidth: '120px', isNew: true },
+        { key: 'new_result.final_confidence', label: 'New Confidence', sortable: true, minWidth: '100px', isNew: true },
+        { key: 'new_result.final_status', label: 'New Status', sortable: true, minWidth: '100px', isNew: true },
+        { key: 'new_result.classification_source', label: 'New Source', sortable: true, minWidth: '80px', isNew: true },
+        { key: 'new_result.classification_notes_or_reason', label: 'New Notes/Reason', sortable: false, minWidth: '200px', isNew: true },
+    ];
+
+    if (isIntegratedView.value) {
+        // Modify original notes header label
+        const origNotesHeader = originalResultHeaders.find(h => h.key === 'original_result.classification_notes_or_reason');
+        if (origNotesHeader) origNotesHeader.label = 'Orig Notes/Reason';
+
+        return [
+            ...baseHeaders,
+            reviewHintHeader, // Add hint column
+            ...originalResultHeaders,
+            ...newResultHeaders
+        ];
+    } else {
+        // Modify original notes header label and make it the hint column if flagged
+        const origNotesHeader = originalResultHeaders.find(h => h.key === 'original_result.classification_notes_or_reason');
+        if (origNotesHeader) origNotesHeader.label = 'Hint / Notes / Reason';
+        return [
+            ...baseHeaders,
+            ...originalResultHeaders
+        ];
+    }
+});
+
+// Helper to get nested values for filtering/sorting
+const getNestedValue = (obj: any, path: string): any => {
+  if (!obj) return null;
+  // Handle direct keys first
+  if (path.indexOf('.') === -1) {
+      return obj[path] ?? null;
+  }
+  // Handle nested keys
+  return path.split('.').reduce((value, key) => (value && value[key] !== undefined && value[key] !== null ? value[key] : null), obj);
+};
+
+const filteredAndSortedItems = computed(() => {
+  let filtered = combinedItems.value;
+
+  // Filtering
   if (searchTerm.value) {
     const lowerSearchTerm = searchTerm.value.toLowerCase();
-    filtered = filtered.filter(item =>
-      item.vendor_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level1_id?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level1_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level2_id?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level2_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level3_id?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level3_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level4_id?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level4_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level5_id?.toLowerCase().includes(lowerSearchTerm) ||
-      item.level5_name?.toLowerCase().includes(lowerSearchTerm) ||
-      item.classification_notes_or_reason?.toLowerCase().includes(lowerSearchTerm) ||
-      item.final_status?.toLowerCase().includes(lowerSearchTerm) ||
-      item.classification_source?.toLowerCase().includes(lowerSearchTerm) ||
-      // Include hint in search if vendor is flagged
-      (jobStore.isFlagged(item.vendor_name) && jobStore.getHint(item.vendor_name)?.toLowerCase().includes(lowerSearchTerm))
-    );
+    filtered = filtered.filter(item => {
+        // Search direct fields
+        if (item.vendor_name?.toLowerCase().includes(lowerSearchTerm)) return true;
+        if (isIntegratedView.value && item.review_hint?.toLowerCase().includes(lowerSearchTerm)) return true;
+
+        // Search original result fields (using header keys for consistency)
+        const originalHeaders = dynamicHeaders.value.filter(h => h.isOriginal);
+        for (const header of originalHeaders) {
+             const value = getNestedValue(item, header.key);
+             if (value && String(value).toLowerCase().includes(lowerSearchTerm)) return true;
+        }
+
+        // Search new result fields if integrated view
+        if (isIntegratedView.value) {
+            const newHeaders = dynamicHeaders.value.filter(h => h.isNew);
+            for (const header of newHeaders) {
+                const value = getNestedValue(item, header.key);
+                if (value && String(value).toLowerCase().includes(lowerSearchTerm)) return true;
+            }
+        }
+        // Search hint if flagged (even in non-integrated view)
+        if (jobStore.isFlagged(item.vendor_name) && jobStore.getHint(item.vendor_name)?.toLowerCase().includes(lowerSearchTerm)) return true;
+
+        return false; // No match
+    });
   }
 
   // Sorting
@@ -273,30 +415,28 @@ const filteredAndSortedResults = computed(() => {
     const key = sortKey.value;
     const direction = sortDirection.value === 'asc' ? 1 : -1;
 
-    // Use slice() to avoid sorting the original array directly if it's reactive
+    // Special handling for the hint column in non-integrated view
+    const effectiveSortKey = (!isIntegratedView.value && key === 'original_result.classification_notes_or_reason') ? 'hint_or_notes' : key;
+
     filtered = filtered.slice().sort((a, b) => {
-      // Handle sorting by hint if flagged
       let valA: any;
       let valB: any;
-      if (key === 'classification_notes_or_reason') {
-         valA = jobStore.isFlagged(a.vendor_name) ? jobStore.getHint(a.vendor_name) : a.classification_notes_or_reason;
-         valB = jobStore.isFlagged(b.vendor_name) ? jobStore.getHint(b.vendor_name) : b.classification_notes_or_reason;
+
+      if (effectiveSortKey === 'hint_or_notes') {
+          valA = jobStore.isFlagged(a.vendor_name) ? jobStore.getHint(a.vendor_name) : a.original_result?.classification_notes_or_reason;
+          valB = jobStore.isFlagged(b.vendor_name) ? jobStore.getHint(b.vendor_name) : b.original_result?.classification_notes_or_reason;
       } else {
-        // Type assertion needed because TypeScript can't guarantee key is valid for both a and b
-        valA = a[key as keyof JobResultItem];
-        valB = b[key as keyof JobResultItem];
+          valA = getNestedValue(a, key);
+          valB = getNestedValue(b, key);
       }
 
-
-      // Handle null/undefined values consistently (e.g., push them to the end)
       const aIsNull = valA === null || valA === undefined || valA === '';
       const bIsNull = valB === null || valB === undefined || valB === '';
 
       if (aIsNull && bIsNull) return 0;
-      if (aIsNull) return 1 * direction; // Nulls/empty last
-      if (bIsNull) return -1 * direction; // Nulls/empty last
+      if (aIsNull) return 1 * direction;
+      if (bIsNull) return -1 * direction;
 
-      // Type-specific comparison
       if (typeof valA === 'string' && typeof valB === 'string') {
         return valA.localeCompare(valB) * direction;
       }
@@ -304,8 +444,6 @@ const filteredAndSortedResults = computed(() => {
         return (valA - valB) * direction;
       }
 
-      // Fallback for other types or mixed types (simple comparison)
-      // Convert to string for consistent comparison if types differ or are complex
       const strA = String(valA).toLowerCase();
       const strB = String(valB).toLowerCase();
       if (strA < strB) return -1 * direction;
@@ -319,19 +457,17 @@ const filteredAndSortedResults = computed(() => {
 
 // --- Methods ---
 
-function sortBy(key: keyof JobResultItem) {
+function sortBy(key: string) {
   if (sortKey.value === key) {
-    // Cycle direction: asc -> desc -> null (no sort)
-    if (sortDirection.value === 'asc') {
-        sortDirection.value = 'desc';
-    } else if (sortDirection.value === 'desc') {
-        sortDirection.value = null;
-        sortKey.value = null; // Clear key if sort is disabled
-    } else { // Was null, start with asc
+    if (sortDirection.value === 'asc') sortDirection.value = 'desc';
+    else if (sortDirection.value === 'desc') {
+        sortDirection.value = null; // Cycle to no sort
+        sortKey.value = null;
+    } else { // Was null
         sortDirection.value = 'asc';
+        sortKey.value = key; // Re-apply key
     }
   } else {
-    // Start new sort
     sortKey.value = key;
     sortDirection.value = 'asc';
   }
@@ -353,30 +489,39 @@ function getStatusClass(status: string | null | undefined): string {
     }
 }
 
-// Highlight cells beyond the target classification depth
-function getCellClass(item: JobResultItem, level: number): string {
-    const baseClass = 'text-gray-700';
-    const beyondDepthClass = 'text-gray-400 italic'; // Style for beyond depth
-
-    // Check if the ID for this level exists and is not null/empty
-    const levelIdKey = `level${level}_id` as keyof JobResultItem;
-    const hasId = item[levelIdKey] !== null && item[levelIdKey] !== undefined && item[levelIdKey] !== '';
-
-    if (level > props.targetLevel && hasId) {
-        return beyondDepthClass;
+function getSourceClass(source: string | null | undefined): string {
+    switch(source?.toLowerCase()){
+        case 'initial': return 'bg-green-100 text-green-800';
+        case 'search': return 'bg-blue-100 text-blue-800';
+        case 'review': return 'bg-purple-100 text-purple-800'; // Added style for review source
+        default: return 'bg-gray-100 text-gray-800';
     }
+}
+
+// Highlight cells beyond the target classification depth or if ID is null/empty
+function getCellClass(item: JobResultItem | null | undefined, level: number): string {
+    const baseClass = 'text-gray-700';
+    const beyondDepthClass = 'text-gray-400 italic';
+    const nullClass = 'text-gray-400';
+
+    if (!item) return nullClass;
+
+    const levelIdKey = `level${level}_id` as keyof JobResultItem;
+    const hasId = item[levelIdKey] !== null && item[levelIdKey] !== undefined && String(item[levelIdKey]).trim() !== '';
+
+    if (!hasId) return nullClass;
+    if (level > props.targetLevel) return beyondDepthClass;
     return baseClass;
 }
 
 // --- Flagging and Hint Handling ---
-function toggleFlag(vendorName: string) {
+function toggleFlag(vendorName: string, reviewHint: string | null) {
     if (jobStore.isFlagged(vendorName)) {
         jobStore.unflagVendor(vendorName);
     } else {
-        jobStore.flagVendor(vendorName);
-        // If using modal:
-        // selectedVendorForHint.value = vendorName;
-        // showHintModal.value = true;
+        // Pre-populate hint with the review hint if available in integrated view, otherwise null
+        const initialHint = isIntegratedView.value ? reviewHint : null;
+        jobStore.flagVendor(vendorName, initialHint);
     }
 }
 
@@ -384,15 +529,8 @@ function updateHint(vendorName: string, hint: string) {
     jobStore.setHint(vendorName, hint);
 }
 
-// function saveHint(hint: string) {
-//     if (selectedVendorForHint.value) {
-//         jobStore.setHint(selectedVendorForHint.value, hint);
-//     }
-//     selectedVendorForHint.value = ''; // Clear selection
-// }
-
 async function submitFlags() {
-    emit('submit-flags'); // Notify parent (JobStatus) to handle submission logic
+    emit('submit-flags'); // Notify parent
 }
 
 
@@ -414,20 +552,55 @@ const SortIcon = {
   `,
 };
 
+// Watch for prop changes to potentially clear sort/filter (optional)
+watch(() => [props.originalResults, props.reviewResults], () => {
+    console.log("Results props changed, resetting sort/filter");
+    searchTerm.value = '';
+    sortKey.value = 'vendor_name';
+    sortDirection.value = 'asc';
+});
+
 </script>
 
 <style scoped>
-/* Add minimum width to table cells if needed for better layout */
-/* th, td { min-width: 100px; } */
-/* th:first-child, td:first-child { min-width: 150px; } */ /* Vendor Name */
-/* th:last-child, td:last-child { min-width: 200px; } */ /* Notes */
-
-/* Ensure table layout is fixed if content wrapping becomes an issue */
-/* table { table-layout: fixed; } */
-
-/* Style for cells beyond requested depth */
-.text-gray-400.italic {
-    /* Add a visual cue, e.g., slightly lighter background or border */
-    /* background-color: #f9fafb; */
+/* Ensure sticky header cells have appropriate background */
+thead th.sticky {
+  position: sticky;
+  background-color: #f3f4f6; /* bg-gray-100 */
 }
+
+/* Ensure sticky body cells have appropriate background */
+tbody td.sticky {
+    position: sticky;
+    background-color: inherit; /* Inherit from parent tr */
+}
+/* Ensure flagged rows inherit sticky background correctly */
+tbody tr.bg-indigo-50 td.sticky {
+    background-color: #e0e7ff; /* bg-indigo-50 */
+}
+
+
+/* Add slight borders for visual separation in integrated view */
+th.isOriginal, td.isOriginal {
+    border-left: 1px solid #e5e7eb; /* gray-200 */
+}
+th.isNew, td.isNew {
+    border-left: 1px solid #e5e7eb; /* gray-200 */
+}
+th:first-child, td:first-child { /* Flag column */
+    border-left: none;
+}
+th:nth-child(2), td:nth-child(2) { /* Vendor name column */
+     border-left: none;
+}
+/* Adjust border for hint column if it's the first after vendor name */
+th:nth-child(3), td:nth-child(3) {
+    border-left: v-bind("isIntegratedView ? '1px solid #e5e7eb' : 'none'");
+}
+
+/* REMOVED empty ruleset */
+/* Style for cells beyond requested depth */
+/* .text-gray-400.italic { */
+    /* background-color: #f9fafb; */
+/* } */
 </style>
