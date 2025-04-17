@@ -1,0 +1,47 @@
+<goal or issue to address>
+Okay, let's refine the user experience for reclassification based on your ideas, aiming for clarity and simplicity without overengineering.
+Here's a breakdown of an improved workflow and the necessary considerations:
+Core Idea: Treat reclassification as a special type of job (REVIEW job) that takes input from a previous CLASSIFICATION job and user hints. The results of this REVIEW job can then be optionally merged back into the original CLASSIFICATION job's results.
+Refined Workflow & UI/UX:
+Initiating Reclassification (From Original Job Results):
+On the JobStatus screen for a completed CLASSIFICATION job, the JobResultsTable (or ReviewResultsTable if viewing an already merged job) will show the results.
+Add a "Flag for Review" button/checkbox to each row (as implemented in JobResultsTable/ReviewResultsTable).
+When items are flagged, a "Submit Flags for Re-classification" button appears (as implemented).
+Clicking this button triggers the POST /{original_job_id}/reclassify endpoint, which creates a new Job record with job_type = REVIEW and queues the reclassify_flagged_vendors_task.
+UX: Provide immediate feedback that the review job has started (e.g., a success message with the new review job ID, potentially redirecting the user to the new job's status page).
+Viewing Reclassification Results (Review Job Status Screen):
+The user navigates to the status page for the REVIEW job (e.g., via Job History or the link provided after submission).
+The JobStatus component displays the details of this REVIEW job.
+When the REVIEW job status is COMPLETED:
+The ReviewResultsTable component is displayed.
+This table should clearly show:
+Vendor Name
+The Hint provided by the user for that vendor.
+The Original Classification details (L1-L5 ID/Name, Status, Confidence, Source). Use distinct styling (e.g., background color like bg-blue-50).
+The New Classification details obtained using the hint (L1-L5 ID/Name, Status, Confidence, Source='Review'). Use distinct styling (e.g., background color like bg-green-50).
+Simplification: Remove the proposed row-level "Accept" or "Provide New Hints" options here. The user already provided hints to get this result. If they disagree with the new result, they can flag it again from this screen (or the original job screen after merging) to start another review cycle. This avoids nested complexity.
+Merging Results:
+On the completed REVIEW job's status screen, add a button: "Merge Results into Original Job".
+This button should only be visible/enabled when the REVIEW job status is COMPLETED.
+Action: Clicking this button triggers a new backend endpoint.
+Backend Merge Endpoint:
+Endpoint: POST /api/v1/jobs/{review_job_id}/merge
+Logic:
+Fetch the REVIEW job (review_job_id). Verify it's COMPLETED and job_type == REVIEW.
+Get the parent_job_id from the REVIEW job.
+Fetch the original CLASSIFICATION job (parent_job_id). Verify it exists.
+Load the detailed_results from both jobs (List[ReviewResultItem] for review, List[JobResultItem] for original). Handle potential missing results gracefully.
+Create a map of the original job's results keyed by vendor_name for efficient updates.
+Iterate through the REVIEW job's results (List[ReviewResultItem]).
+For each review_item, get the vendor_name and the new_result (which is a dict matching JobResultItem).
+If the vendor_name exists in the original results map, replace the entry in the map with the new_result dict. Ensure the classification_source in the new_result is appropriately marked (e.g., 'Review').
+Convert the updated map back into a List[JobResultItem].
+Update the original CLASSIFICATION job's detailed_results field with this new list.
+Crucially: Trigger the regeneration of the downloadable Excel file for the original CLASSIFICATION job using the updated detailed_results. Update the output_file_name on the original job record.
+Add a flag/timestamp to the REVIEW job's stats indicating it has been merged (e.g., "merged_at": datetime.now().isoformat()) to prevent accidental double-merging and inform the UI.
+Commit the changes to both job records (original job's results/output file, review job's stats).
+Response: Success message, maybe the ID of the updated original job.
+Downloading Results:
+The primary download action should always be associated with the original CLASSIFICATION job (GET /api/v1/jobs/{original_job_id}/download).
+After the merge operation, downloading the results for the original job will automatically provide the spreadsheet with the updated, reclassified data, matching the original column structure (JobResultItem schema).
+The REVIEW job itself does not need a download button, as its purpose is intermediary.
