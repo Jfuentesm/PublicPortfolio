@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Risk Assessment - AIRisk</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="container app-header-container">
+            <a href="dashboard.html" class="logo">AIRisk</a>
+            
+            <div class="user-menu">
+                <div class="user-avatar">JS</div>
+                <span class="user-name">John Smith</span>
+                <i class="fas fa-chevron-down"></i>
+                
+                <div class="dropdown-menu">
+                    <ul>
+                        <li><a href="#"><i class="fas fa-user"></i> Profile</a></li>
+                        <li><a href="#"><i class="fas fa-cog"></i> Settings</a></li>
+                        <li><a href="#"><i class="fas fa-question-circle"></i> Help</a></li>
+                        <li><a href="index.html"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- App Container -->
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-menu">
+                <div class="menu-header">Main</div>
+                <ul>
+                    <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                    <li><a href="risk-identification.html"><i class="fas fa-search"></i> Risk Identification</a></li>
+                    <li><a href="risk-assessment.html" class="active"><i class="fas fa-balance-scale"></i> Risk Assessment</a></li>
+                    <li><a href="risk-register.html"><i class="fas fa-clipboard-list"></i> Risk Register</a></li>
+                </ul>
+                
+                <div class="menu-header">Mitigation</div>
+                <ul>
+                    <li><a href="mitigation-planning.html"><i class="fas fa-tasks"></i> Planning</a></li>
+                    <li><a href="my-tasks.html"><i class="fas fa-check-square"></i> My Tasks</a></li>
+                </ul>
+                
+                <div class="menu-header">Reports</div>
+                <ul>
+                    <li><a href="reports.html"><i class="fas fa-chart-bar"></i> Reports</a></li>
+                    <li><a href="analytics.html"><i class="fas fa-chart-line"></i> Analytics</a></li>
+                </ul>
+                
+                <div class="menu-header">Settings</div>
+                <ul>
+                    <li><a href="company-profile.html"><i class="fas fa-building"></i> Company Profile</a></li>
+                    <li><a href="users.html"><i class="fas fa-users"></i> Users</a></li>
+                    <li><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <h1>Risk Assessment</h1>
+            <p>Evaluate the likelihood and impact of identified risks to prioritize your mitigation efforts.</p>
+            
+            <div id="alert-container"></div>
+            
+            <!-- Assessment Setup -->
+            <div class="card mb-20">
+                <div class="card-header">
+                    <h3>Assessment Setup</h3>
+                </div>
+                <div class="card-body">
+                    <form id="assessment-setup-form">
+                        <div class="form-group">
+                            <label for="risk-register" class="form-label">Risk Register</label>
+                            <select id="risk-register" class="form-select">
+                                <option value="current">Current Risk Register (38 risks)</option>
+                                <option value="q1-2025">Q1 2025 Risk Register (32 risks)</option>
+                                <option value="q4-2024">Q4 2024 Risk Register (30 risks)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="assessment-rubric" class="form-label">Assessment Rubric</label>
+                            <select id="assessment-rubric" class="form-select">
+                                <option value="standard">Standard 5x5 Matrix</option>
+                                <option value="simplified">Simplified 3x3 Matrix</option>
+                                <option value="custom">Custom Rubric</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" id="ai-assist" class="form-check-input" checked>
+                                <label for="ai-assist">Use AI assistance for assessment</label>
+                            </div>
+                        </div>
+                        
+                        <button id="assess-risk-btn" type="button" class="btn">Start Assessment</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Assessment Results (Initially Hidden) -->
+            <div id="assessment-results" style="display: none;">
+                <!-- Risk Heatmap -->
+                <div class="card mb-20">
+                    <div class="card-header">
+                        <h3>Risk Heatmap</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="heatmap">
+                            <div class="heatmap-cell heatmap-medium-high">3</div>
+                            <div class="heatmap-cell heatmap-high">2</div>
+                            <div class="heatmap-cell heatmap-high">5</div>
+                            <div class="heatmap-cell heatmap-high">1</div>
+                            <div class="heatmap-cell heatmap-high">0</div>
+                            
+                            <div class="heatmap-cell heatmap-medium-low">4</div>
+                            <div class="heatmap-cell heatmap-medium">6</div>
+                            <div class="heatmap-cell heatmap-medium-high">3</div>
+                            <div class="heatmap-cell heatmap-high">2</div>
+                            <div class="heatmap-cell heatmap-high">0</div>
+                            
+                            <div class="heatmap-cell heatmap-low">2</div>
+                            <div class="heatmap-cell heatmap-medium-low">5</div>
+                            <div class="heatmap-cell heatmap-medium">3</div>
+                            <div class="heatmap-cell heatmap-medium-high">1</div>
+                            <div class="heatmap-cell heatmap-medium-high">0</div>
+                            
+                            <div class="heatmap-cell heatmap-low">1</div>
+                            <div class="heatmap-cell heatmap-low">0</div>
+                            <div class="heatmap-cell heatmap-medium-low">1</div>
+                            <div class="heatmap-cell heatmap-medium">0</div>
+                            <div class="heatmap-cell heatmap-medium">0</div>
+                            
+                            <div class="heatmap-cell heatmap-low">0</div>
+                            <div class="heatmap-cell heatmap-low">0</div>
+                            <div class="heatmap-cell heatmap-low">0</div>
+                            <div class="heatmap-cell heatmap-medium-low">0</div>
+                            <div class="heatmap-cell heatmap-medium-low">0</div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                            <div>
+                                <p><strong>Likelihood</strong> (vertical axis)</p>
+                                <div class="heatmap-axis">
+                                    <div class="heatmap-axis-item">Very Low</div>
+                                    <div class="heatmap-axis-item">Low</div>
+                                    <div class="heatmap-axis-item">Medium</div>
+                                    <div class="heatmap-axis-item">High</div>
+                                    <div class="heatmap-axis-item">Very High</div>
+                                </div>
+                            </div>
+                            <div>
+                                <p><strong>Impact</strong> (horizontal axis)</p>
+                                <div class="heatmap-axis">
+                                    <div class="heatmap-axis-item">Very Low</div>
+                                    <div class="heatmap-axis-item">Low</div>
+                                    <div class="heatmap-axis-item">Medium</div>
+                                    <div class="heatmap-axis-item">High</div>
+                                    <div class="heatmap-axis-item">Very High</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Assessment Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Assessment Results</h3>
+                        <div>
+                            <button class="btn btn-sm">Export</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Risk</th>
+                                        <th>Category</th>
+                                        <th>AI Likelihood</th>
+                                        <th>AI Impact</th>
+                                        <th>Final Score</th>
+                                        <th>Priority</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Data Breach Risk</td>
+                                        <td>Cybersecurity</td>
+                                        <td>4 (High)</td>
+                                        <td>5 (Very High)</td>
+                                        <td>20</td>
+                                        <td><span class="badge badge-danger">High</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" data-modal="risk-detail-modal">Review</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Supply Chain Disruption</td>
+                                        <td>Operational</td>
+                                        <td>4 (High)</td>
+                                        <td>4 (High)</td>
+                                        <td>16</td>
+                                        <td><span class="badge badge-danger">High</span></td>
+                                        <td>
+                                            <button class="btn btn-sm">Review</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Regulatory Non-Compliance</td>
+                                        <td>Compliance</td>
+                                        <td>3 (Medium)</td>
+                                        <td>5 (Very High)</td>
+                                        <td>15</td>
+                                        <td><span class="badge badge-danger">High</span></td>
+                                        <td>
+                                            <button class="btn btn-sm">Review</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Key Personnel Departure</td>
+                                        <td>Human Resources</td>
+                                        <td>3 (Medium)</td>
+                                        <td>4 (High)</td>
+                                        <td>12</td>
+                                        <td><span class="badge badge-warning">Medium</span></td>
+                                        <td>
+                                            <button class="btn btn-sm">Review</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Market Share Decline</td>
+                                        <td>Strategic</td>
+                                        <td>3 (Medium)</td>
+                                        <td>4 (High)</td>
+                                        <td>12</td>
+                                        <td><span class="badge badge-warning">Medium</span></td>
+                                        <td>
+                                            <button class="btn btn-sm">Review</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Risk Detail Modal -->
+    <div id="risk-detail-modal" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Data Breach Risk</h3>
+                <div class="modal-close">&times;</div>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <p>Cybersecurity</p>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <p>Risk of unauthorized access to sensitive customer data due to inadequate security controls.</p>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">AI Assessment</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <p><strong>Likelihood:</strong> 4 (High)</p>
+                            <p><strong>Justification:</strong> Recent industry trends show increasing frequency of attacks on similar companies. Your current security posture has some gaps in multi-factor authentication and endpoint protection.</p>
+                        </div>
+                        <div>
+                            <p><strong>Impact:</strong> 5 (Very High)</p>
+                            <p><strong>Justification:</strong> Given your customer data volume and compliance requirements (GDPR, CCPA), a breach would result in significant financial penalties, reputation damage, and potential legal action.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Your Assessment</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <label for="user-likelihood" class="form-label">Likelihood</label>
+                            <select id="user-likelihood" class="form-select">
+                                <option value="1">1 - Very Low</option>
+                                <option value="2">2 - Low</option>
+                                <option value="3">3 - Medium</option>
+                                <option value="4" selected>4 - High</option>
+                                <option value="5">5 - Very High</option>
+                            </select>
+                            <label for="likelihood-justification" class="form-label mt-20">Justification</label>
+                            <textarea id="likelihood-justification" class="form-control" rows="3"></textarea>
+                        </div>
+                        <div>
+                            <label for="user-impact" class="form-label">Impact</label>
+                            <select id="user-impact" class="form-select">
+                                <option value="1">1 - Very Low</option>
+                                <option value="2">2 - Low</option>
+                                <option value="3">3 - Medium</option>
+                                <option value="4">4 - High</option>
+                                <option value="5" selected>5 - Very High</option>
+                            </select>
+                            <label for="impact-justification" class="form-label mt-20">Justification</label>
+                            <textarea id="impact-justification" class="form-control" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button class="btn">Save Assessment</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+<script src="js/responsive-nav.js"></script>
+</body>
+</html>

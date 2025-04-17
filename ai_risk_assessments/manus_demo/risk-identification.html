@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Risk Identification - AIRisk</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="container app-header-container">
+            <a href="dashboard.html" class="logo">AIRisk</a>
+            
+            <div class="user-menu">
+                <div class="user-avatar">JS</div>
+                <span class="user-name">John Smith</span>
+                <i class="fas fa-chevron-down"></i>
+                
+                <div class="dropdown-menu">
+                    <ul>
+                        <li><a href="#"><i class="fas fa-user"></i> Profile</a></li>
+                        <li><a href="#"><i class="fas fa-cog"></i> Settings</a></li>
+                        <li><a href="#"><i class="fas fa-question-circle"></i> Help</a></li>
+                        <li><a href="index.html"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- App Container -->
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-menu">
+                <div class="menu-header">Main</div>
+                <ul>
+                    <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                    <li><a href="risk-identification.html" class="active"><i class="fas fa-search"></i> Risk Identification</a></li>
+                    <li><a href="risk-assessment.html"><i class="fas fa-balance-scale"></i> Risk Assessment</a></li>
+                    <li><a href="risk-register.html"><i class="fas fa-clipboard-list"></i> Risk Register</a></li>
+                </ul>
+                
+                <div class="menu-header">Mitigation</div>
+                <ul>
+                    <li><a href="mitigation-planning.html"><i class="fas fa-tasks"></i> Planning</a></li>
+                    <li><a href="my-tasks.html"><i class="fas fa-check-square"></i> My Tasks</a></li>
+                </ul>
+                
+                <div class="menu-header">Reports</div>
+                <ul>
+                    <li><a href="reports.html"><i class="fas fa-chart-bar"></i> Reports</a></li>
+                    <li><a href="analytics.html"><i class="fas fa-chart-line"></i> Analytics</a></li>
+                </ul>
+                
+                <div class="menu-header">Settings</div>
+                <ul>
+                    <li><a href="company-profile.html"><i class="fas fa-building"></i> Company Profile</a></li>
+                    <li><a href="users.html"><i class="fas fa-users"></i> Users</a></li>
+                    <li><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <h1>Risk Identification</h1>
+            <p>Identify potential risks relevant to your business context. Our AI will suggest risks based on your company profile and industry benchmarks.</p>
+            
+            <div id="alert-container"></div>
+            
+            <!-- Company Profile Summary -->
+            <div class="card mb-20">
+                <div class="card-header">
+                    <h3>Company Profile Summary</h3>
+                    <a href="company-profile.html" class="btn btn-sm">Edit Profile</a>
+                </div>
+                <div class="card-body">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                        <div>
+                            <p><strong>Company:</strong> Acme Inc.</p>
+                            <p><strong>Industry:</strong> Technology / Software</p>
+                            <p><strong>Size:</strong> Medium (100-250 employees)</p>
+                        </div>
+                        <div>
+                            <p><strong>Location:</strong> United States</p>
+                            <p><strong>Key Operations:</strong> Software Development, Cloud Services</p>
+                            <p><strong>Compliance Requirements:</strong> GDPR, CCPA, SOC 2</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- AI Risk Suggestion -->
+            <div class="card mb-20">
+                <div class="card-header">
+                    <h3>AI Risk Suggestion</h3>
+                </div>
+                <div class="card-body">
+                    <p>Let our AI analyze your company profile and suggest relevant risks from our proprietary database and industry benchmarks.</p>
+                    <button id="suggest-risks-btn" class="btn mt-20">Suggest Risks</button>
+                </div>
+            </div>
+            
+            <!-- Suggested Risks -->
+            <div id="suggested-risks" class="mb-20"></div>
+            
+            <!-- Manual Risk Entry -->
+            <div class="card mb-20">
+                <div class="card-header">
+                    <h3>Add Custom Risk</h3>
+                </div>
+                <div class="card-body">
+                    <form id="add-risk-form">
+                        <div class="form-group">
+                            <label for="risk-title" class="form-label">Risk Title</label>
+                            <input type="text" id="risk-title" class="form-control" placeholder="E.g., Data Breach Risk">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="risk-category" class="form-label">Category</label>
+                            <select id="risk-category" class="form-select">
+                                <option value="">Select a category</option>
+                                <option value="Cybersecurity">Cybersecurity</option>
+                                <option value="Operational">Operational</option>
+                                <option value="Financial">Financial</option>
+                                <option value="Strategic">Strategic</option>
+                                <option value="Compliance">Compliance</option>
+                                <option value="Reputational">Reputational</option>
+                                <option value="Human Resources">Human Resources</option>
+                                <option value="Legal">Legal</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="risk-description" class="form-label">Description</label>
+                            <textarea id="risk-description" class="form-control" rows="4" placeholder="Describe the risk in detail..."></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="risk-owner" class="form-label">Risk Owner</label>
+                            <select id="risk-owner" class="form-select">
+                                <option value="">Assign an owner</option>
+                                <option value="1">John Smith (You)</option>
+                                <option value="2">Sarah Johnson (IT Security Manager)</option>
+                                <option value="3">Michael Chen (Operations Director)</option>
+                                <option value="4">Lisa Rodriguez (Compliance Officer)</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn">Add Risk</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Risk Library -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Risk Library</h3>
+                </div>
+                <div class="card-body">
+                    <p>Browse our comprehensive library of standard risks by category.</p>
+                    
+                    <div class="tabs">
+                        <div class="tab active" data-tab="tab-cybersecurity">Cybersecurity</div>
+                        <div class="tab" data-tab="tab-operational">Operational</div>
+                        <div class="tab" data-tab="tab-financial">Financial</div>
+                        <div class="tab" data-tab="tab-strategic">Strategic</div>
+                        <div class="tab" data-tab="tab-compliance">Compliance</div>
+                    </div>
+                    
+                    <div id="tab-cybersecurity" class="tab-content active">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Risk</th>
+                                        <th>Description</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Data Breach</td>
+                                        <td>Unauthorized access to sensitive customer or business data due to inadequate security controls.</td>
+                                        <td><button class="btn btn-sm">Add to Register</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ransomware Attack</td>
+                                        <td>Malicious software that encrypts company data and demands payment for decryption keys.</td>
+                                        <td><button class="btn btn-sm">Add to Register</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Phishing Attacks</td>
+                                        <td>Social engineering attacks targeting employees to gain unauthorized access to systems or data.</td>
+                                        <td><button class="btn btn-sm">Add to Register</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Cloud Security Vulnerabilities</td>
+                                        <td>Security gaps in cloud infrastructure leading to potential data exposure or service disruption.</td>
+                                        <td><button class="btn btn-sm">Add to Register</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Insider Threats</td>
+                                        <td>Malicious or negligent actions by employees or contractors with access to sensitive systems.</td>
+                                        <td><button class="btn btn-sm">Add to Register</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="tab-operational" class="tab-content">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Risk</th>
+                                        <th>Description</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Supply Chain Disruption</td>
+                                        <td>Interruption in the flow of goods or services due to supplier issues or logistics problems.</td>
+                                        <td><button class="btn btn-sm">Add to Register</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Business Continuity Failure</td>
+                                        <td>Inability to maintain critical operations during or after a disruptive event.</td>
+                                        <td><button class="btn btn-sm">Add to Register</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Technology Infrastructure Failure</td>
+                                        <td>Critical system outages or failures impacting business operations.</td>
+                                        <td><button class="btn btn-sm">Add to Register</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Process Inefficiencies</td>
+                                        <td>Suboptimal operational processes leading to increased costs or reduced productivity.</td>
+                                        <td><button class="btn btn-sm">Add to Register</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Quality Control Issues</td>
+                                        <td>Defects or inconsistencies in products or services affecting customer satisfaction.</td>
+                                        <td><button class="btn btn-sm">Add to Register</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="tab-financial" class="tab-content">
+                        <!-- Financial risks content -->
+                    </div>
+                    
+                    <div id="tab-strategic" class="tab-content">
+                        <!-- Strategic risks content -->
+                    </div>
+                    
+                    <div id="tab-compliance" class="tab-content">
+                        <!-- Compliance risks content -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add Risk Form Handling
+            const addRiskForm = document.getElementById('add-risk-form');
+            
+            if (addRiskForm) {
+                addRiskForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const title = document.getElementById('risk-title').value;
+                    const category = document.getElementById('risk-category').value;
+                    const description = document.getElementById('risk-description').value;
+                    const owner = document.getElementById('risk-owner').value;
+                    
+                    // Simple validation
+                    if (!title || !category || !description) {
+                        const alertContainer = document.getElementById('alert-container');
+                        alertContainer.innerHTML = `
+                            <div class="alert alert-danger">
+                                Please fill in all required fields.
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    // Simulate successful addition
+                    const alertContainer = document.getElementById('alert-container');
+                    alertContainer.innerHTML = `
+                        <div class="alert alert-success">
+                            Risk "${title}" has been added to your risk register.
+                        </div>
+                    `;
+                    
+                    // Clear form
+                    addRiskForm.reset();
+                });
+            }
+        });
+    </script>
+<script src="js/responsive-nav.js"></script>
+</body>
+</html>
