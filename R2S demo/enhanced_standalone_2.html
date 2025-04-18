@@ -1668,6 +1668,65 @@
                 
                 <div class="card phase-impact">
                     <div class="card-header">
+                        <h3 class="card-title">Impact Analysis</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="deliverable-preview">
+                            <h4>Impact Assessment by Category (5-Year Horizon)</h4>
+                            <table class="preview-table">
+                                <thead>
+                                    <tr>
+                                        <th>Risk Category</th>
+                                        <th>Expected Impact</th>
+                                        <th>Worst Case</th>
+                                        <th>Best Case</th>
+                                        <th>Confidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Operational</td>
+                                        <td>4</td>
+                                        <td>5</td>
+                                        <td>3</td>
+                                        <td>High</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Compliance</td>
+                                        <td>3</td>
+                                        <td>4</td>
+                                        <td>2</td>
+                                        <td>Medium</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Financial</td>
+                                        <td>3</td>
+                                        <td>4</td>
+                                        <td>2</td>
+                                        <td>High</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Strategic</td>
+                                        <td>4</td>
+                                        <td>5</td>
+                                        <td>3</td>
+                                        <td>Medium</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Human Resources</td>
+                                        <td>2</td>
+                                        <td>3</td>
+                                        <td>1</td>
+                                        <td>High</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card phase-impact">
+                    <div class="card-header">
                         <h3 class="card-title">Risk Correlation Network</h3>
                     </div>
                     <div class="card-body">
@@ -1677,6 +1736,22 @@
                             <div class="network-node primary">Supply Chain<br>Disruption<br>(R1)</div>
                             <div class="network-node secondary">Increased Raw<br>Material Costs<br>(R3)</div>
                             <div class="network-node secondary">Loss of<br>Market Share<br>(R2)</div>
+                            <div class="network-node secondary" style="position: absolute; top: 20px; left: 20%; font-size: 0.8em;">
+                                Water Scarcity<br>
+                                <span style="font-size: 0.9em; color: #666;">Impact Level: 4</span>
+                            </div>
+                            <div class="network-node secondary" style="position: absolute; top: 20px; right: 20%; font-size: 0.8em;">
+                                Material Volatility<br>
+                                <span style="font-size: 0.9em; color: #666;">Impact Level: 5</span>
+                            </div>
+                            <div class="network-node secondary" style="position: absolute; bottom: 20px; left: 20%; font-size: 0.8em;">
+                                Biodiversity Loss<br>
+                                <span style="font-size: 0.9em; color: #666;">Impact Level: 3</span>
+                            </div>
+                            <div class="network-node secondary" style="position: absolute; bottom: 20px; right: 20%; font-size: 0.8em;">
+                                Resource Costs<br>
+                                <span style="font-size: 0.9em; color: #666;">Impact Level: 4</span>
+                            </div>
                         </div>
                         
                         <div class="deliverable-preview">
@@ -2085,8 +2160,8 @@
                                                     <th>Initiative</th>
                                                     <th>Description</th>
                                                     <th>Risks Addressed</th>
-                                                    <th>Investment</th>
-                                                    <th>ROI</th>
+                                                    <th>Investment Level</th>
+                                                    <th>Expected Impact</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -2094,22 +2169,22 @@
                                                     <td>Governance Framework</td>
                                                     <td>Establish sustainability governance structure</td>
                                                     <td>R7, R8</td>
-                                                    <td>$450K</td>
-                                                    <td>3.2x</td>
+                                                    <td>2</td>
+                                                    <td>4</td>
                                                 </tr>
                                                 <tr>
                                                     <td>Risk Management System</td>
                                                     <td>Implement enterprise risk management platform</td>
                                                     <td>R1, R3, R7</td>
-                                                    <td>$650K</td>
-                                                    <td>2.8x</td>
+                                                    <td>3</td>
+                                                    <td>4</td>
                                                 </tr>
                                                 <tr>
                                                     <td>Supplier Assessment</td>
                                                     <td>Develop supplier sustainability assessment program</td>
                                                     <td>R1, R3</td>
-                                                    <td>$380K</td>
-                                                    <td>3.5x</td>
+                                                    <td>2</td>
+                                                    <td>3</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -2125,8 +2200,8 @@
                                                     <th>Initiative</th>
                                                     <th>Description</th>
                                                     <th>Risks Addressed</th>
-                                                    <th>Investment</th>
-                                                    <th>ROI</th>
+                                                    <th>Investment Level</th>
+                                                    <th>Expected Impact</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -2134,22 +2209,22 @@
                                                     <td>Supply Chain Resilience</td>
                                                     <td>Diversify supplier base and implement redundancies</td>
                                                     <td>R1, R3</td>
-                                                    <td>$1.2M</td>
-                                                    <td>2.4x</td>
+                                                    <td>4</td>
+                                                    <td>5</td>
                                                 </tr>
                                                 <tr>
                                                     <td>Regulatory Compliance</td>
                                                     <td>Develop compliance monitoring system</td>
                                                     <td>R7</td>
-                                                    <td>$850K</td>
-                                                    <td>3.1x</td>
+                                                    <td>3</td>
+                                                    <td>4</td>
                                                 </tr>
                                                 <tr>
                                                     <td>Sustainability Training</td>
                                                     <td>Implement company-wide sustainability training</td>
                                                     <td>R8</td>
-                                                    <td>$520K</td>
-                                                    <td>2.2x</td>
+                                                    <td>2</td>
+                                                    <td>3</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -2165,8 +2240,8 @@
                                                     <th>Initiative</th>
                                                     <th>Description</th>
                                                     <th>Risks Addressed</th>
-                                                    <th>Investment</th>
-                                                    <th>ROI</th>
+                                                    <th>Investment Level</th>
+                                                    <th>Expected Impact</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -2174,22 +2249,22 @@
                                                     <td>Sustainability Analytics</td>
                                                     <td>Implement advanced analytics for sustainability metrics</td>
                                                     <td>R2, R7</td>
-                                                    <td>$980K</td>
-                                                    <td>2.6x</td>
+                                                    <td>3</td>
+                                                    <td>4</td>
                                                 </tr>
                                                 <tr>
                                                     <td>Green Manufacturing</td>
                                                     <td>Upgrade manufacturing processes for sustainability</td>
                                                     <td>R2, R3, R7</td>
-                                                    <td>$2.4M</td>
-                                                    <td>1.9x</td>
+                                                    <td>5</td>
+                                                    <td>5</td>
                                                 </tr>
                                                 <tr>
                                                     <td>Talent Development</td>
                                                     <td>Create sustainability career paths and expertise</td>
                                                     <td>R8</td>
-                                                    <td>$750K</td>
-                                                    <td>2.3x</td>
+                                                    <td>3</td>
+                                                    <td>3</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -2205,8 +2280,8 @@
                                                     <th>Initiative</th>
                                                     <th>Description</th>
                                                     <th>Risks Addressed</th>
-                                                    <th>Investment</th>
-                                                    <th>ROI</th>
+                                                    <th>Investment Level</th>
+                                                    <th>Expected Impact</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -2214,22 +2289,22 @@
                                                     <td>Sustainable Product Innovation</td>
                                                     <td>Develop new sustainable product lines</td>
                                                     <td>R2, R5</td>
-                                                    <td>$3.2M</td>
-                                                    <td>2.8x</td>
+                                                    <td>5</td>
+                                                    <td>5</td>
                                                 </tr>
                                                 <tr>
                                                     <td>Circular Economy Model</td>
                                                     <td>Implement closed-loop manufacturing system</td>
                                                     <td>R1, R3, R7</td>
-                                                    <td>$2.8M</td>
-                                                    <td>2.1x</td>
+                                                    <td>5</td>
+                                                    <td>4</td>
                                                 </tr>
                                                 <tr>
                                                     <td>Sustainability Leadership</td>
                                                     <td>Position company as industry sustainability leader</td>
                                                     <td>R2, R5</td>
-                                                    <td>$1.5M</td>
-                                                    <td>3.4x</td>
+                                                    <td>4</td>
+                                                    <td>5</td>
                                                 </tr>
                                             </tbody>
                                         </table>
