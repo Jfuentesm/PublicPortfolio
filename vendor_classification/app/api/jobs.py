@@ -46,10 +46,10 @@ async def list_jobs(
     limit: int = Query(100, ge=1, le=500, description="Maximum number of jobs to return"),
 ):
     """
-    List jobs for the current user. Admins can see all jobs (optional enhancement).
+    List jobs. Superusers see all jobs, regular users see only their own.
     Supports filtering by status, date range, type, and pagination.
     """
-    set_log_context({"username": current_user.username})
+    set_log_context({"username": current_user.username, "is_superuser": current_user.is_superuser}) # Log superuser status
     logger.info("Fetching job history", extra={
         "status_filter": status_filter,
         "job_type_filter": job_type_filter, # <<< ADDED Log
@@ -61,10 +61,13 @@ async def list_jobs(
 
     query = db.query(Job)
 
-    # Filter by user (Admins could potentially see all - add logic here if needed)
-    # For now, all users only see their own jobs
-    # if not current_user.is_superuser: # Example admin check
-    query = query.filter(Job.created_by == current_user.username)
+    # --- MODIFIED: Filter by user ONLY if not superuser ---
+    if not current_user.is_superuser:
+        logger.debug("Applying user filter for non-superuser.")
+        query = query.filter(Job.created_by == current_user.username)
+    else:
+        logger.debug("Skipping user filter for superuser.")
+    # --- END MODIFIED ---
 
     # Apply filters
     if status_filter:
@@ -99,9 +102,9 @@ async def read_job(
 ):
     """
     Retrieve details for a specific job by its ID.
-    Ensures the current user owns the job (or is an admin - future enhancement).
+    Ensures the current user owns the job or is an admin.
     """
-    set_log_context({"username": current_user.username, "target_job_id": job_id})
+    set_log_context({"username": current_user.username, "target_job_id": job_id, "is_superuser": current_user.is_superuser})
     logger.info(f"Fetching details for job ID: {job_id}")
 
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -110,13 +113,11 @@ async def read_job(
         logger.warning(f"Job not found", extra={"job_id": job_id})
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
 
-    # --- Authorization Check ---
-    # Ensure the user requesting the job is the one who created it
-    # (Or add admin override logic here if needed)
-    if job.created_by != current_user.username: # and not current_user.is_superuser:
+    # --- MODIFIED: Authorization Check (Allow Superusers) ---
+    if not current_user.is_superuser and job.created_by != current_user.username:
         logger.warning(f"Authorization failed: User '{current_user.username}' attempted to access job '{job_id}' owned by '{job.created_by}'")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this job")
-    # --- End Authorization Check ---
+    # --- END MODIFIED ---
 
     # LOGGING: Log the job details being returned, especially target_level and job_type
     logger.info(f"Returning details for job ID: {job_id}", extra={"job_status": job.status, "target_level": job.target_level, "job_type": job.job_type})
@@ -131,9 +132,10 @@ async def read_job_stats(
 ):
     """
     Retrieve processing statistics for a specific job.
+    Ensures the current user owns the job or is an admin.
     For REVIEW jobs, this might contain the input hints and merge status.
     """
-    set_log_context({"username": current_user.username, "target_job_id": job_id})
+    set_log_context({"username": current_user.username, "target_job_id": job_id, "is_superuser": current_user.is_superuser})
     logger.info(f"Fetching statistics for job ID: {job_id}")
 
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -142,10 +144,11 @@ async def read_job_stats(
         logger.warning(f"Job not found for stats", extra={"job_id": job_id})
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
 
-    # Authorization Check (same as read_job)
-    if job.created_by != current_user.username: # and not current_user.is_superuser:
+    # --- MODIFIED: Authorization Check (Allow Superusers) ---
+    if not current_user.is_superuser and job.created_by != current_user.username:
         logger.warning(f"Authorization failed: User '{current_user.username}' attempted to access stats for job '{job_id}' owned by '{job.created_by}'")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access stats for this job")
+    # --- END MODIFIED ---
 
     # LOGGING: Log the raw stats being returned from the database
     logger.info(f"Returning statistics for job ID: {job_id}", extra={"job_type": job.job_type})
@@ -165,10 +168,11 @@ async def read_job_results(
 ):
     """
     Retrieve the detailed classification results for a specific completed job.
+    Ensures the current user owns the job or is an admin.
     Returns a structure containing the job_id, job_type, and a list of results
     (either JobResultItem or ReviewResultItem depending on the job_type).
     """
-    set_log_context({"username": current_user.username, "target_job_id": job_id})
+    set_log_context({"username": current_user.username, "target_job_id": job_id, "is_superuser": current_user.is_superuser})
     logger.info(f"Fetching detailed results for job ID: {job_id}")
 
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -177,10 +181,11 @@ async def read_job_results(
         logger.warning(f"Job not found for results", extra={"job_id": job_id})
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
 
-    # Authorization Check
-    if job.created_by != current_user.username: # and not current_user.is_superuser:
+    # --- MODIFIED: Authorization Check (Allow Superusers) ---
+    if not current_user.is_superuser and job.created_by != current_user.username:
         logger.warning(f"Authorization failed: User '{current_user.username}' attempted to access results for job '{job_id}' owned by '{job.created_by}'")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access results for this job")
+    # --- END MODIFIED ---
 
     # Check if job is completed and has results
     if job.status != JobStatus.COMPLETED.value:
@@ -212,13 +217,14 @@ async def download_job_results(
 ):
     """
     Downloads the output Excel file for a completed job.
+    Ensures the current user owns the job or is an admin.
     Note: Only generates Excel for CLASSIFICATION jobs.
     The file reflects the latest state, including merged review results.
     """
     from fastapi.responses import FileResponse # Import here
     # import os # Already imported above
 
-    set_log_context({"username": current_user.username, "target_job_id": job_id})
+    set_log_context({"username": current_user.username, "target_job_id": job_id, "is_superuser": current_user.is_superuser})
     logger.info(f"Request to download results for job ID: {job_id}")
 
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -227,10 +233,11 @@ async def download_job_results(
         logger.warning(f"Job not found for download", extra={"job_id": job_id})
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
 
-    # Authorization Check
-    if job.created_by != current_user.username: # and not current_user.is_superuser:
+    # --- MODIFIED: Authorization Check (Allow Superusers) ---
+    if not current_user.is_superuser and job.created_by != current_user.username:
         logger.warning(f"Authorization failed: User '{current_user.username}' attempted download for job '{job_id}' owned by '{job.created_by}'")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to download results for this job")
+    # --- END MODIFIED ---
 
     # --- Check if download is applicable ---
     if job.job_type == JobType.REVIEW.value:
@@ -273,8 +280,9 @@ async def reclassify_job_items(
     """
     Initiates a re-classification task for specific vendors from an original job,
     using user-provided hints. Creates a new REVIEW job.
+    Ensures the current user owns the original job or is an admin.
     """
-    set_log_context({"username": current_user.username, "original_job_id": original_job_id})
+    set_log_context({"username": current_user.username, "original_job_id": original_job_id, "is_superuser": current_user.is_superuser})
     logger.info(f"Received reclassification request for job {original_job_id}", extra={"item_count": len(payload.items)})
 
     # 1. Find the original job
@@ -283,10 +291,11 @@ async def reclassify_job_items(
         logger.warning(f"Original job {original_job_id} not found for reclassification.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Original job not found")
 
-    # 2. Authorization check (user owns the original job)
-    if original_job.created_by != current_user.username: # and not current_user.is_superuser:
+    # --- MODIFIED: Authorization Check (Allow Superusers) ---
+    if not current_user.is_superuser and original_job.created_by != current_user.username:
         logger.warning(f"Authorization failed: User '{current_user.username}' attempted reclassification for job '{original_job_id}' owned by '{original_job.created_by}'")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to reclassify items for this job")
+    # --- END MODIFIED ---
 
     # 3. Basic validation (ensure original job was classification, maybe check status?)
     if original_job.job_type != JobType.CLASSIFICATION.value:
@@ -312,7 +321,7 @@ async def reclassify_job_items(
         current_stage=ProcessingStage.RECLASSIFICATION.value, # Set initial stage to RECLASSIFICATION
         # --- END FIX ---
         progress=0.0,
-        created_by=current_user.username,
+        created_by=current_user.username, # The user initiating the review owns the review job
         target_level=original_job.target_level, # Inherit target level
         job_type=JobType.REVIEW.value, # Mark as REVIEW type
         parent_job_id=original_job_id, # Link back to the original job
@@ -339,7 +348,9 @@ async def reclassify_job_items(
     except Exception as e:
         logger.error(f"Failed to queue Celery reclassification task for review job {review_job_id}", exc_info=True)
         # Attempt to mark the created review job as failed
+        # Use the fail method on the Job instance
         review_job.fail(f"Failed to queue background task: {str(e)}")
+        db.add(review_job) # Need to add the updated job back to the session
         db.commit()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to queue reclassification task.")
 
@@ -356,9 +367,10 @@ async def merge_review_results(
 ):
     """
     Merges the results from a completed REVIEW job back into its parent CLASSIFICATION job.
+    Ensures the current user owns the review job or is an admin.
     Updates the parent job's detailed_results and triggers regeneration of its downloadable Excel file.
     """
-    set_log_context({"username": current_user.username, "review_job_id": review_job_id})
+    set_log_context({"username": current_user.username, "review_job_id": review_job_id, "is_superuser": current_user.is_superuser})
     logger.info(f"Received request to merge results for review job {review_job_id}")
 
     # 1. Fetch the REVIEW job
@@ -367,10 +379,11 @@ async def merge_review_results(
         logger.warning(f"Review job {review_job_id} not found for merging.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review job not found")
 
-    # 2. Authorization check (user owns the review job)
-    if review_job.created_by != current_user.username:
+    # --- MODIFIED: Authorization Check (Allow Superusers) ---
+    if not current_user.is_superuser and review_job.created_by != current_user.username:
         logger.warning(f"Authorization failed: User '{current_user.username}' attempted merge for job '{review_job_id}' owned by '{review_job.created_by}'")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to merge this review job")
+    # --- END MODIFIED ---
 
     # 3. Validation
     if review_job.job_type != JobType.REVIEW.value:
@@ -400,11 +413,11 @@ async def merge_review_results(
         logger.error(f"Parent job {parent_job.id} is not a CLASSIFICATION job.", extra={"parent_job_type": parent_job.job_type})
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent job is not a classification job.")
     if not parent_job.detailed_results:
-        logger.warning(f"Parent job {parent_job.id} has no detailed results to update. This is unusual but proceeding.", extra={"parent_job_id": parent_job.id})
+        logger.warning(f"Parent job {parent_job.id} has no detailed results to update. Initializing as empty list.", extra={"parent_job_id": parent_job.id})
         # Initialize as empty list if missing
         parent_job.detailed_results = []
 
-    set_log_context({"parent_job_id": parent_job.id})
+    set_log_context({"parent_job_id": parent_job.id}) # Add parent job ID to context
     logger.info(f"Found parent job {parent_job.id} for merging.")
 
     # 5. Load results and perform the merge
@@ -460,12 +473,8 @@ async def merge_review_results(
             logger.info(f"Successfully regenerated Excel file for parent job {parent_job.id}: {new_output_filename}")
         except Exception as excel_err:
             logger.error(f"Failed to regenerate Excel file for parent job {parent_job.id} during merge.", exc_info=True)
-            # Should we rollback the merge or proceed without the updated file?
-            # Let's proceed but log the error prominently. The results are still merged in the DB.
-            # Optionally, set output_file_name to None or keep the old one? Keeping old one for now.
-            # parent_job.output_file_name = None # Or keep existing?
-            # Raise an internal error to signal partial failure?
-            # For now, just log and continue with DB commit.
+            # Log the error prominently but continue with DB commit.
+            # The results are still merged in the DB.
 
         # 8. Mark the REVIEW job as merged in its stats
         if not review_job.stats:
@@ -474,6 +483,8 @@ async def merge_review_results(
         logger.info(f"Marked review job {review_job_id} as merged in stats.")
 
         # 9. Commit changes to both jobs
+        db.add(parent_job) # Ensure parent job changes are staged
+        db.add(review_job) # Ensure review job changes are staged
         db.commit()
         logger.info(f"Successfully committed changes for merge operation (Review Job: {review_job_id}, Parent Job: {parent_job.id}).")
 

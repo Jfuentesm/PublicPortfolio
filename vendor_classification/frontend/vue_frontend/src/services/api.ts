@@ -171,7 +171,7 @@ interface ReclassifyRequestItemData {
 // Matches backend schemas/review.py -> ReclassifyResponse
 interface ReclassifyResponseData {
     review_job_id: string;
-    message: string;
+    message: string; // Optional message if added in backend
 }
 // --- END ADDED ---
 
@@ -211,6 +211,13 @@ export interface RecentJobsResponse {
     jobs: RecentJobItem[];
 }
 // --- END ADDED: Admin Dashboard Interfaces ---
+
+// --- ADDED: Cancel Job Response Interface ---
+// Matches backend api/admin.py -> cancel_job response
+interface CancelJobResponse {
+    message: string;
+}
+// --- END ADDED ---
 
 
 // --- Axios Instance Setup ---
@@ -435,6 +442,7 @@ const apiService = {
 
     /**
         * Fetches a list of jobs for the current user, with optional filtering/pagination.
+        * (Superusers will receive all jobs from the backend).
         */
     async getJobs(params: GetJobsParams = {}): Promise<JobResponse[]> {
         const cleanedParams = Object.fromEntries(
@@ -596,6 +604,19 @@ const apiService = {
         return response.data;
     },
     // --- END ADDED: Admin Dashboard API Methods ---
+
+    // --- ADDED: Cancel Job API Method ---
+    /**
+     * Cancels a job (admin only).
+     */
+    async cancelJob(jobId: string): Promise<CancelJobResponse> {
+        console.log(`[api.ts cancelJob] Requesting cancellation for job ID: ${jobId}`);
+        // Uses axiosInstance, requires superuser auth token via interceptor
+        const response = await axiosInstance.post<CancelJobResponse>(`/admin/jobs/${jobId}/cancel`);
+        console.log(`[api.ts cancelJob] Cancellation response for job ${jobId}: ${response.data.message}`);
+        return response.data;
+    },
+    // --- END ADDED ---
 
 };
 
