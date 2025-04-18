@@ -12,19 +12,19 @@
           </svg>
           <span>Loading job history...</span>
         </div>
-  
+
         <!-- Error State -->
         <div v-else-if="historyError" class="p-4 bg-red-100 border border-red-300 text-red-800 rounded-md text-sm flex items-center">
           <ExclamationTriangleIcon class="h-5 w-5 mr-2 text-red-600 flex-shrink-0"/>
           <span>Error loading history: {{ historyError }}</span>
         </div>
-  
+
         <!-- Empty State -->
         <div v-else-if="!jobHistory || jobHistory.length === 0" class="text-center text-gray-500 py-8">
           <p>No job history found.</p>
           <p class="text-sm">Upload a file to start your first job.</p>
         </div>
-  
+
         <!-- History Table -->
         <div v-else class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
@@ -32,6 +32,9 @@
               <tr>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Job ID
+                </th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Type
                 </th>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Company
@@ -52,6 +55,11 @@
                 <td class="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-700">
                   {{ job.id.substring(0, 8) }}...
                 </td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                     <span v-if="job.job_type === 'REVIEW'" class="inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800 align-middle">REVIEW</span>
+                     <span v-else-if="job.job_type === 'CLASSIFICATION'" class="inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 align-middle">CLASSIFICATION</span>
+                     <span v-else class="text-xs text-gray-500">{{ job.job_type }}</span>
+                 </td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 font-medium">
                   {{ job.company_name }}
                 </td>
@@ -64,8 +72,9 @@
                   {{ formatDateTime(job.created_at) }}
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                  <!-- Download only for completed CLASSIFICATION jobs -->
                   <button
-                    v-if="job.status === 'completed'"
+                    v-if="job.status === 'completed' && job.job_type === 'CLASSIFICATION'"
                     @click.stop="downloadResults(job.id, $event)"
                     :disabled="isDownloadLoading(job.id)"
                     class="text-primary hover:text-primary-hover disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center"
@@ -79,6 +88,7 @@
                     <!-- <span class="ml-1">Download</span> -->
                   </button>
                   <span v-else-if="job.status === 'failed'" class="text-red-500 text-xs italic" title="Job Failed">Failed</span>
+                  <span v-else-if="job.job_type === 'REVIEW' && job.status === 'completed'" class="text-gray-400 text-xs italic" title="Review Job Completed (No Download)">Merged/Done</span>
                   <span v-else class="text-gray-400 text-xs italic" title="Processing or Pending">In Progress</span>
                   <!-- Add View Details button if needed -->
                   <!-- <button @click.stop="selectJob(job.id)" class="text-indigo-600 hover:text-indigo-900 ml-3">View</button> -->
@@ -87,42 +97,42 @@
             </tbody>
           </table>
         </div>
-  
+
         <!-- TODO: Add Pagination Controls if needed -->
-  
+
       </div>
     </div>
   </template>
-  
+
   <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue';
   import { useJobStore } from '@/stores/job';
   import { ExclamationTriangleIcon, ArrowDownTrayIcon } from '@heroicons/vue/20/solid';
   import apiService from '@/services/api';
-  
+
   const jobStore = useJobStore();
-  
+
   const jobHistory = computed(() => jobStore.jobHistory);
   const historyLoading = computed(() => jobStore.historyLoading);
   const historyError = computed(() => jobStore.historyError);
-  
+
   // State for managing individual download button loading
   const downloadingJobs = ref<Set<string>>(new Set());
   const downloadErrors = ref<Record<string, string | null>>({});
-  
+
   const isDownloadLoading = (jobId: string) => downloadingJobs.value.has(jobId);
-  
+
   const fetchHistory = async () => {
     await jobStore.fetchJobHistory({ limit: 100 }); // Fetch latest 100 jobs on mount
   };
-  
+
   const selectJob = (jobId: string) => {
     console.log(`JobHistory: Selecting job ${jobId}`);
     jobStore.setCurrentJobId(jobId);
     // Optional: Scroll to the top or to the JobStatus component
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  
+
   const formatDateTime = (isoString: string | null | undefined): string => {
     if (!isoString) return 'N/A';
     try {
@@ -134,7 +144,7 @@
       return 'Invalid Date';
     }
   };
-  
+
   const getStatusBadgeClass = (status: string | undefined) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
@@ -143,14 +153,14 @@
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-  
+
   const downloadResults = async (jobId: string, event: Event) => {
      event.stopPropagation(); // Prevent row click when clicking button
      if (!jobId || downloadingJobs.value.has(jobId)) return;
-  
+
      downloadingJobs.value.add(jobId);
      downloadErrors.value[jobId] = null;
-  
+
     try {
       const { blob, filename } = await apiService.downloadResults(jobId);
       const url = window.URL.createObjectURL(blob);
@@ -171,13 +181,13 @@
       downloadingJobs.value.delete(jobId);
     }
   };
-  
-  
+
+
   onMounted(() => {
     fetchHistory();
   });
   </script>
-  
+
   <style scoped>
   /* Add specific styles if needed */
   tbody tr:hover {

@@ -7,7 +7,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 import time
 import uuid
 import json
-
+from core import config
 from core.config import settings
 from core.logging_config import get_logger
 from core.log_context import set_log_context, get_correlation_id
@@ -26,7 +26,7 @@ class SearchService:
     def __init__(self):
         """Initialize the search service."""
         logger.info("Initializing Tavily Search service with key rotation")
-        self.api_keys = settings.TAVILY_API_KEYS
+        self.api_keys = config.MANUAL_TAVILY_API_KEYS
         self.base_url = "https://api.tavily.com"
         self.current_key_index = 0
 
@@ -102,6 +102,7 @@ class SearchService:
         try:
             logger.debug(f"Sending request to Tavily API using key index {self.current_key_index}")
 
+            # --- Log Request Payload (already present) ---
             payload_for_log = { # Redact key for logging
                 "api_key": f"[REDACTED_KEY_INDEX_{self.current_key_index}]",
                 "query": search_query,
@@ -111,12 +112,13 @@ class SearchService:
             }
             headers = {"Content-Type": "application/json"}
 
-            # Trace Logging for Request
+            # Trace Logging for Request (already present)
             try:
                 llm_trace_logger.debug(f"LLM_TRACE: Tavily Request Headers (Attempt ID: {search_attempt_id}):\n{json.dumps(headers, indent=2)}", extra={'correlation_id': correlation_id})
                 llm_trace_logger.debug(f"LLM_TRACE: Tavily Request Payload (Attempt ID: {search_attempt_id}):\n{json.dumps(payload_for_log, indent=2)}", extra={'correlation_id': correlation_id})
             except Exception as log_err:
                  llm_trace_logger.warning(f"LLM_TRACE: Failed to log Tavily request details (Attempt ID: {search_attempt_id}): {log_err}", extra={'correlation_id': correlation_id})
+            # --- End Log Request Payload ---
 
             actual_payload = payload_for_log.copy()
             actual_payload["api_key"] = current_api_key # Use the actual key for the request
@@ -130,11 +132,12 @@ class SearchService:
                         headers=headers,
                         timeout=30.0
                     )
+                    # --- Log Raw Response (already present) ---
                     api_duration = time.time() - start_time
                     raw_content = response.text
                     status_code = response.status_code
-                    # Trace Logging for Response
                     llm_trace_logger.debug(f"LLM_TRACE: Tavily Raw Response (Attempt ID: {search_attempt_id}, Status: {status_code}, Duration: {api_duration:.3f}s):\n-------\n{raw_content or '[No Content Received]'}\n-------", extra={'correlation_id': correlation_id})
+                    # --- End Log Raw Response ---
                     response.raise_for_status() # Raise HTTPStatusError for 4xx/5xx AFTER logging
                     response_data = response.json()
 
@@ -160,9 +163,10 @@ class SearchService:
              status_code = e.response.status_code
              logger.error(f"Tavily API HTTP error for vendor '{vendor_name}'", exc_info=False, # exc_info=False for less noise, trace log has it
                          extra={"status_code": status_code, "response": response_text, "key_index_used": self.current_key_index, "attempt_id": search_attempt_id})
+             # Log HTTP Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: Tavily API HTTP Error (Attempt ID: {search_attempt_id}): Status={status_code}, Response='{response_text}'", exc_info=True, extra={'correlation_id': correlation_id})
 
-             # --- Key Rotation Logic ---
+             # --- Key Rotation Logic (already present) ---
              if status_code in TAVILY_ROTATION_STATUS_CODES:
                  self._rotate_key() # Rotate if the status code matches
              else:
@@ -176,6 +180,7 @@ class SearchService:
              # Network errors (connection, timeout etc.)
              logger.error(f"Tavily API request error for vendor '{vendor_name}'", exc_info=False, # exc_info=False for less noise, trace log has it
                           extra={"error_details": str(e), "key_index_used": self.current_key_index, "attempt_id": search_attempt_id})
+             # Log Network Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: Tavily API Network Error (Attempt ID: {search_attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
              # Optionally rotate on specific network errors? Less common for key issues.
              # self._rotate_key()
@@ -185,6 +190,7 @@ class SearchService:
              # Handle cases where Tavily returns non-JSON response with 200 OK (unlikely but possible)
              logger.error(f"Failed to decode JSON response from Tavily for vendor '{vendor_name}'", exc_info=False,
                           extra={"response_preview": raw_content[:500] if raw_content else "N/A", "key_index_used": self.current_key_index, "attempt_id": search_attempt_id})
+             # Log JSON Decode Error (already present)
              llm_trace_logger.error(f"LLM_TRACE: Tavily JSON Decode Error (Attempt ID: {search_attempt_id}): {e}. Raw Content: {raw_content or 'N/A'}", exc_info=True, extra={'correlation_id': correlation_id})
              # Don't rotate key for JSON errors. Re-raise for tenacity.
              # Treat as a failure like other exceptions.
@@ -194,9 +200,8 @@ class SearchService:
             # Catch any other unexpected errors during the process
             logger.error(f"Unexpected error during Tavily search for vendor '{vendor_name}'", exc_info=True, # Include stack trace for unexpected
                          extra={"key_index_used": self.current_key_index, "attempt_id": search_attempt_id})
+            # Log Unexpected Error (already present)
             llm_trace_logger.error(f"LLM_TRACE: Tavily Unexpected Error (Attempt ID: {search_attempt_id}): {e}", exc_info=True, extra={'correlation_id': correlation_id})
             # Optionally rotate on unexpected errors? Could hide other issues.
             # self._rotate_key()
             raise # Re-raise for tenacity
-
-

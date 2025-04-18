@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - AIRisk</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <a href="index.html" class="logo">AIRisk</a>
+            </div>
+            <h2 class="auth-title">Create your account</h2>
+            
+            <div id="alert-container"></div>
+            
+            <form id="register-form">
+                <div class="form-group">
+                    <label for="name" class="form-label">Full Name</label>
+                    <input type="text" id="name" class="form-control" placeholder="John Smith" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="company" class="form-label">Company Name</label>
+                    <input type="text" id="company" class="form-control" placeholder="Acme Inc." required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email" class="form-label">Email address</label>
+                    <input type="email" id="email" class="form-control" placeholder="name@company.com" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm-password" class="form-label">Confirm Password</label>
+                    <input type="password" id="confirm-password" class="form-control" placeholder="••••••••" required>
+                </div>
+                
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" id="terms" class="form-check-input" required>
+                        <label for="terms">I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></label>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn" style="width: 100%;">Create account</button>
+            </form>
+            
+            <div class="auth-footer">
+                <p>Already have an account? <a href="login.html">Sign in</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const registerForm = document.getElementById('register-form');
+            
+            if (registerForm) {
+                registerForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const name = document.getElementById('name').value;
+                    const company = document.getElementById('company').value;
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    const confirmPassword = document.getElementById('confirm-password').value;
+                    const terms = document.getElementById('terms').checked;
+                    
+                    // Simple validation
+                    if (!name || !company || !email || !password) {
+                        const errorAlert = document.createElement('div');
+                        errorAlert.className = 'alert alert-danger';
+                        errorAlert.textContent = 'Please fill in all required fields.';
+                        
+                        const existingAlert = registerForm.querySelector('.alert');
+                        if (existingAlert) {
+                            existingAlert.remove();
+                        }
+                        
+                        const alertContainer = document.getElementById('alert-container');
+                        alertContainer.appendChild(errorAlert);
+                        return;
+                    }
+                    
+                    if (password !== confirmPassword) {
+                        const errorAlert = document.createElement('div');
+                        errorAlert.className = 'alert alert-danger';
+                        errorAlert.textContent = 'Passwords do not match.';
+                        
+                        const existingAlert = registerForm.querySelector('.alert');
+                        if (existingAlert) {
+                            existingAlert.remove();
+                        }
+                        
+                        const alertContainer = document.getElementById('alert-container');
+                        alertContainer.appendChild(errorAlert);
+                        return;
+                    }
+                    
+                    if (!terms) {
+                        const errorAlert = document.createElement('div');
+                        errorAlert.className = 'alert alert-danger';
+                        errorAlert.textContent = 'You must agree to the Terms of Service and Privacy Policy.';
+                        
+                        const existingAlert = registerForm.querySelector('.alert');
+                        if (existingAlert) {
+                            existingAlert.remove();
+                        }
+                        
+                        const alertContainer = document.getElementById('alert-container');
+                        alertContainer.appendChild(errorAlert);
+                        return;
+                    }
+                    
+                    // Simulate successful registration
+                    window.location.href = 'onboarding.html';
+                });
+            }
+        });
+    </script>
+<script src="js/responsive-nav.js"></script>
+</body>
+</html>

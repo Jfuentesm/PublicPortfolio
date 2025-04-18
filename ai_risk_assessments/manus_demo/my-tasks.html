@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Tasks - AIRisk</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="container app-header-container">
+            <a href="dashboard.html" class="logo">AIRisk</a>
+            
+            <div class="user-menu">
+                <div class="user-avatar">JS</div>
+                <span class="user-name">John Smith</span>
+                <i class="fas fa-chevron-down"></i>
+                
+                <div class="dropdown-menu">
+                    <ul>
+                        <li><a href="#"><i class="fas fa-user"></i> Profile</a></li>
+                        <li><a href="#"><i class="fas fa-cog"></i> Settings</a></li>
+                        <li><a href="#"><i class="fas fa-question-circle"></i> Help</a></li>
+                        <li><a href="index.html"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- App Container -->
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-menu">
+                <div class="menu-header">Main</div>
+                <ul>
+                    <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                    <li><a href="risk-identification.html"><i class="fas fa-search"></i> Risk Identification</a></li>
+                    <li><a href="risk-assessment.html"><i class="fas fa-balance-scale"></i> Risk Assessment</a></li>
+                    <li><a href="risk-register.html"><i class="fas fa-clipboard-list"></i> Risk Register</a></li>
+                </ul>
+                
+                <div class="menu-header">Mitigation</div>
+                <ul>
+                    <li><a href="mitigation-planning.html"><i class="fas fa-tasks"></i> Planning</a></li>
+                    <li><a href="my-tasks.html" class="active"><i class="fas fa-check-square"></i> My Tasks</a></li>
+                </ul>
+                
+                <div class="menu-header">Reports</div>
+                <ul>
+                    <li><a href="reports.html"><i class="fas fa-chart-bar"></i> Reports</a></li>
+                    <li><a href="analytics.html"><i class="fas fa-chart-line"></i> Analytics</a></li>
+                </ul>
+                
+                <div class="menu-header">Settings</div>
+                <ul>
+                    <li><a href="company-profile.html"><i class="fas fa-building"></i> Company Profile</a></li>
+                    <li><a href="users.html"><i class="fas fa-users"></i> Users</a></li>
+                    <li><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <h1>My Tasks</h1>
+            <p>Track and update your assigned mitigation tasks.</p>
+            
+            <div id="alert-container"></div>
+            
+            <!-- Task Filters -->
+            <div class="card mb-20">
+                <div class="card-header">
+                    <h3>Filters</h3>
+                </div>
+                <div class="card-body">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                        <div class="form-group">
+                            <label for="status-filter" class="form-label">Status</label>
+                            <select id="status-filter" class="form-select">
+                                <option value="all">All Statuses</option>
+                                <option value="not-started">Not Started</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                                <option value="blocked">Blocked</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="risk-filter" class="form-label">Risk</label>
+                            <select id="risk-filter" class="form-select">
+                                <option value="all">All Risks</option>
+                                <option value="1">Data Breach Risk</option>
+                                <option value="2">Supply Chain Disruption</option>
+                                <option value="3">Regulatory Non-Compliance</option>
+                                <option value="4">Key Personnel Departure</option>
+                                <option value="5">Market Share Decline</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="due-date-filter" class="form-label">Due Date</label>
+                            <select id="due-date-filter" class="form-select">
+                                <option value="all">All Dates</option>
+                                <option value="overdue">Overdue</option>
+                                <option value="today">Due Today</option>
+                                <option value="this-week">Due This Week</option>
+                                <option value="this-month">Due This Month</option>
+                                <option value="future">Future</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Task List -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>My Tasks (6)</h3>
+                    <div>
+                        <button class="btn btn-sm">Export</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Task</th>
+                                    <th>Related Risk</th>
+                                    <th>Due Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Implement Multi-Factor Authentication</td>
+                                    <td>Data Breach Risk</td>
+                                    <td>May 15, 2025</td>
+                                    <td><span class="badge badge-warning">In Progress</span></td>
+                                    <td>
+                                        <button class="btn btn-sm" data-modal="task-detail-modal">Update</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Update Data Protection Policy</td>
+                                    <td>Data Breach Risk</td>
+                                    <td>Jun 10, 2025</td>
+                                    <td><span class="badge badge-warning">Not Started</span></td>
+                                    <td>
+                                        <button class="btn btn-sm">Update</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Develop Backup Supplier List</td>
+                                    <td>Supply Chain Disruption</td>
+                                    <td>May 20, 2025</td>
+                                    <td><span class="badge badge-warning">In Progress</span></td>
+                                    <td>
+                                        <button class="btn btn-sm">Update</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Review Compliance Requirements</td>
+                                    <td>Regulatory Non-Compliance</td>
+                                    <td>Apr 30, 2025</td>
+                                    <td><span class="badge badge-danger">Overdue</span></td>
+                                    <td>
+                                        <button class="btn btn-sm">Update</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Document Critical Processes</td>
+                                    <td>Key Personnel Departure</td>
+                                    <td>May 5, 2025</td>
+                                    <td><span class="badge badge-success">Completed</span></td>
+                                    <td>
+                                        <button class="btn btn-sm">View</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Conduct Market Analysis</td>
+                                    <td>Market Share Decline</td>
+                                    <td>Jun 15, 2025</td>
+                                    <td><span class="badge badge-warning">Not Started</span></td>
+                                    <td>
+                                        <button class="btn btn-sm">Update</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Task Detail Modal -->
+    <div id="task-detail-modal" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Update Task</h3>
+                <div class="modal-close">&times;</div>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Task</label>
+                    <p>Implement Multi-Factor Authentication</p>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Related Risk</label>
+                    <p>Data Breach Risk</p>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <p>Implement multi-factor authentication for all user accounts in the system to reduce the risk of unauthorized access.</p>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Due Date</label>
+                    <p>May 15, 2025</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-status" class="form-label">Status</label>
+                    <select id="task-status" class="form-select">
+                        <option value="not-started">Not Started</option>
+                        <option value="in-progress" selected>In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="blocked">Blocked</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="progress-percentage" class="form-label">Progress (%)</label>
+                    <input type="number" id="progress-percentage" class="form-control" value="60" min="0" max="100">
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-comment" class="form-label">Update Comment</label>
+                    <textarea id="task-comment" class="form-control" rows="3" placeholder="Provide details about your progress or any issues..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Attach Evidence</label>
+                    <input type="file" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button class="btn">Save Update</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+<script src="js/responsive-nav.js"></script>
+</body>
+</html>

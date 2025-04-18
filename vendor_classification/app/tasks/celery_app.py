@@ -1,4 +1,3 @@
-
 # app/tasks/celery_app.py
 from celery import Celery
 import logging
@@ -74,7 +73,8 @@ try:
     def handle_task_prerun(task_id, task, args, kwargs, **extra_options):
         """Signal handler before task runs."""
         clear_all_context() # Clear any lingering context
-        job_id = kwargs.get('job_id') or (args[0] if args else None) or task_id
+        # Determine job_id based on common kwargs patterns
+        job_id = kwargs.get('job_id') or kwargs.get('review_job_id') or (args[0] if args else None) or task_id
         set_correlation_id(job_id) # Use job_id as correlation_id
         set_job_id(job_id)
         logger.info(
@@ -132,8 +132,13 @@ except Exception as e:
 # Import tasks to register them
 logger.info("Attempting to import tasks for registration...")
 try:
+    # Import original classification task
     from tasks.classification_tasks import process_vendor_file
     logger.info("Successfully imported 'tasks.classification_tasks.process_vendor_file'")
+    # --- CORRECTED: Import reclassification task from classification_tasks ---
+    from tasks.classification_tasks import reclassify_flagged_vendors_task
+    logger.info("Successfully imported 'tasks.classification_tasks.reclassify_flagged_vendors_task'")
+    # --- END CORRECTED ---
 except ImportError as e:
     logger.error("ImportError when importing tasks", exc_info=True)
     logger.error(f"sys.path during task import: {sys.path}")

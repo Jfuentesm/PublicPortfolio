@@ -1,11 +1,14 @@
-// <file path='frontend/vue_frontend/src/services/api.ts'>
 import axios, {
     type AxiosInstance,
     type InternalAxiosRequestConfig,
     type AxiosError // Import AxiosError type
 } from 'axios';
 import { useAuthStore } from '@/stores/auth'; // Adjust path as needed
-import type { JobDetails } from '@/stores/job'; // Adjust path as needed
+// --- UPDATED: Import JobResultItem and ReviewResultItem ---
+// --- REMOVED JobStatsData from this import ---
+import type { JobDetails, JobResultItem, ReviewResultItem } from '@/stores/job'; // Adjust path as needed
+// --- END REMOVED ---
+// --- END UPDATED ---
 
 // --- Define API Response Interfaces ---
 
@@ -48,15 +51,15 @@ interface AuthResponse {
     user: UserResponse; // Include the user details
 }
 
-// --- REMOVED UploadResponse - Use JobResponse instead ---
-// interface UploadResponse {
-//     job_id: string;
-//     status: string;
-//     message: string;
-//     created_at: string;
-//     progress: number;
-//     current_stage: string;
-// }
+// --- ADDED: File Validation Response Interface ---
+// Matches backend api/main.py -> FileValidationResponse
+export interface FileValidationResponse {
+    is_valid: boolean;
+    message: string;
+    detected_columns: string[];
+    missing_mandatory_columns: string[];
+}
+// --- END ADDED ---
 
 // Matches backend response for /api/v1/jobs/{job_id}/notify
 interface NotifyResponse {
@@ -80,11 +83,27 @@ export interface JobResponse {
     created_by: string;
     error_message?: string | null;
     target_level: number; // Ensure target_level is included here
+    // --- ADDED: Job Type and Parent Link ---
+    job_type: 'CLASSIFICATION' | 'REVIEW';
+    parent_job_id: string | null;
+    // --- END ADDED ---
+    stats?: Record<string, any>; // Include stats field optionally
 }
 
-// --- UPDATED JobStatsData Interface ---
+// --- ADDED: Job Results Response Interface ---
+// Matches backend schemas/job.py -> JobResultsResponse
+export interface JobResultsResponse {
+    job_id: string;
+    job_type: 'CLASSIFICATION' | 'REVIEW';
+    results: JobResultItem[] | ReviewResultItem[]; // Union type
+}
+// --- END ADDED ---
+
+// --- ADDED: Job Stats Data Interface ---
 // Matches backend models/classification.py -> ProcessingStats and console log
+// --- UPDATED: Export the interface ---
 export interface JobStatsData {
+// --- END UPDATED ---
     job_id: string;
     company_name: string;
     start_time: string | null; // Assuming ISO string
@@ -93,23 +112,31 @@ export interface JobStatsData {
     total_vendors: number | null; // Added
     unique_vendors: number | null; // Added (was present in console)
     target_level: number | null; // Added target level to stats
-    successfully_classified_l4: number | null; // Keep for reference
-    successfully_classified_l5: number | null; // Keep L5 count
-    classification_not_possible_initial: number | null; // Added
-    invalid_category_errors: number | null; // Added (was present in console)
-    search_attempts: number | null; // Added
-    search_successful_classifications_l1: number | null; // Added
-    search_successful_classifications_l5: number | null; // Renamed from search_assisted_l5
-    api_usage: { // Nested structure
+    successfully_classified_l4?: number | null; // Keep for reference (optional)
+    successfully_classified_l5?: number | null; // Keep L5 count (optional)
+    classification_not_possible_initial?: number | null; // Added (optional)
+    invalid_category_errors?: number | null; // Added (was present in console) (optional)
+    search_attempts?: number | null; // Added (optional)
+    search_successful_classifications_l1?: number | null; // Added (optional)
+    search_successful_classifications_l5?: number | null; // Renamed from search_assisted_l5 (optional)
+    api_usage?: { // Nested structure (optional)
         openrouter_calls: number | null;
         openrouter_prompt_tokens: number | null;
         openrouter_completion_tokens: number | null;
         openrouter_total_tokens: number | null;
-        tavily_search_calls: number | null;
+        tavily_search_calls?: number | null; // Optional if not always present
         cost_estimate_usd: number | null;
     } | null; // Allow api_usage itself to be null if not populated
+    // --- ADDED: Stats specific to REVIEW jobs ---
+    reclassify_input?: Array<{ vendor_name: string; hint: string }>; // Input hints (optional)
+    total_items_processed?: number; // Optional
+    successful_reclassifications?: number; // Optional
+    failed_reclassifications?: number; // Optional
+    parent_job_id?: string; // Include parent ID in stats for review jobs (optional)
+    merged_at?: string | null; // Added merge timestamp (optional)
+    // --- END ADDED ---
 }
-// --- END UPDATED JobStatsData Interface ---
+// --- END ADDED ---
 
 
 // Structure for download result helper
@@ -123,9 +150,39 @@ interface GetJobsParams {
     status?: string;
     start_date?: string; // ISO string format
     end_date?: string; // ISO string format
+    job_type?: 'CLASSIFICATION' | 'REVIEW'; // Filter by type
     skip?: number;
     limit?: number;
 }
+
+// --- ADDED: Password Reset Interfaces ---
+// Matches backend schemas/password_reset.py -> MessageResponse
+interface MessageResponse {
+    message: string;
+}
+// --- END ADDED ---
+
+// --- ADDED: Reclassification Interfaces ---
+// Matches backend schemas/review.py -> ReclassifyRequestItem
+interface ReclassifyRequestItemData {
+    vendor_name: string;
+    hint: string;
+}
+// Matches backend schemas/review.py -> ReclassifyResponse
+interface ReclassifyResponseData {
+    review_job_id: string;
+    message: string;
+}
+// --- END ADDED ---
+
+// --- ADDED: Merge Response Interface ---
+// Matches backend api/jobs.py -> merge_review_results response
+interface MergeResponseData {
+    message: string;
+    updated_parent_job_id: string;
+}
+// --- END ADDED ---
+
 
 // --- Axios Instance Setup ---
 
@@ -143,13 +200,20 @@ axiosInstance.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
         const authStore = useAuthStore();
         const token = authStore.getToken();
-        // No need for noAuthUrls here as login uses base axios
-        if (token && config.url) {
+        // Define URLs that should NOT receive the auth token
+        // --- UPDATED: Added /users/register ---
+        const noAuthUrls = ['/auth/password-recovery', '/auth/reset-password', '/users/register'];
+        // --- END UPDATED ---
+
+        // Check if the request URL matches any of the no-auth URLs
+        const requiresAuth = token && config.url && !noAuthUrls.some(url => config.url?.startsWith(url));
+
+        if (requiresAuth) {
             // LOGGING: Log token presence and target URL
             // console.log(`[api.ts Request Interceptor] Adding token for URL: ${config.url}`);
             config.headers.Authorization = `Bearer ${token}`;
         } else {
-            // console.log(`[api.ts Request Interceptor] No token found or no URL for config: ${config.url}`);
+            // console.log(`[api.ts Request Interceptor] No token added for URL: ${config.url} (Token: ${token ? 'present' : 'missing'}, No-Auth Match: ${!requiresAuth && !!token})`);
         }
         return config;
     },
@@ -173,10 +237,16 @@ axiosInstance.interceptors.response.use(
         if (error.response) {
             const { status, data } = error.response;
 
-            // Handle 401 Unauthorized (except for login attempts)
-            // Login uses base axios, so this interceptor won't catch its 401
-            if (status === 401) {
-                console.warn('[api.ts Response Interceptor] Received 401 Unauthorized. Logging out.');
+            // Handle 401 Unauthorized (except for login attempts and password reset)
+            const isLoginAttempt = error.config?.url === '/token'; // Base URL for login
+            // --- UPDATED: Check register url ---
+            const isPublicAuthOperation = error.config?.url?.startsWith('/auth/') || error.config?.url?.startsWith('/users/register');
+            // --- END UPDATED ---
+
+            // --- UPDATED: Check isPublicAuthOperation ---
+            if (status === 401 && !isLoginAttempt && !isPublicAuthOperation) {
+            // --- END UPDATED ---
+                console.warn('[api.ts Response Interceptor] Received 401 Unauthorized on protected route. Logging out.');
                 authStore.logout(); // Trigger logout action
                 // No reload here, let the component handle redirection or UI change
                 return Promise.reject(new Error('Session expired. Please log in again.'));
@@ -186,21 +256,25 @@ axiosInstance.interceptors.response.use(
             let detailMessage = 'An error occurred.';
             const responseData = data as any;
 
-            if (responseData?.detail) {
-                    if (Array.isArray(responseData.detail)) {
-                        detailMessage = `Validation Error: ${responseData.detail.map((err: any) => `${err.loc?.join('.') ?? 'field'}: ${err.msg}`).join('; ')}`;
-                    } else if (typeof responseData.detail === 'string') {
-                        detailMessage = responseData.detail;
-                    } else {
-                        try { detailMessage = JSON.stringify(responseData.detail); } catch { /* ignore */ }
-                    }
-            } else if (typeof data === 'string' && data.length > 0 && data.length < 300) {
+            // Handle FastAPI validation errors (detail is an array)
+            if (responseData?.detail && Array.isArray(responseData.detail)) {
+                 detailMessage = `Validation Error: ${responseData.detail.map((err: any) => `${err.loc?.join('.') ?? 'field'}: ${err.msg}`).join('; ')}`;
+            }
+            // Handle other FastAPI errors (detail is a string) or custom errors
+            else if (responseData?.detail && typeof responseData.detail === 'string') {
+                detailMessage = responseData.detail;
+            }
+            // Handle cases where the error might be directly in the data object (less common)
+            else if (typeof data === 'string' && data.length > 0 && data.length < 300) {
                 detailMessage = data;
-            } else if (error.message) {
+            }
+            // Fallback to Axios error message
+            else if (error.message) {
                 detailMessage = error.message;
             }
 
-            const errorMessage = `Error ${status}: ${detailMessage}`;
+            // Prepend status code for clarity, unless it's a 422 validation error where the message is usually sufficient
+            const errorMessage = status === 422 ? detailMessage : `Error ${status}: ${detailMessage}`;
             console.error(`[api.ts Response Interceptor] Rejecting with error: ${errorMessage}`); // LOGGING
             return Promise.reject(new Error(errorMessage));
 
@@ -227,7 +301,9 @@ const apiService = {
         params.append('password', passwordInput);
         console.log(`[api.ts login] Attempting login for user: ${usernameInput}`); // LOGGING
         // Use base axios to avoid default JSON headers and ensure correct Content-Type
+        // Also avoids the interceptor adding an Authorization header if a previous token exists
         const response = await axios.post<AuthResponse>('/token', params, {
+            baseURL: '/', // Use root base URL since '/token' is not under /api/v1
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         });
         console.log(`[api.ts login] Login successful for user: ${usernameInput}`); // LOGGING
@@ -235,7 +311,21 @@ const apiService = {
     },
 
     /**
-        * Uploads the vendor file.
+        * Validates the header of an uploaded file.
+        */
+    async validateUpload(formData: FormData): Promise<FileValidationResponse> {
+        console.log('[api.ts validateUpload] Attempting file header validation...'); // LOGGING
+        // Uses axiosInstance, includes auth token if available and URL requires it
+        const response = await axiosInstance.post<FileValidationResponse>('/validate-upload', formData, {
+             headers: { 'Content-Type': undefined } // Let browser set Content-Type for FormData
+        });
+        console.log(`[api.ts validateUpload] Validation response received: isValid=${response.data.is_valid}`); // LOGGING
+        return response.data;
+    },
+
+
+    /**
+        * Uploads the vendor file (after validation).
         * Returns the full JobResponse object.
         */
     async uploadFile(formData: FormData): Promise<JobResponse> { // Return JobResponse
@@ -254,7 +344,7 @@ const apiService = {
     async getJobStatus(jobId: string): Promise<JobDetails> {
         console.log(`[api.ts getJobStatus] Fetching status for job ID: ${jobId}`); // LOGGING
         const response = await axiosInstance.get<JobDetails>(`/jobs/${jobId}`);
-        console.log(`[api.ts getJobStatus] Received status for job ${jobId}:`, response.data.status, `Target Level: ${response.data.target_level}`); // LOGGING
+        console.log(`[api.ts getJobStatus] Received status for job ${jobId}:`, response.data.status, `Target Level: ${response.data.target_level}`, `Job Type: ${response.data.job_type}`); // LOGGING
         return response.data;
     },
 
@@ -263,9 +353,21 @@ const apiService = {
         */
     async getJobStats(jobId: string): Promise<JobStatsData> { // Use the updated interface here
         console.log(`[api.ts getJobStats] Fetching stats for job ID: ${jobId}`); // LOGGING
+        // Use the exported JobStatsData interface
         const response = await axiosInstance.get<JobStatsData>(`/jobs/${jobId}/stats`);
         // LOGGING: Log the received stats structure
         console.log(`[api.ts getJobStats] Received stats for job ${jobId}:`, JSON.parse(JSON.stringify(response.data)));
+        return response.data;
+    },
+
+    /**
+     * Fetches the detailed classification results for a specific job.
+     * Returns the JobResultsResponse structure containing job type and results list.
+     */
+    async getJobResults(jobId: string): Promise<JobResultsResponse> {
+        console.log(`[api.ts getJobResults] Fetching detailed results for job ID: ${jobId}`); // LOGGING
+        const response = await axiosInstance.get<JobResultsResponse>(`/jobs/${jobId}/results`);
+        console.log(`[api.ts getJobResults] Received ${response.data.results.length} detailed result items for job ${jobId} (Type: ${response.data.job_type}).`); // LOGGING
         return response.data;
     },
 
@@ -307,7 +409,7 @@ const apiService = {
         */
     async getJobs(params: GetJobsParams = {}): Promise<JobResponse[]> {
         const cleanedParams = Object.fromEntries(
-            Object.entries(params).filter(([, value]) => value !== undefined && value !== null)
+            Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
         );
         console.log('[api.ts getJobs] Fetching job list with params:', cleanedParams); // LOGGING
         const response = await axiosInstance.get<JobResponse[]>('/jobs/', { params: cleanedParams });
@@ -351,9 +453,9 @@ const apiService = {
         * Creates a new user (admin only).
         */
     async createUser(userData: UserCreateData): Promise<UserResponse> {
-        console.log(`[api.ts createUser] Attempting to create user: ${userData.username}`); // LOGGING
+        console.log(`[api.ts createUser] Attempting to create user (admin): ${userData.username}`); // LOGGING
         const response = await axiosInstance.post<UserResponse>('/users/', userData);
-        console.log(`[api.ts createUser] User created successfully: ${response.data.username}`); // LOGGING
+        console.log(`[api.ts createUser] User created successfully (admin): ${response.data.username}`); // LOGGING
         return response.data;
     },
 
@@ -377,6 +479,72 @@ const apiService = {
         return response.data;
     },
     // --- END User Management API Methods ---
+
+    // --- ADDED: Public Registration API Method ---
+    /**
+     * Registers a new user publicly.
+     */
+    async registerUser(userData: UserCreateData): Promise<UserResponse> {
+        console.log(`[api.ts registerUser] Attempting public registration for user: ${userData.username}`);
+        // Uses axiosInstance, interceptor skips auth token for this URL
+        const response = await axiosInstance.post<UserResponse>('/users/register', userData);
+        console.log(`[api.ts registerUser] Public registration successful: ${response.data.username}`);
+        return response.data;
+    },
+    // --- END Public Registration API Method ---
+
+
+    // --- ADDED: Password Reset API Methods ---
+    /**
+     * Requests a password reset email to be sent.
+     */
+    async requestPasswordRecovery(email: string): Promise<MessageResponse> {
+        console.log(`[api.ts requestPasswordRecovery] Requesting password reset for email: ${email}`);
+        // This uses axiosInstance, but the interceptor should skip adding auth token for this URL
+        const response = await axiosInstance.post<MessageResponse>('/auth/password-recovery', { email });
+        console.log(`[api.ts requestPasswordRecovery] Request response: ${response.data.message}`);
+        return response.data;
+    },
+
+    /**
+     * Resets the password using the provided token and new password.
+     */
+    async resetPassword(token: string, newPassword: string): Promise<MessageResponse> {
+        console.log(`[api.ts resetPassword] Attempting password reset with token: ${token.substring(0, 10)}...`);
+        // This uses axiosInstance, but the interceptor should skip adding auth token for this URL
+        const response = await axiosInstance.post<MessageResponse>('/auth/reset-password', {
+            token: token,
+            new_password: newPassword
+        });
+        console.log(`[api.ts resetPassword] Reset response: ${response.data.message}`);
+        return response.data;
+    },
+    // --- END Password Reset API Methods ---
+
+    // --- ADDED: Reclassification API Method ---
+    /**
+     * Submits flagged items for reclassification.
+     */
+    async reclassifyJob(originalJobId: string, items: ReclassifyRequestItemData[]): Promise<ReclassifyResponseData> {
+        console.log(`[api.ts reclassifyJob] Submitting ${items.length} items for reclassification for job ${originalJobId}`);
+        const payload = { items: items };
+        const response = await axiosInstance.post<ReclassifyResponseData>(`/jobs/${originalJobId}/reclassify`, payload);
+        console.log(`[api.ts reclassifyJob] Reclassification job started: ${response.data.review_job_id}`);
+        return response.data;
+    },
+    // --- END ADDED ---
+
+    // --- ADDED: Merge API Method ---
+    /**
+     * Merges results from a review job into its parent.
+     */
+    async mergeReviewResults(reviewJobId: string): Promise<MergeResponseData> {
+        console.log(`[api.ts mergeReviewResults] Requesting merge for review job ${reviewJobId}`);
+        const response = await axiosInstance.post<MergeResponseData>(`/jobs/${reviewJobId}/merge`);
+        console.log(`[api.ts mergeReviewResults] Merge request successful: ${response.data.message}`);
+        return response.data;
+    }
+    // --- END ADDED ---
 };
 
 export default apiService;

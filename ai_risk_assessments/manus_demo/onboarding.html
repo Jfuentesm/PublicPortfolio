@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onboarding - AIRisk</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="container app-header-container">
+            <a href="index.html" class="logo">AIRisk</a>
+            
+            <div class="user-menu">
+                <div class="user-avatar">JS</div>
+                <span class="user-name">John Smith</span>
+                <i class="fas fa-chevron-down"></i>
+                
+                <div class="dropdown-menu">
+                    <ul>
+                        <li><a href="#"><i class="fas fa-user"></i> Profile</a></li>
+                        <li><a href="#"><i class="fas fa-cog"></i> Settings</a></li>
+                        <li><a href="#"><i class="fas fa-question-circle"></i> Help</a></li>
+                        <li><a href="index.html"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Onboarding Container -->
+    <div class="auth-container" style="padding-top: 100px;">
+        <div class="card" style="width: 100%; max-width: 800px;">
+            <div class="card-header">
+                <h2 class="text-center">Welcome to AIRisk</h2>
+                <p class="text-center">Let's set up your account to get the most out of our platform.</p>
+                
+                <!-- Progress Bar -->
+                <div style="margin-top: 30px;">
+                    <div class="progress-text" style="margin-bottom: 5px; font-size: 0.9rem;">Step 1 of 4</div>
+                    <div class="progress">
+                        <div class="progress-bar" style="width: 25%;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-body">
+                <!-- Step 1: Company Profile -->
+                <div id="step-1" class="onboarding-step">
+                    <h3>Company Profile</h3>
+                    <p>Tell us about your company so we can tailor the risk assessment to your specific needs.</p>
+                    
+                    <div class="alert-container"></div>
+                    
+                    <form>
+                        <div class="form-group">
+                            <label for="company-name" class="form-label">Company Name</label>
+                            <input type="text" id="company-name" class="form-control" value="Acme Inc." required>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div class="form-group">
+                                <label for="industry" class="form-label">Industry</label>
+                                <select id="industry" class="form-select" required>
+                                    <option value="">Select Industry</option>
+                                    <option value="technology" selected>Technology / Software</option>
+                                    <option value="finance">Finance / Banking</option>
+                                    <option value="healthcare">Healthcare</option>
+                                    <option value="manufacturing">Manufacturing</option>
+                                    <option value="retail">Retail / E-commerce</option>
+                                    <option value="services">Professional Services</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="company-size" class="form-label">Company Size</label>
+                                <select id="company-size" class="form-select" required>
+                                    <option value="">Select Size</option>
+                                    <option value="small">Small (10-99 employees)</option>
+                                    <option value="medium" selected>Medium (100-250 employees)</option>
+                                    <option value="large">Large (251-1000 employees)</option>
+                                    <option value="enterprise">Enterprise (1000+ employees)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Technology-specific fields -->
+                        <div id="tech-specific-fields">
+                            <div class="form-group">
+                                <label class="form-label">Key Technologies (select all that apply)</label>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                    <div class="form-check">
+                                        <input type="checkbox" id="tech-cloud" class="form-check-input" checked>
+                                        <label for="tech-cloud">Cloud Services</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" id="tech-saas" class="form-check-input" checked>
+                                        <label for="tech-saas">SaaS Products</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" id="tech-mobile" class="form-check-input">
+                                        <label for="tech-mobile">Mobile Applications</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" id="tech-ai" class="form-check-input" checked>
+                                        <label for="tech-ai">AI/ML</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" id="tech-iot" class="form-check-input">
+                                        <label for="tech-iot">IoT</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" id="tech-blockchain" class="form-check-input">
+                                        <label for="tech-blockchain">Blockchain</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="location" class="form-label">Primary Location</label>
+                            <select id="location" class="form-select" required>
+                                <option value="">Select Location</option>
+                                <option value="us" selected>United States</option>
+                                <option value="eu">European Union</option>
+                                <option value="uk">United Kingdom</option>
+                                <option value="ca">Canada</option>
+                                <option value="au">Australia</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Compliance Requirements (select all that apply)</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <div class="form-check">
+                                    <input type="checkbox" id="compliance-gdpr" class="form-check-input" checked>
+                                    <label for="compliance-gdpr">GDPR</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="compliance-ccpa" class="form-check-input" checked>
+                                    <label for="compliance-ccpa">CCPA</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="compliance-hipaa" class="form-check-input">
+                                    <label for="compliance-hipaa">HIPAA</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="compliance-pci" class="form-check-input">
+                                    <label for="compliance-pci">PCI DSS</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="compliance-soc2" class="form-check-input" checked>
+                                    <label for="compliance-soc2">SOC 2</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="compliance-iso" class="form-check-input">
+                                    <label for="compliance-iso">ISO 27001</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <button class="btn next-step" style="float: right;">Next Step</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Step 2: Organization Structure -->
+                <div id="step-2" class="onboarding-step" style="display: none;">
+                    <h3>Organization Structure</h3>
+                    <p>Define your organization's structure to enable hierarchical reporting and task assignment.</p>
+                    
+                    <div class="alert-container"></div>
+                    
+                    <form>
+                        <div class="form-group">
+                            <label class="form-label">Departments</label>
+                            <p>Add the departments in your organization.</p>
+                            
+                            <div id="departments-container">
+                                <div class="department-row form-group">
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="text" class="form-control" placeholder="Department Name" value="Executive" style="flex: 2;">
+                                        <input type="text" class="form-control" placeholder="Department Head" value="John Smith" style="flex: 2;">
+                                        <button class="btn btn-danger btn-sm remove-dept" style="flex: 0 0 auto;" disabled>Remove</button>
+                                    </div>
+                                </div>
+                                <div class="department-row form-group">
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="text" class="form-control" placeholder="Department Name" value="IT" style="flex: 2;">
+                                        <input type="text" class="form-control" placeholder="Department Head" value="Sarah Johnson" style="flex: 2;">
+                                        <button class="btn btn-danger btn-sm remove-dept" style="flex: 0 0 auto;">Remove</button>
+                                    </div>
+                                </div>
+                                <div class="department-row form-group">
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="text" class="form-control" placeholder="Department Name" value="Operations" style="flex: 2;">
+                                        <input type="text" class="form-control" placeholder="Department Head" value="Michael Chen" style="flex: 2;">
+                                        <button class="btn btn-danger btn-sm remove-dept" style="flex: 0 0 auto;">Remove</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button id="add-department" class="btn btn-secondary btn-sm">+ Add Department</button>
+                        </div>
+                        
+                        <div class="form-group" style="margin-top: 30px;">
+                            <label class="form-label">Key Users</label>
+                            <p>Add key users who will be using the platform.</p>
+                            
+                            <div id="users-container">
+                                <div class="user-row form-group">
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="text" class="form-control" placeholder="Full Name" value="John Smith" style="flex: 2;" disabled>
+                                        <input type="email" class="form-control" placeholder="Email" value="john.smith@example.com" style="flex: 2;" disabled>
+                                        <select class="form-select" style="flex: 1;" disabled>
+                                            <option value="">Role</option>
+                                            <option value="admin" selected>Admin</option>
+                                            <option value="risk-owner">Risk Owner</option>
+                                            <option value="viewer">Viewer</option>
+                                        </select>
+                                        <button class="btn btn-danger btn-sm remove-user" style="flex: 0 0 auto;" disabled>Remove</button>
+                                    </div>
+                                </div>
+                                <div class="user-row form-group">
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="text" class="form-control" placeholder="Full Name" value="Sarah Johnson" style="flex: 2;">
+                                        <input type="email" class="form-control" placeholder="Email" value="sarah.johnson@example.com" style="flex: 2;">
+                                        <select class="form-select" style="flex: 1;">
+                                            <option value="">Role</option>
+                                            <option value="admin">Admin</option>
+                                            <option value="risk-owner" selected>Risk Owner</option>
+                                            <option value="viewer">Viewer</option>
+                                        </select>
+                                        <button class="btn btn-danger btn-sm remove-user" style="flex: 0 0 auto;">Remove</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button id="add-user" class="btn btn-secondary btn-sm">+ Add User</button>
+                        </div>
+                        
+                        <div class="form-group" style="margin-top: 30px; display: flex; justify-content: space-between;">
+                            <button class="btn btn-secondary prev-step">Previous Step</button>
+                            <div>
+                                <button class="btn btn-secondary skip-step" style="margin-right: 10px;">Skip This Step</button>
+                                <button class="btn next-step">Next Step</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Step 3: Assessment Rubric -->
+                <div id="step-3" class="onboarding-step" style="display: none;">
+                    <h3>Assessment Rubric</h3>
+                    <p>Define how risks will be assessed and scored in your organization.</p>
+                    
+                    <div class="alert-container"></div>
+                    
+                    <form>
+                        <div class="form-group">
+                            <label for="rubric-type" class="form-label">Rubric Type</label>
+                            <select id="rubric-type" class="form-select">
+                                <option value="standard" selected>Standard 5x5 Matrix</option>
+                                <option value="simplified">Simplified 3x3 Matrix</option>
+                                <option value="custom">Custom Rubric</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label class="form-label">Standard 5x5 Risk Matrix</label>
+                                <button id="customize-rubric" class="btn btn-secondary btn-sm">Customize Rubric</button>
+                            </div>
+                            
+                            <div style="margin-top: 20px; background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
+                                <div style="margin-bottom: 20px;">
+                                    <h4>Likelihood Scale</h4>
+                                    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; text-align: center; margin-top: 10px;">
+                                        <div style="background-color: #e9ecef; padding: 10px; border-radius: 4px;">
+                                            <div>1</div>
+                                            <div>Very Low</div>
+                                        </div>
+                                        <div style="background-color: #e9ecef; padding: 10px; border-radius: 4px;">
+                                            <div>2</div>
+                                            <div>Low</div>
+                                        </div>
+                                        <div style="background-color: #e9ecef; padding: 10px; border-radius: 4px;">
+                                            <div>3</div>
+                                            <div>Medium</div>
+                                        </div>
+                                        <div style="background-color: #e9ecef; padding: 10px; border-radius: 4px;">
+                                            <div>4</div>
+                                            <div>High</div>
+                                        </div>
+                                        <div style="background-color: #e9ecef; padding: 10px; border-radius: 4px;">
+                                            <div>5</div>
+                                            <div>Very High</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4>Impact Scale</h4>
+                                    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; text-align: center; margin-top: 10px;">
+                                        <div style="background-color: #e9ecef; padding: 10px; border-radius: 4px;">
+                                            <div>1</div>
+                                            <div>Very Low</div>
+                                        </div>
+                                        <div style="background-color: #e9ecef; padding: 10px; border-radius: 4px;">
+                                            <div>2</div>
+                                            <div>Low</div>
+                                        </div>
+                                        <div style="background-color: #e9ecef; padding: 10px; border-radius: 4px;">
+                                            <div>3</div>
+                                            <div>Medium</div>
+                                        </div>
+                                        <div style="background-color: #e9ecef; padding: 10px; border-radius: 4px;">
+                                            <div>4</div>
+                                            <div>High</div>
+                                        </div>
+                                        <div style="background-color: #e9ecef; padding: 10px; border-radius: 4px;">
+                                            <div>5</div>
+                                            <div>Very High</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="rubric-customization" style="display: none; margin-top: 20px;">
+                                <h4>Customize Rubric</h4>
+                                <p>Customize the definitions for each level of likelihood and impact.</p>
+                                
+                                <div style="margin-top: 20px;">
+                                    <h5>Likelihood Definitions</h5>
+                                    <div class="form-group">
+                                        <label class="form-label">Very Low (1)</label>
+                                        <input type="text" class="form-control" value="Rare event, unlikely to occur in the next 5 years">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Low (2)</label>
+                                        <input type="text" class="form-control" value="Unlikely to occur in the next 2-5 years">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Medium (3)</label>
+                                        <input type="text" class="form-control" value="Possible to occur in the next 1-2 years">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">High (4)</label>
+                                        <input type="text" class="form-control" value="Likely to occur in the next year">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Very High (5)</label>
+                                        <input type="text" class="form-control" value="Almost certain to occur in the next year">
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-top: 20px;">
+                                    <h5>Impact Definitions</h5>
+                                    <div class="form-group">
+                                        <label class="form-label">Very Low (1)</label>
+                                        <input type="text" class="form-control" value="Minimal financial impact (<$10K), no operational disruption">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Low (2)</label>
+                                        <input type="text" class="form-control" value="Minor financial impact ($10K-$50K), brief operational disruption">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Medium (3)</label>
+                                        <input type="text" class="form-control" value="Moderate financial impact ($50K-$250K), limited operational disruption">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">High (4)</label>
+                                        <input type="text" class="form-control" value="Major financial impact ($250K-$1M), significant operational disruption">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Very High (5)</label>
+                                        <input type="text" class="form-control" value="Severe financial impact (>$1M), critical operational disruption">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group" style="margin-top: 30px; display: flex; justify-content: space-between;">
+                            <button class="btn btn-secondary prev-step">Previous Step</button>
+                            <div>
+                                <button class="btn btn-secondary skip-step" style="margin-right: 10px;">Skip This Step</button>
+                                <button class="btn next-step">Next Step</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Step 4: Confirmation -->
+                <div id="step-4" class="onboarding-step" style="display: none;">
+                    <h3>You're All Set!</h3>
+                    <p>Your AIRisk account is ready to be set up with the following configuration:</p>
+                    
+                    <div class="alert-container"></div>
+                    
+                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <h4>Company Profile</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                            <div><strong>Company:</strong> Acme Inc.</div>
+                            <div><strong>Industry:</strong> Technology / Software</div>
+                            <div><strong>Size:</strong> Medium (100-250 employees)</div>
+                            <div><strong>Location:</strong> United States</div>
+                        </div>
+                        
+                        <h4 style="margin-top: 20px;">Organization</h4>
+                        <div style="margin-top: 10px;">
+                            <div><strong>Departments:</strong> Executive, IT, Operations</div>
+                            <div><strong>Users:</strong> 2 (1 Admin, 1 Risk Owner)</div>
+                        </div>
+                        
+                        <h4 style="margin-top: 20px;">Assessment Rubric</h4>
+                        <div style="margin-top: 10px;">
+                            <div><strong>Type:</strong> Standard 5x5 Matrix</div>
+                        </div>
+                    </div>
+                    
+                    <p>Click "Complete Setup" to finalize your account setup and start using AIRisk.</p>
+                    
+                    <div class="form-group" style="margin-top: 30px; display: flex; justify-content: space-between;">
+                        <button class="btn btn-secondary prev-step">Previous Step</button>
+                        <button class="btn complete-onboarding">Complete Setup</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/onboarding.js"></script>
+<script src="js/responsive-nav.js"></script>
+</body>
+</html>

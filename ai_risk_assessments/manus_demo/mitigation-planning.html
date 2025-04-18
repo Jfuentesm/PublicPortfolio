@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mitigation Planning - AIRisk</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="container app-header-container">
+            <a href="dashboard.html" class="logo">AIRisk</a>
+            
+            <div class="user-menu">
+                <div class="user-avatar">JS</div>
+                <span class="user-name">John Smith</span>
+                <i class="fas fa-chevron-down"></i>
+                
+                <div class="dropdown-menu">
+                    <ul>
+                        <li><a href="#"><i class="fas fa-user"></i> Profile</a></li>
+                        <li><a href="#"><i class="fas fa-cog"></i> Settings</a></li>
+                        <li><a href="#"><i class="fas fa-question-circle"></i> Help</a></li>
+                        <li><a href="index.html"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- App Container -->
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-menu">
+                <div class="menu-header">Main</div>
+                <ul>
+                    <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                    <li><a href="risk-identification.html"><i class="fas fa-search"></i> Risk Identification</a></li>
+                    <li><a href="risk-assessment.html"><i class="fas fa-balance-scale"></i> Risk Assessment</a></li>
+                    <li><a href="risk-register.html"><i class="fas fa-clipboard-list"></i> Risk Register</a></li>
+                </ul>
+                
+                <div class="menu-header">Mitigation</div>
+                <ul>
+                    <li><a href="mitigation-planning.html" class="active"><i class="fas fa-tasks"></i> Planning</a></li>
+                    <li><a href="my-tasks.html"><i class="fas fa-check-square"></i> My Tasks</a></li>
+                </ul>
+                
+                <div class="menu-header">Reports</div>
+                <ul>
+                    <li><a href="reports.html"><i class="fas fa-chart-bar"></i> Reports</a></li>
+                    <li><a href="analytics.html"><i class="fas fa-chart-line"></i> Analytics</a></li>
+                </ul>
+                
+                <div class="menu-header">Settings</div>
+                <ul>
+                    <li><a href="company-profile.html"><i class="fas fa-building"></i> Company Profile</a></li>
+                    <li><a href="users.html"><i class="fas fa-users"></i> Users</a></li>
+                    <li><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <h1>Mitigation Planning</h1>
+            <p>Create and manage mitigation plans for your high-priority risks.</p>
+            
+            <div id="alert-container"></div>
+            
+            <!-- Risk Details -->
+            <div class="card mb-20">
+                <div class="card-header">
+                    <h3>Risk Details</h3>
+                </div>
+                <div class="card-body">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+                        <div>
+                            <h3>Data Breach Risk</h3>
+                            <p><strong>Category:</strong> Cybersecurity</p>
+                            <p><strong>Description:</strong> Risk of unauthorized access to sensitive customer data due to inadequate security controls.</p>
+                            <p><strong>Risk Owner:</strong> Sarah Johnson (IT Security Manager)</p>
+                        </div>
+                        <div>
+                            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
+                                <h4>Risk Score</h4>
+                                <div style="font-size: 3rem; font-weight: bold; color: #dc3545; text-align: center;">20</div>
+                                <div style="text-align: center; margin-bottom: 10px;"><span class="badge badge-danger">High Priority</span></div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <div>
+                                        <p><strong>Likelihood:</strong> 4/5</p>
+                                    </div>
+                                    <div>
+                                        <p><strong>Impact:</strong> 5/5</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mitigation Strategy -->
+            <div class="card mb-20">
+                <div class="card-header">
+                    <h3>Mitigation Strategy</h3>
+                </div>
+                <div class="card-body">
+                    <form id="mitigation-strategy-form">
+                        <div class="form-group">
+                            <label for="strategy" class="form-label">Select Strategy</label>
+                            <select id="strategy" class="form-select">
+                                <option value="">Select a strategy</option>
+                                <option value="avoid">Avoid - Eliminate the risk by removing its cause</option>
+                                <option value="reduce" selected>Reduce - Implement controls to lower likelihood or impact</option>
+                                <option value="transfer">Transfer - Share or offload the risk to a third party</option>
+                                <option value="accept">Accept - Acknowledge the risk without further action</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="strategy-justification" class="form-label">Justification</label>
+                            <textarea id="strategy-justification" class="form-control" rows="3" placeholder="Explain why this strategy is appropriate...">We will implement security controls to reduce both the likelihood and impact of a potential data breach. Complete elimination is not feasible given our business model, but we can significantly reduce the risk through proper security measures.</textarea>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- AI Suggestions -->
+            <div class="card mb-20">
+                <div class="card-header">
+                    <h3>AI-Suggested Mitigation Actions</h3>
+                </div>
+                <div class="card-body">
+                    <p>Let our AI analyze your risk details and suggest practical mitigation actions based on industry best practices.</p>
+                    <button id="generate-plan-btn" class="btn mt-20">Generate Mitigation Plan</button>
+                    
+                    <div id="mitigation-plan" style="display: none; margin-top: 20px;"></div>
+                </div>
+            </div>
+            
+            <!-- Manual Task Creation -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Add Mitigation Task</h3>
+                </div>
+                <div class="card-body">
+                    <form id="add-task-form">
+                        <div class="form-group">
+                            <label for="task-title" class="form-label">Task Title</label>
+                            <input type="text" id="task-title" class="form-control" placeholder="E.g., Implement Multi-Factor Authentication">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="task-description" class="form-label">Description</label>
+                            <textarea id="task-description" class="form-control" rows="3" placeholder="Describe the task in detail..."></textarea>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div class="form-group">
+                                <label for="task-owner" class="form-label">Task Owner</label>
+                                <select id="task-owner" class="form-select">
+                                    <option value="">Assign an owner</option>
+                                    <option value="1">John Smith (You)</option>
+                                    <option value="2">Sarah Johnson (IT Security Manager)</option>
+                                    <option value="3">Michael Chen (Operations Director)</option>
+                                    <option value="4">Lisa Rodriguez (Compliance Officer)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="due-date" class="form-label">Due Date</label>
+                                <input type="date" id="due-date" class="form-control">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="success-criteria" class="form-label">Success Criteria</label>
+                            <input type="text" id="success-criteria" class="form-control" placeholder="How will you measure successful completion?">
+                        </div>
+                        
+                        <button type="submit" class="btn">Add Task</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add Task Form Handling
+            const addTaskForm = document.getElementById('add-task-form');
+            
+            if (addTaskForm) {
+                addTaskForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const title = document.getElementById('task-title').value;
+                    const description = document.getElementById('task-description').value;
+                    const owner = document.getElementById('task-owner').value;
+                    const dueDate = document.getElementById('due-date').value;
+                    
+                    // Simple validation
+                    if (!title || !owner || !dueDate) {
+                        const alertContainer = document.getElementById('alert-container');
+                        alertContainer.innerHTML = `
+                            <div class="alert alert-danger">
+                                Please fill in all required fields.
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    // Simulate successful addition
+                    const alertContainer = document.getElementById('alert-container');
+                    alertContainer.innerHTML = `
+                        <div class="alert alert-success">
+                            Task "${title}" has been added to the mitigation plan.
+                        </div>
+                    `;
+                    
+                    // Clear form
+                    addTaskForm.reset();
+                });
+            }
+        });
+    </script>
+<script src="js/responsive-nav.js"></script>
+</body>
+</html>

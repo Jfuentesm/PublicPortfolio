@@ -78,12 +78,19 @@ RUN mkdir -p /data/input /data/output /data/taxonomy /data/logs
 
 # Install Python dependencies
 COPY requirements.txt .
-# Consider adding --verbose to pip install for more detail if needed
 RUN pip install --no-cache-dir numpy==1.24.4
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code (backend only)
 COPY ./app /app
+
+# --- ADDED DIAGNOSTIC STEP ---
+# Print the contents of the config file right after copying it
+RUN echo ">>> [Final Stage 2] Contents of /app/core/config.py:" && \
+    cat /app/core/config.py || \
+    echo ">>> [Final Stage 2] ERROR: Could not cat /app/core/config.py"
+# --- END ADDED DIAGNOSTIC STEP ---
+
 
 # --- ADDED DIAGNOSTIC ---
 # Verify that __init__.py and users.py are present in /app/api/
@@ -115,11 +122,12 @@ RUN echo ">>> [Final Stage 2] Checking Python app directory contents (/app):" &&
 
 # Add a healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
 CMD ["sh", "-c", "echo '>>> [CMD Start] Starting web server...' && \
-                  echo '>>> [CMD Start] Final check of /app/frontend/dist:' && \
-                  ls -lA /app/frontend/dist && \
-                  echo '>>> [CMD Start] Running Uvicorn...' && \
-                  uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug"]
+                    echo '>>> [CMD Start] Final check of /app/frontend/dist:' && \
+                    ls -lA /app/frontend/dist && \
+                    echo '>>> [CMD Start] Running Uvicorn...' && \
+                    uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug"]
+    
