@@ -36,7 +36,7 @@ echo "Using compose command: '$COMPOSE_CMD'"
 echo "Database volume name expected: '$VOLUME_NAME' (will be REMOVED)"
 
 # Bring down containers and networks, AND remove volumes (-v flag ADDED)
-$COMPOSE_CMD down --remove-orphans -v || echo "Warning: docker compose down failed, continuing cleanup..."
+$COMPOSE_CMD down --remove-orphans || echo "Warning: docker compose down failed, continuing cleanup..."
 
 # Force remove network if it persists (compose down should handle this, but just in case)
 if docker network inspect $NETWORK_NAME >/dev/null 2>&1; then
@@ -46,10 +46,9 @@ else
     echo "Network '$NETWORK_NAME' does not exist or was removed."
 fi
 
-# Explicitly remove the database volume (compose down -v should handle this, but belt-and-suspenders)
-echo "Attempting explicit removal of volume '$VOLUME_NAME'..."
-docker volume rm -f $VOLUME_NAME || echo "Warning: Failed to remove volume '$VOLUME_NAME' or it didn't exist."
-echo "Docker container/network/volume cleanup attempt finished."
+# (No longer removing the database volume)
+echo "Database volume '$VOLUME_NAME' was NOT removed. Previous data is preserved except for jobs cleanup."
+echo "Docker container/network cleanup attempt finished."
 # ----- END DOCKER CLEANUP -----
 
 # Create necessary directories
@@ -144,13 +143,21 @@ if [ $retry_count -lt $max_retries ]; then
     echo "Health check successful!"
 fi
 
+# Clean up jobs table, keeping only completed jobs
+DB_CONTAINER_ID=$($COMPOSE_CMD ps -q db)
+if [ -n "$DB_CONTAINER_ID" ]; then
+    echo "Cleaning up jobs table: keeping only jobs with status 'completed'..."
+    docker exec -i $DB_CONTAINER_ID psql -U postgres -d vendor_classification -c "DELETE FROM jobs WHERE status != 'completed';"
+else
+    echo "Could not find DB container to clean up jobs table."
+fi
 
 echo ""
-echo "===> Setup completed (Database RESET, Logs Cleared)." # Updated message
+echo "===> Setup completed (Jobs table cleaned, Logs Cleared)." # Updated message
 echo "Access the web interface (built Vue app) at: http://localhost:$WEB_PORT"
 echo "Login with username: admin, password: password"
 echo "PostgreSQL is available on host port 5433"
-echo "Database data in volume '$VOLUME_NAME' was REMOVED and recreated." # Updated message
+echo "Database data in volume '$VOLUME_NAME' was PRESERVED except for jobs table cleanup." # Updated message
 echo "Log directory 'data/logs' was cleared before this run."
 echo "Cache file '$CACHE_FILE' ensured to exist." # Added message
 echo ""

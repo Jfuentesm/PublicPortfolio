@@ -1,0 +1,2269 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        /* Root Variables */
+        :root {
+            --prep-color: #FFB600;     /* Yellow PMS 130 */
+            --risk-color: #EB8C00;     /* Tangerine PMS 144 */
+            --impact-color: #D04A02;   /* Orange PMS 1665 */
+            --cluster-color: #DB536A;  /* Rose PMS 710 */
+            --capability-color: #E0301E; /* Red PMS 179 */
+
+            --primary-text: #464646;
+            --secondary-text: #7D7D7D;
+            --background-light: #DEDEDE;
+            --accent-light: #e1f5fe;
+
+            --border-color: #DEDEDE;
+            --shadow: 0 1px 3px rgba(0,0,0,0.08);
+            --card-shadow: 0 2px 4px rgba(0,0,0,0.12);
+        }
+
+        /* Base Styles */
+        @font-face {
+            font-family: 'ITC Charter';
+            src: url('path-to-charter-font.woff2') format('woff2');
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            padding-top: 60px;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background-light);
+            color: var(--primary-text);
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.5;
+        }
+
+        h1, h2, h3, .phase-title {
+            font-family: 'ITC Charter', Georgia, serif;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        /* Navigation */
+        .nav-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 12px 40px;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .nav-menu a {
+            text-decoration: none;
+            color: var(--primary-text);
+            padding: 8px 16px;
+            border-radius: 0;
+            transition: all 0.2s;
+            font-weight: 500;
+            position: relative;
+        }
+
+        .nav-menu a:hover {
+            background: #f5f5f5;
+        }
+
+        .nav-menu a.active {
+            background: none;
+        }
+
+        .nav-menu a.active::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--prep-color);
+        }
+
+        /* Hero Section */
+        .hero-section {
+            background: var(--cluster-color);
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+            border-radius: 0;
+            padding: 80px 40px;
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;  
+        }
+
+        .hero-section h1 {
+            color: white;
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .hero-section p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.4em;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Value Props */
+        .value-props {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 60px 0;
+        }
+
+        .value-prop {
+            background: white;
+            padding: 30px;
+            border-radius: 0;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s ease;
+        }
+
+        .value-prop:hover {
+            transform: translateY(-2px);
+        }
+
+        .value-prop-icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .value-prop-icon svg {
+            stroke: var(--primary-text);
+            stroke-width: 1.25;
+            width: 40px;
+            height: 40px;
+        }
+
+        .value-prop h3 {
+            color: #333;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .value-prop ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .value-prop ul li {
+            padding: 8px 0;
+            color: #555;
+            border-top: 1px solid #eee;
+        }
+
+        .value-prop ul li:first-child {
+            border-top: none;
+        }
+
+        /* Timeline Table */
+        .timeline-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border-color);
+        }
+
+        .timeline-table th,
+        .timeline-table td {
+            padding: 12px;
+            border: 1px solid #eee;
+            vertical-align: top;
+        }
+
+        .timeline-table th {
+            background: #f5f5f5;
+            font-weight: bold;
+            text-align: left;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .timeline-table th:last-child {
+            min-width: 816px;
+        }
+
+        /* Week Markers */
+        .week-markers {
+            display: flex;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 4px;
+            margin-bottom: 4px;
+            min-width: 816px;
+        }
+
+        .week-marker {
+            width: 48px;
+            flex-shrink: 0;
+            text-align: center;
+            font-size: 0.8em;
+            color: #666;
+            padding: 4px 0;
+        }
+
+        /* Add color coding for the phase labels */
+        .week-markers:first-child .week-marker {
+            font-weight: 500;
+            color: var(--primary-text);
+        }
+
+        .week-markers:first-child .week-marker:nth-child(1) { color: var(--prep-color); }
+        .week-markers:first-child .week-marker:nth-child(2),
+        .week-markers:first-child .week-marker:nth-child(3),
+        .week-markers:first-child .week-marker:nth-child(4) { color: var(--risk-color); }
+        .week-markers:first-child .week-marker:nth-child(5),
+        .week-markers:first-child .week-marker:nth-child(6),
+        .week-markers:first-child .week-marker:nth-child(7) { color: var(--impact-color); }
+        .week-markers:first-child .week-marker:nth-child(8),
+        .week-markers:first-child .week-marker:nth-child(9),
+        .week-markers:first-child .week-marker:nth-child(10) { color: var(--cluster-color); }
+        .week-markers:first-child .week-marker:nth-child(11),
+        .week-markers:first-child .week-marker:nth-child(12),
+        .week-markers:first-child .week-marker:nth-child(13) { color: var(--capability-color); }
+        .week-markers:first-child .week-marker:nth-child(14),
+        .week-markers:first-child .week-marker:nth-child(15),
+        .week-markers:first-child .week-marker:nth-child(16),
+        .week-markers:first-child .week-marker:nth-child(17) { color: var(--primary-text); }
+
+        /* Phase Styles */
+        .phase-header {
+            font-weight: 700;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 6px;
+            margin: -8px -8px 8px -8px;
+            border-left: 4px solid;
+        }
+
+        /* Phase Colors */
+        .phase-setup { background-color: rgba(255, 182, 0, 0.03); }
+        .phase-risk { background-color: rgba(235, 140, 0, 0.03); }
+        .phase-impact { background-color: rgba(208, 74, 2, 0.03); }
+        .phase-cluster { background-color: rgba(219, 83, 106, 0.03); }
+        .phase-capability { background-color: rgba(224, 48, 30, 0.03); }
+        .phase-initiative { background-color: rgba(70, 70, 70, 0.03); }
+
+        .phase-setup .phase-header { border-left-color: var(--prep-color); }
+        .phase-risk .phase-header { border-left-color: var(--risk-color); }
+        .phase-impact .phase-header { border-left-color: var(--impact-color); }
+        .phase-cluster .phase-header { border-left-color: var(--cluster-color); }
+        .phase-capability .phase-header { border-left-color: var(--capability-color); }
+        .phase-initiative .phase-header { border-left-color: var(--initiative-color); }
+
+        /* Timeline Cell and Bars */
+        .timeline-cell {
+            position: relative;
+            height: 60px;
+            width: 816px;
+            background-image: linear-gradient(90deg, #f0f0f0 1px, transparent 1px);
+            background-size: 48px 100%;
+            background-position: -1px 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .timeline-bar {
+            position: absolute;
+            height: 32px;
+            top: 8px;
+            border-radius: 0;
+            transition: all 0.2s ease;
+        }
+
+        .timeline-bar:hover {
+            transform: translateY(-2px);
+            opacity: 0.8;
+        }
+
+        .team-bar { background: var(--prep-color); }
+        .client-bar { background: var(--impact-color); }
+        .llm-bar { background: var(--capability-color); }
+
+        /* Workshop Styles */
+        .workshop-row {
+            background-color: #fafafa !important;
+        }
+
+        .workshop-marker {
+            position: absolute;
+            color: var(--prep-color);
+            font-size: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .workshop-label {
+            position: absolute;
+            color: #666;
+            font-size: 0.8em;
+            top: 75%;
+            transform: translateY(-50%);
+            left: 24px;
+            white-space: nowrap;
+        }
+
+        /* Agent Styles */
+        .agent-cell {
+            width: 100px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .agent-team { color: var(--prep-color); }
+        .agent-client { color: var(--impact-color); }
+        .agent-llm { color: var(--capability-color); }
+
+        /* Activity Styles */
+        .activity-cell {
+            width: 200px;
+            font-size: 0.9em;
+        }
+
+        .activity-cell .description {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 4px;
+            display: block;
+        }
+
+
+        /* Add these styles before the @media queries */
+        .scroll-down-indicator {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9em;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+            cursor: pointer;
+        }
+
+        .scroll-down-indicator.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .scroll-down-indicator span {
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .scroll-down-indicator .chevron {
+            width: 24px;
+            height: 24px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-10px);
+            }
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+
+
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .value-props {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline-table {
+                display: block;
+                overflow-x: auto;
+            }
+
+            .hero-section h1 {
+                font-size: 2em;
+            }
+
+            .hero-section p {
+                font-size: 1.2em;
+            }
+        }
+
+        .deliverable-preview {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--accent-light);
+            border-radius: 4px;
+        }
+
+        .deliverable-preview h4 {
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+            color: var(--primary-text);
+        }
+
+        .preview-table {
+            width: 100%;
+            font-size: 0.8em;
+            border-collapse: collapse;
+        }
+
+        .preview-table th,
+        .preview-table td {
+            padding: 6px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .preview-table th {
+            font-weight: 600;
+            color: var(--primary-text);
+        }
+
+        .preview-table td {
+            color: var(--secondary-text);
+        }
+
+        .wave-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .wave {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+
+        .wave-label {
+            font-weight: 500;
+            color: var(--primary-text);
+        }
+
+        .wave-duration {
+            color: var(--secondary-text);
+        }
+
+        .value-chain-map {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .chain-step {
+            background: white;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.8em;
+            color: var(--primary-text);
+        }
+
+        .chain-arrow {
+            color: var(--secondary-text);
+            font-size: 0.8em;
+        }
+
+        .risk-network {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            position: relative;
+        }
+
+        .network-node {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .network-node.primary {
+            background: var(--prep-color);
+            color: white;
+        }
+
+        .network-node.secondary {
+            background: white;
+            border: 1px solid var(--border-color);
+            color: var(--primary-text);
+        }
+
+        .preview-table tr:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .wave:hover {
+            transform: translateX(4px);
+            transition: transform 0.2s ease;
+        }
+
+        @media (max-width: 768px) {
+            .value-chain-map {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .chain-arrow {
+                transform: rotate(90deg);
+            }
+
+            .risk-network {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+
+        /* Replace the deliverables section with enhanced visual samples */
+        #deliverables .value-props {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        /* Risk Assessment Card */
+        #deliverables .value-prop:nth-child(1) {
+            background: var(--prep-color);
+            color: white;
+        }
+
+        /* Enhanced Value Chain Visual */
+        #deliverables .value-prop:nth-child(1) .deliverable-preview {
+            background: rgba(255, 182, 0, 0.1);
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        /* Enhanced Risk Catalog Sample */
+        #deliverables .value-prop:nth-child(1) .deliverable-preview table {
+            background: rgba(255, 182, 0, 0.1);
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        /* Impact Analysis Card */
+        #deliverables .value-prop:nth-child(2) {
+            background: var(--impact-color);
+            color: white;
+        }
+
+        /* Enhanced Value at Risk Visual */
+        #deliverables .value-prop:nth-child(2) .deliverable-preview {
+            background: rgba(208, 74, 2, 0.1);
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        /* Enhanced Risk Network Visual */
+        #deliverables .value-prop:nth-child(2) .deliverable-preview {
+            background: rgba(219, 83, 106, 0.1);
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        /* Capability Assessment Card */
+        #deliverables .value-prop:nth-child(3) {
+            background: var(--capability-color);
+            color: white;
+        }
+
+        /* Enhanced Capability Matrix */
+        #deliverables .value-prop:nth-child(3) .deliverable-preview {
+            background: rgba(224, 48, 30, 0.1);
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        /* Enhanced Implementation Waves */
+        #deliverables .value-prop:nth-child(3) .deliverable-preview {
+            background: rgba(224, 48, 30, 0.1);
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        /* Enhanced Deliverable Preview Styles */
+        .deliverable-preview {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--accent-light);
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s ease;
+        }
+
+        .deliverable-preview:hover {
+            transform: translateY(-2px);
+        }
+
+        .network-node {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            text-align: center;
+            line-height: 1.2;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s ease;
+        }
+
+        .network-node:hover {
+            transform: scale(1.05);
+        }
+
+        .network-node.primary {
+            background: var(--prep-color);
+            color: white;
+        }
+
+        .network-node.secondary {
+            background: white;
+            border: 1px solid var(--border-color);
+            color: var(--primary-text);
+        }
+
+        .chain-step {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            text-align: center;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s ease;
+        }
+
+        .chain-step:hover {
+            transform: translateY(-2px);
+        }
+
+        .preview-table {
+            width: 100%;
+            font-size: 0.8em;
+            border-collapse: separate;
+            border-spacing: 0 4px;
+        }
+
+        .preview-table tr {
+            transition: transform 0.2s ease;
+        }
+
+        .preview-table tr:hover {
+            transform: translateX(4px);
+        }
+
+        .preview-table th,
+        .preview-table td {
+            padding: 8px;
+            text-align: left;
+        }
+
+        .preview-table th {
+            font-weight: 600;
+            color: var(--primary-text);
+        }
+
+        .preview-table td {
+            color: var(--secondary-text);
+        }
+
+        /* Enhanced Deliverable Card Styling */
+        #deliverables .value-prop {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 30px;
+        }
+
+        /* Deliverables List Section */
+        #deliverables .value-prop .deliverables-list {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        #deliverables .value-prop ul {
+            margin: 15px 0 0 0;
+        }
+
+        #deliverables .value-prop ul li {
+            color: rgba(255, 255, 255, 0.9);
+            padding: 8px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Samples Section */
+        #deliverables .value-prop .samples-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        #deliverables .value-prop .samples-section h4 {
+            color: var(--primary-text);
+            font-size: 1.1em;
+            margin: 0 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        /* Individual Sample Previews */
+        .deliverable-preview {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .deliverable-preview:last-child {
+            margin-bottom: 0;
+        }
+
+        .deliverable-preview h4 {
+            color: var(--primary-text);
+            font-size: 1em;
+            margin: 0 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Preview Table Enhancements */
+        .preview-table {
+            background: white;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .preview-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            font-weight: 600;
+        }
+
+        .preview-table td {
+            padding: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* Update the deliverables-list section styling */
+        #deliverables .value-prop .deliverables-list {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Remove the icon container styles since we're not using them */
+        #deliverables .value-prop .value-prop-icon {
+            display: none;
+        }
+
+        /* Update the heading style for better spacing without icons */
+        #deliverables .value-prop .deliverables-list h3 {
+            margin: 0;
+            color: white;
+            font-size: 1.4em;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Add background color to the last implementation roadmap card */
+        #deliverables .value-prop:last-child {
+            background: var(--primary-text);
+            color: white;
+        }
+
+        /* Update the risk assessment card title color */
+        #deliverables .value-prop:nth-child(1) h3 {
+            color: #000000;  /* Black */
+        }
+
+        /* Update the last implementation roadmap card background */
+        #deliverables .value-prop:last-child {
+            background: var(--primary-text);
+            color: white;
+        }
+
+        /* Update Value at Risk section text contrast */
+        .value-prop:nth-child(2) .samples-section {
+            color: #333333;  /* Darker text for better contrast */
+        }
+
+        .value-prop:nth-child(2) .samples-section span {
+            color: #333333;  /* Darker text for better contrast */
+        }
+
+        /* Update Risk Network lines and text */
+        .risk-network svg line {
+            stroke: #999999;  /* Darker lines for better visibility */
+            stroke-width: 1.5;  /* Slightly thicker lines */
+        }
+
+        .network-node.secondary {
+            background: white;
+            border: 1px solid var(--border-color);
+            color: #333333;  /* Darker text */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);  /* Add subtle shadow for better contrast */
+        }
+
+        /* Operating Model Assessment styling improvements */
+        .operating-model-assessment h5 {
+            color: #333333;  /* Darker text for headings */
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .operating-model-assessment {
+            background: white;  /* Ensure white background for better contrast */
+        }
+
+        /* Add these styles to the grid container */
+        .operating-model-assessment .grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            padding: 15px;
+            background: white;
+        }
+
+        /* Style for each grid item */
+        .operating-model-assessment .grid-item {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        /* Style for the labels and values */
+        .operating-model-assessment .dimension-label {
+            color: #333333;  /* Darker text */
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .operating-model-assessment .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);  /* Subtle inset shadow */
+        }
+
+        .operating-model-assessment .progress-bar-fill {
+            height: 100%;
+            background: var(--capability-color);
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);  /* Subtle shadow for depth */
+        }
+
+        /* Implementation Roadmap Card */
+        #deliverables .value-prop:nth-child(4) {
+            background: #2D2D2D;  /* Dark grey - Process black 90% */
+            color: white;
+        }
+
+        /* Update the samples section for better contrast on dark background */
+        #deliverables .value-prop:nth-child(4) .samples-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            padding: 20px;
+            color: var(--primary-text);
+        }
+
+        /* Adjust wave styles for better visibility */
+        #deliverables .value-prop:nth-child(4) .wave {
+            background: white;
+            border: 1px solid var(--border-color);
+        }
+
+        #deliverables .value-prop:nth-child(4) .wave-label {
+            color: var(--primary-text);
+        }
+
+        #deliverables .value-prop:nth-child(4) .wave-duration {
+            color: var(--secondary-text);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            position: relative;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .progress-bar-target {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .progress-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7em;
+            color: var(--secondary-text);
+        }
+
+        .progress-labels .target {
+            color: var(--capability-color);
+        }
+            /* Home Container */
+        .home-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Why Now Section */
+        .why-now-section {
+            padding: 60px 0;
+            background: white;
+            border-radius: 12px;
+            margin: 48px auto;
+            box-shadow: var(--card-shadow);
+        }
+
+        .why-now-section h2,
+        .methodology-section h2,
+        .client-types-section h2 {
+            text-align: center;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 48px;
+            color: var(--primary-text);
+        }
+
+        .approach-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            padding: 0 40px;
+        }
+
+        .approach-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 32px;
+            background: white;
+            border-radius: 12px;
+            transition: transform 0.2s ease;
+        }
+
+        .approach-card:hover {
+            transform: translateY(-4px);
+        }
+
+        /* Remove or update the icon-wrapper styles */
+        .icon-wrapper {
+            padding: 24px;
+            margin-bottom: 24px;
+            transition: transform 0.2s ease;
+            /* Remove background and border-radius */
+        }
+
+        /* Update the icon styles */
+        .icon {
+            width: 40px;
+            height: 40px;
+            color: #2D2D2D; /* Dark grey from style guide */
+        }
+
+        /* Update the hover effects */
+        .approach-card:hover .icon-wrapper {
+            transform: scale(1.1);
+        }
+
+        .approach-card h3 {
+            font-size: 1.4rem;
+            margin-bottom: 16px;
+            color: var(--primary-text);
+        }
+
+        .approach-card p {
+            color: var(--secondary-text);
+            line-height: 1.6;
+            font-size: 1.1rem;
+        }
+
+        /* Methodology Section */
+        .methodology-section {
+            padding: 60px 20px; /* Reduce side padding */
+            margin: 60px auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden; /* Prevent overflow */
+        }
+
+        .methodology-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px; /* Reduce gap */
+            max-width: 1200px; /* Add max-width */
+            margin: 0 auto; /* Center the grid */
+            padding: 0 20px; /* Reduce padding */
+        }
+
+        .methodology-card {
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px; /* Reduce padding */
+            display: flex;
+            flex-direction: column;
+            background: white;
+            height: 100%;
+            overflow: hidden;
+            min-width: 0; /* Prevent content from forcing card width */
+        }
+
+        .methodology-card h3 {
+            font-size: 1.2rem; /* Reduce font size */
+            margin-bottom: 12px;
+            color: var(--primary-text);
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
+        }
+
+        .methodology-card p {
+            color: var(--secondary-text);
+            line-height: 1.5;
+            font-size: 0.95rem; /* Reduce font size */
+            margin: 0;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        /* Update the method icon styles */
+        .method-icon-wrapper {
+            margin-bottom: 16px;  /* Add bottom margin */
+            width: fit-content;  /* Adjust width to content */
+        }
+
+        .method-icon {
+            width: 32px;
+            height: 32px;
+            color: #2D2D2D;  /* Dark grey from style guide */
+        }
+
+        /* Client Types Section */
+        .client-types-section {
+            padding: 60px 0;
+            margin: 60px auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .client-types-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            padding: 0 40px;
+        }
+
+        .client-card {
+            background: white;
+            box-shadow: var(--card-shadow);
+            border-radius: 12px;
+            padding: 32px;
+            transition: transform 0.2s ease;
+        }
+
+        .client-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .client-card h3 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            color: var(--primary-text);
+        }
+
+        .client-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .client-card li {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            color: var(--secondary-text);
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        .chevron-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--prep-color);
+            margin-right: 16px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            text-align: center;
+            padding: 80px 0;
+            margin: 60px auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .cta-section h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            color: var(--primary-text);
+        }
+
+        .cta-section p {
+            color: var(--secondary-text);
+            margin-bottom: 40px;
+            font-size: 1.2rem;
+            line-height: 1.6;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            background: var(--prep-color);
+            color: white;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .cta-button:hover {
+            background: var(--risk-color);
+            transform: translateY(-2px);
+        }
+
+        .arrow-icon {
+            width: 24px;
+            height: 24px;
+            margin-left: 12px;
+            transition: transform 0.2s ease;
+        }
+
+        .cta-button:hover .arrow-icon {
+            transform: translateX(4px);
+        }
+
+
+    .scroll-to-top {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: white;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        cursor: pointer;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        z-index: 1000;
+        border: 1px solid var(--border-color);
+    }
+
+    .scroll-to-top:hover {
+        transform: translateY(-2px);
+        background: var(--accent-light);
+    }
+
+    .scroll-to-top.visible {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .scroll-to-top svg {
+        width: 20px;
+        height: 20px;
+        color: var(--primary-text);
+    }
+
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .home-container {
+                padding: 0 16px;
+            }
+
+            .why-now-section h2,
+            .methodology-section h2,
+            .client-types-section h2 {
+                font-size: 1.8rem;
+                margin-bottom: 32px;
+            }
+
+            .approach-grid,
+            .methodology-grid,
+            .client-types-grid {
+                grid-template-columns: 1fr;
+                padding: 0 20px;
+                gap: 24px;
+            }
+
+            .methodology-card {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                padding: 24px;
+            }
+
+            .method-icon-wrapper {
+                margin-right: 0;
+                margin-bottom: 20px;
+            }
+
+            .client-card {
+                padding: 24px;
+            }
+
+            .cta-section {
+                padding: 60px 20px;
+            }
+
+            .cta-section h2 {
+                font-size: 1.6rem;
+            }
+
+            .cta-section p {
+                font-size: 1.1rem;
+            }
+
+            .cta-button {
+                padding: 14px 28px;
+                font-size: 1rem;
+            }
+
+            .methodology-grid {
+                grid-template-columns: 1fr;
+                padding: 0 10px;
+            }
+            
+            .methodology-card {
+                padding: 15px;
+            }
+        }
+    
+    </style>
+</head>
+<body>
+    <!-- Update the navigation menu -->
+    <nav class="nav-menu">
+        <a href="#home" class="active">Home</a>
+        <a href="#timeline">Timeline</a>
+        <a href="#deliverables">Deliverables</a>
+    </nav>
+
+    <!-- Add the home page content -->
+    <div id="home" class="home-container">
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <h1>Transform Sustainability Risks into Strategic Advantage</h1>
+            <p>Convert your ESG and sustainability risk inventory into executable strategic initiatives in 16 weeks.<br><br>
+               Our analytics-powered methodology helps you protect value from climate, resource, and social risks while building sustainable competitive advantages for tomorrow.</p>
+            <div class="scroll-down-indicator">
+                <span>Scroll to explore</span>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+            </div>
+        </div>
+    
+        <!-- Why Now Section -->
+        <div class="why-now-section">
+            <h2>Why Organizations Choose Our Approach</h2>
+            <div class="approach-grid">
+                <div class="approach-card">
+                    <div class="icon-wrapper">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <h3>Beyond Risk Management</h3>
+                    <p>Transform fragmented sustainability risks into strategic opportunities for value creation</p>
+                </div>
+                <div class="approach-card">
+                    <div class="icon-wrapper">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="6"/>
+                            <circle cx="12" cy="12" r="2"/>
+                        </svg>
+                    </div>
+                    <h3>Data-Driven Decisions</h3>
+                    <p>Leverage advanced analytics and industry expertise to quantify impacts and prioritize actions</p>
+                </div>
+                <div class="approach-card">
+                    <div class="icon-wrapper">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                        </svg>
+                    </div>
+                    <h3>Execution Focus</h3>
+                    <p>Build lasting capabilities and clear roadmaps for sustainable transformation</p>
+                </div>
+            </div>
+        </div>
+    
+        <!-- Methodology Overview - Now properly contained -->
+        <div class="methodology-section">
+            <h2>Our Proven Methodology</h2>
+            <div class="methodology-grid">
+                <div class="methodology-card">
+                    <div class="method-icon-wrapper">
+                        <svg class="method-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 8v8m-8-8v8M12 4v16m5-16H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2z"/>
+                        </svg>
+                    </div>
+                    <h3>Risk Assessment</h3>
+                    <p>Comprehensive analysis and quantification of sustainability risks</p>
+                </div>
+                <div class="methodology-card">
+                    <div class="method-icon-wrapper">
+                        <svg class="method-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="6"/>
+                            <circle cx="12" cy="12" r="2"/>
+                        </svg>
+                    </div>
+                    <h3>Strategic Response</h3>
+                    <p>Convert risks into strategic opportunities and action plans</p>
+                </div>
+                <div class="methodology-card">
+                    <div class="method-icon-wrapper">
+                        <svg class="method-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                    </div>
+                    <h3>Capability Building</h3>
+                    <p>Develop essential capabilities for sustainable transformation</p>
+                </div>
+                <div class="methodology-card">
+                    <div class="method-icon-wrapper">
+                        <svg class="method-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                    </div>
+                    <h3>Implementation</h3>
+                    <p>Clear roadmap for execution and value capture</p>
+                </div>
+            </div>
+        </div>
+    
+        <!-- Client Types Section -->
+        <div class="client-types-section">
+            <h2>Who We Serve</h2>
+            <div class="client-types-grid">
+                <div class="client-card">
+                    <h3>Sustainability & Risk Leaders</h3>
+                    <ul>
+                        <li>
+                            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                            <span>Transform ESG risks into structured action plans</span>
+                        </li>
+                        <li>
+                            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                            <span>Comprehensive impact quantification</span>
+                        </li>
+                        <li>
+                            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                            <span>Value protection frameworks</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="client-card">
+                    <h3>Growth Leaders</h3>
+                    <ul>
+                        <li>
+                            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                            <span>Convert challenges into market opportunities</span>
+                        </li>
+                        <li>
+                            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                            <span>Innovation pathways development</span>
+                        </li>
+                        <li>
+                            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                            <span>Strategic differentiation</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="client-card">
+                    <h3>Operations Leaders</h3>
+                    <ul>
+                        <li>
+                            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                            <span>Build execution capabilities</span>
+                        </li>
+                        <li>
+                            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                            <span>Transformation roadmaps</span>
+                        </li>
+                        <li>
+                            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                            <span>Clear target metrics</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    
+        <!-- CTA Section -->
+        <div class="cta-section">
+            <h2>Ready to Transform Your Approach?</h2>
+            <p>Learn how our methodology can help your organization turn sustainability risks into strategic advantages.</p>
+            <button class="cta-button">
+                Schedule a Consultation
+                <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14m-7-7l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="timeline" class="timeline">
+        <!-- Timeline hero section -->
+        <div class="hero-section">
+            <h1>Project Timeline</h1>
+            <p>A detailed 16-week transformation roadmap with clear milestones and deliverables</p>
+            <div class="scroll-down-indicator" data-next="timeline-table">
+                <span>Scroll to view timeline</span>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+            </div>
+        </div>
+
+        <table class="timeline-table">
+            <thead>
+                <tr>
+                    <th> </th>
+                    <th> </th>
+                    <th>Activity</th>
+                    <th>
+                        <div class="week-markers">
+                            <div class="week-marker" style="width: 48px;">Setup</div>
+                            <div class="week-marker" style="width: 144px;">Risk Assessment</div>
+                            <div class="week-marker" style="width: 144px;">Impact Quantification</div>
+                            <div class="week-marker" style="width: 144px;">Strategic Clusters</div>
+                            <div class="week-marker" style="width: 144px;">Capability</div>
+                            <div class="week-marker" style="width: 192px;">Roadmap</div>
+                        </div>
+                        <div class="week-markers">
+                            <div class="week-marker" style="width: 48px;">W0</div>
+                            <div class="week-marker" style="width: 48px;">W1</div>
+                            <div class="week-marker" style="width: 48px;">W2</div>
+                            <div class="week-marker" style="width: 48px;">W3</div>
+                            <div class="week-marker" style="width: 48px;">W4</div>
+                            <div class="week-marker" style="width: 48px;">W5</div>
+                            <div class="week-marker" style="width: 48px;">W6</div>
+                            <div class="week-marker" style="width: 48px;">W7</div>
+                            <div class="week-marker" style="width: 48px;">W8</div>
+                            <div class="week-marker" style="width: 48px;">W9</div>
+                            <div class="week-marker" style="width: 48px;">W10</div>
+                            <div class="week-marker" style="width: 48px;">W11</div>
+                            <div class="week-marker" style="width: 48px;">W12</div>
+                            <div class="week-marker" style="width: 48px;">W13</div>
+                            <div class="week-marker" style="width: 48px;">W14</div>
+                            <div class="week-marker" style="width: 48px;">W15</div>
+                            <div class="week-marker" style="width: 48px;">W16</div>
+                        </div>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="workshop-row">
+                    <td></td>
+                    <td class="agent-cell"></td>
+                    <td class="activity-cell">Client Workshops</td>
+                    <td class="timeline-cell">
+                        <!-- Week 1: Kick-off workshop -->
+                        <div class="workshop-marker" style="left: 48px;">▲</div>
+                        <div class="workshop-label" style="left: 72px;">Project Kickoff</div>
+                        
+                        <!-- Week 3: Risk validation -->
+                        <div class="workshop-marker" style="left: 144px;">▲</div>
+                        <div class="workshop-label" style="left: 168px;">Risk Review</div>
+                        
+                        <!-- Week 6: Quantification validation -->
+                        <div class="workshop-marker" style="left: 288px;">▲</div>
+                        <div class="workshop-label" style="left: 312px;">Impact Review</div>
+                        
+                        <!-- Week 9: Strategic action cluster -->
+                        <div class="workshop-marker" style="left: 432px;">▲</div>
+                        <div class="workshop-label" style="left: 456px;">Strategy Align</div>
+                        
+                        <!-- Week 12: Capability roadmap -->
+                        <div class="workshop-marker" style="left: 576px;">▲</div>
+                        <div class="workshop-label" style="left: 600px;">Cap Review</div>
+                        
+                        <!-- Week 15: Initiative validation -->
+                        <div class="workshop-marker" style="left: 720px;">▲</div>
+                        <div class="workshop-label" style="left: 744px;">Final Review</div>
+                    </td>
+                </tr>
+                <!-- Setup Phase -->
+                <tr class="phase-start phase-setup">
+                    <td rowspan="1">
+                        <div class="phase-header">Setup</div>
+                        <div class="phase-weeks">W0</div>
+                    </td>
+                    <td class="agent-cell agent-team">Team</td>
+                    <td class="activity-cell">Technical Setup & Pre-reading
+                        <span class="description">Deploy environment, set up integrations, and prepare industry risk library</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar team-bar" style="left: 0px; width: 48px;"></div>
+                    </td>
+                </tr>
+
+                <!-- Risk Assessment Phase - Reordered activities -->
+                <tr class="phase-start phase-risk">
+                    <td rowspan="4">
+                        <div class="phase-header">Risk Assessment</div>
+                        <div class="phase-weeks">W1-W3</div>
+                    </td>
+                    <td class="agent-cell agent-client">Client</td>
+                    <td class="activity-cell">Kick-off & Education Workshop
+                        <span class="description">Align team roles, schedule workshops, and establish communication channels</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar client-bar" style="left: 48px; width: 48px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-risk">
+                    <td class="agent-cell agent-team">Team</td>
+                    <td class="activity-cell">Tool Training & Initial Risk List
+                        <span class="description">Train team members and create initial risk list from library and 10-K analysis</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar team-bar" style="left: 48px; width: 48px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-risk">
+                    <td class="agent-cell agent-llm">LLM</td>
+                    <td class="activity-cell">Risk Decomposition & Scoring
+                        <span class="description">Map value chain and analyze risk categories, triggers, and impact pathways</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar llm-bar" style="left: 48px; width: 144px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-risk">
+                    <td class="agent-cell agent-team">Team</td>
+                    <td class="activity-cell">Data Collection & Validation
+                        <span class="description">Gather data and validate assumptions for impact quantification</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar team-bar" style="left: 96px; width: 96px;"></div>
+                    </td>
+                </tr>
+
+                <!-- Impact Quantification Phase - Reordered activities -->
+                <tr class="phase-start phase-impact">
+                    <td rowspan="3">
+                        <div class="phase-header">Impact Quantification</div>
+                        <div class="phase-weeks">W4-W6</div>
+                    </td>
+                    <td class="agent-cell agent-llm">LLM</td>
+                    <td class="activity-cell">Risk Correlation Analysis
+                        <span class="description">Identify risk interactions and build risk network analysis</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar llm-bar" style="left: 192px; width: 96px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-impact">
+                    <td class="agent-cell agent-team">Team</td>
+                    <td class="activity-cell">Quantification & Risk Network Analysis
+                        <span class="description">Refine assumptions and build risk cascades using Python support</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar team-bar" style="left: 192px; width: 144px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-impact">
+                    <td class="agent-cell agent-client">Client</td>
+                    <td class="activity-cell">Review Drafts & Workshop
+                        <span class="description">Review quantification results and validate with stakeholders</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar client-bar" style="left: 240px; width: 96px;"></div>
+                    </td>
+                </tr>
+
+                <!-- Strategic Clustering Phase - Reordered activities -->
+                <tr class="phase-start phase-cluster">
+                    <td rowspan="3">
+                        <div class="phase-header">Strategic Clustering</div>
+                        <div class="phase-weeks">W7-W9</div>
+                    </td>
+                    <td class="agent-cell agent-llm">LLM</td>
+                    <td class="activity-cell">Action Translation & Clustering
+                        <span class="description">Translate risks to actions and cluster by strategic implications</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar llm-bar" style="left: 336px; width: 96px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-cluster">
+                    <td class="agent-cell agent-team">Team</td>
+                    <td class="activity-cell">Review & Workshop Preparation
+                        <span class="description">Review action themes and prepare strategic workshop materials</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar team-bar" style="left: 336px; width: 144px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-cluster">
+                    <td class="agent-cell agent-client">Client</td>
+                    <td class="activity-cell">Strategic Action Workshop
+                        <span class="description">Validate strategic clusters and translate to capability requirements</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar client-bar" style="left: 432px; width: 48px;"></div>
+                    </td>
+                </tr>
+
+                <!-- Capability Assessment Phase -->
+                <tr class="phase-start phase-capability">
+                    <td rowspan="4">
+                        <div class="phase-header">Capability Assessment</div>
+                        <div class="phase-weeks">W10-W12</div>
+                    </td>
+                    <td class="agent-cell agent-llm">LLM</td>
+                    <td class="activity-cell">Framework Creation & Current State
+                        <span class="description">Create assessment framework and evaluate current state capabilities</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar llm-bar" style="left: 480px; width: 96px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-capability">
+                    <td class="agent-cell agent-team">Team</td>
+                    <td class="activity-cell">Survey Design & Synthesis
+                        <span class="description">Design and analyze capability diagnostic survey results</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar team-bar" style="left: 480px; width: 144px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-capability">
+                    <td class="agent-cell agent-client">Client</td>
+                    <td class="activity-cell">Capability Diagnostic Survey
+                        <span class="description">Complete survey to validate current state assessment</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar client-bar" style="left: 528px; width: 48px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-capability">
+                    <td class="agent-cell agent-llm">LLM</td>
+                    <td class="activity-cell">Target State Options
+                        <span class="description">Generate and refine target state recommendations</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar llm-bar" style="left: 576px; width: 48px;"></div>
+                    </td>
+                </tr>
+
+                <!-- Initiative Development Phase -->
+                <tr class="phase-start phase-initiative">
+                    <td rowspan="4">
+                        <div class="phase-header">Initiative Roadmap</div>
+                        <div class="phase-weeks">W13-W16</div>
+                    </td>
+                    <td class="agent-cell agent-llm">LLM</td>
+                    <td class="activity-cell">Initiative Generation & Analysis
+                        <span class="description">Create and assess initiatives to close capability gaps</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar llm-bar" style="left: 624px; width: 96px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-initiative">
+                    <td class="agent-cell agent-team">Team</td>
+                    <td class="activity-cell">Business Case & Roadmap Development
+                        <span class="description">Develop business cases and create implementation waves</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar team-bar" style="left: 624px; width: 192px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-initiative">
+                    <td class="agent-cell agent-client">Client</td>
+                    <td class="activity-cell">Initiative Workshop & Final Review
+                        <span class="description">Review prioritization and validate resource estimates</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar client-bar" style="left: 720px; width: 96px;"></div>
+                    </td>
+                </tr>
+                <tr class="phase-initiative">
+                    <td class="agent-cell agent-team">Team</td>
+                    <td class="activity-cell">Final Deliverable & Handover
+                        <span class="description">Finalize strategic roadmap and complete implementation kickoff</span>
+                    </td>
+                    <td class="timeline-cell">
+                        <div class="timeline-bar team-bar" style="left: 768px; width: 48px;"></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Replace methodology and enablement sections with just deliverables -->
+    <div id="deliverables" class="deliverables-section">
+        <div class="hero-section">
+            <h1>Project Deliverables</h1>
+            <p>Tangible outputs that drive transformation across each phase</p>
+            <div class="scroll-down-indicator" data-next="value-props">
+                <span> Scroll to explore deliverables</span>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="value-props">
+            <!-- Risk Assessment Card -->
+            <div class="value-prop">
+                <div class="deliverables-list">
+                    <div class="value-prop-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <h3>Risk Assessment</h3>
+                </div>
+                
+                <div class="samples-section">
+                    <h4>Sample Deliverables</h4>
+                    
+                    <div class="deliverable-preview">
+                        <h4>Value Chain Impact Map</h4>
+                        <div class="value-chain-map" style="position: relative;">
+                            <div class="chain-step" style="background: var(--prep-color); color: white;">Raw Materials</div>
+                            <div class="chain-arrow">→</div>
+                            <div class="chain-step" style="background: var(--risk-color); color: white;">Production</div>
+                            <div class="chain-arrow">→</div>
+                            <div class="chain-step" style="background: var(--impact-color); color: white;">Distribution</div>
+                            <div class="chain-arrow">→</div>
+                            <div class="chain-step" style="background: var(--cluster-color); color: white;">Retail</div>
+                        </div>
+                        <div style="margin-top: 10px; font-size: 0.8em; color: var(--secondary-text);">
+                            Interactive map showing risk exposure across value chain stages
+                        </div>
+                    </div>
+
+                    <div class="deliverable-preview">
+                        <h4>Risk Catalog Sample</h4>
+                        <table class="preview-table">
+                            <tr>
+                                <th>Risk ID</th>
+                                <th>Description</th>
+                                <th>Impact</th>
+                                <th>Controls</th>
+                            </tr>
+                            <tr style="background: rgba(255, 182, 0, 0.1);">
+                                <td>R1</td>
+                                <td>Water scarcity</td>
+                                <td>
+                                    <div style="width: 80%; height: 6px; background: var(--prep-color); border-radius: 3px;"></div>
+                                </td>
+                                <td>Low</td>
+                            </tr>
+                            <tr style="background: rgba(208, 74, 2, 0.1);">
+                                <td>R4</td>
+                                <td>Carbon pricing</td>
+                                <td>
+                                    <div style="width: 60%; height: 6px; background: var(--impact-color); border-radius: 3px;"></div>
+                                </td>
+                                <td>Medium</td>
+                            </tr>
+                            <tr style="background: rgba(219, 83, 106, 0.1);">
+                                <td>R7</td>
+                                <td>Packaging laws</td>
+                                <td>
+                                    <div style="width: 40%; height: 6px; background: var(--cluster-color); border-radius: 3px;"></div>
+                                </td>
+                                <td>Medium</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Impact Analysis Card -->
+            <div class="value-prop">
+                <div class="deliverables-list">
+                    <div class="value-prop-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                        </svg>
+                    </div>
+                    <h3>Impact Quantification</h3>
+                </div>
+                
+                <div class="samples-section">
+                    <h4>Sample Deliverables</h4>
+                    
+                    <div class="deliverable-preview">
+                        <h4>Quantified Impact Assessment (5-Year View)</h4>
+                        <div style="padding: 15px;">
+                            <div style="margin-bottom: 20px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                    <span style="font-weight: 500;">Resource Risks</span>
+                                    <span style="color: var(--primary-text);">$550M at Risk</span>
+                                </div>
+                                <div style="display: flex; gap: 10px; margin-bottom: 5px; font-size: 0.8em;">
+                                    <span>Revenue: -$300M</span>
+                                    <span>|</span>
+                                    <span>Cost: +$150M</span>
+                                    <span>|</span>
+                                    <span>CAPEX: +$100M</span>
+                                </div>
+                                <div style="width: 100%; height: 12px; background: #f0f0f0; border-radius: 6px;">
+                                    <div style="width: 70%; height: 100%; background: var(--prep-color); border-radius: 6px;"></div>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom: 20px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                    <span style="font-weight: 500;">Carbon Transition</span>
+                                    <span style="color: var(--primary-text);">$750M at Risk</span>
+                                </div>
+                                <div style="display: flex; gap: 10px; margin-bottom: 5px; font-size: 0.8em;">
+                                    <span>Revenue: -$200M</span>
+                                    <span>|</span>
+                                    <span>Cost: +$250M</span>
+                                    <span>|</span>
+                                    <span>CAPEX: +$300M</span>
+                                </div>
+                                <div style="width: 100%; height: 12px; background: #f0f0f0; border-radius: 6px;">
+                                    <div style="width: 85%; height: 100%; background: var(--impact-color); border-radius: 6px;"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                    <span style="font-weight: 500;">Circular Economy</span>
+                                    <span style="color: var(--primary-text);">$800M at Risk</span>
+                                </div>
+                                <div style="display: flex; gap: 10px; margin-bottom: 5px; font-size: 0.8em;">
+                                    <span>Revenue: -$400M</span>
+                                    <span>|</span>
+                                    <span>Cost: +$200M</span>
+                                    <span>|</span>
+                                    <span>CAPEX: +$200M</span>
+                                </div>
+                                <div style="width: 100%; height: 12px; background: #f0f0f0; border-radius: 6px;">
+                                    <div style="width: 100%; height: 100%; background: var(--cluster-color); border-radius: 6px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="deliverable-preview">
+                        <h4>Risk Network Analysis</h4>
+                        <div class="risk-network" style="height: 220px; position: relative;">
+                            <!-- Primary Impact Nodes -->
+                            <div class="network-node primary" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 120px;">
+                                Production Viability
+                            </div>
+                            
+                            <!-- Resource Risk Nodes -->
+                            <div class="network-node secondary" style="position: absolute; top: 20px; left: 20%; font-size: 0.8em;">
+                                Water Scarcity<br>
+                                <span style="font-size: 0.9em; color: #666;">$200M Impact</span>
+                            </div>
+                            <div class="network-node secondary" style="position: absolute; top: 20px; right: 20%; font-size: 0.8em;">
+                                Material Volatility<br>
+                                <span style="font-size: 0.9em; color: #666;">$250M Impact</span>
+                            </div>
+                            <div class="network-node secondary" style="position: absolute; bottom: 20px; left: 20%; font-size: 0.8em;">
+                                Biodiversity Loss<br>
+                                <span style="font-size: 0.9em; color: #666;">$100M Impact</span>
+                            </div>
+                            <div class="network-node secondary" style="position: absolute; bottom: 20px; right: 20%; font-size: 0.8em;">
+                                Resource Costs<br>
+                                <span style="font-size: 0.9em; color: #666;">$150M Impact</span>
+                            </div>
+                            
+                            <!-- Connection lines with arrows -->
+                            <svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;">
+                                <defs>
+                                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                        <polygon points="0 0, 10 3.5, 0 7" fill="#999" />
+                                    </marker>
+                                </defs>
+                                <line x1="50%" y1="50%" x2="20%" y2="20%" stroke="#999" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+                                <line x1="50%" y1="50%" x2="80%" y2="20%" stroke="#999" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+                                <line x1="50%" y1="50%" x2="20%" y2="80%" stroke="#999" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+                                <line x1="50%" y1="50%" x2="80%" y2="80%" stroke="#999" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Replace the Capability Assessment Card with two separate cards -->
+<div class="value-prop">
+    <div class="deliverables-list">
+        <div class="value-prop-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+        </div>
+        <h3>Capability Assessment</h3>
+    </div>
+    
+    <div class="samples-section">
+        <h4>Sample Deliverables</h4>
+        
+        <div class="deliverable-preview">
+            <h4>Capability Matrix</h4>
+            <table class="preview-table">
+                <tr>
+                    <th>Capability</th>
+                    <th>Current</th>
+                    <th>Target</th>
+                    <th>Gap</th>
+                </tr>
+                <tr>
+                    <td>Climate Risk Modeling</td>
+                    <td>Basic</td>
+                    <td>Advanced</td>
+                    <td>
+                        <div style="width: 100%; height: 8px; background: #f0f0f0; border-radius: 4px;">
+                            <div style="width: 75%; height: 100%; background: var(--capability-color); border-radius: 4px;"></div>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Carbon Accounting</td>
+                    <td>Annual</td>
+                    <td>Real-time</td>
+                    <td>
+                        <div style="width: 100%; height: 8px; background: #f0f0f0; border-radius: 4px;">
+                            <div style="width: 60%; height: 100%; background: var(--capability-color); border-radius: 4px;"></div>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Circular Design</td>
+                    <td>Limited</td>
+                    <td>Integrated</td>
+                    <td>
+                        <div style="width: 100%; height: 8px; background: #f0f0f0; border-radius: 4px;">
+                            <div style="width: 90%; height: 100%; background: var(--capability-color); border-radius: 4px;"></div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="deliverable-preview operating-model-assessment">
+            <h4>Operating Model Assessment</h4>
+            <div class="grid-container">
+                <div class="grid-item">
+                    <div class="dimension-label">Process & Governance</div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: 65%; background: var(--secondary-text);"></div>
+                        <div class="progress-bar-target" style="width: 85%; border-right: 2px dashed var(--capability-color);"></div>
+                    </div>
+                    <div class="progress-labels">
+                        <span class="current">Current: 65%</span>
+                        <span class="target">Target: 85%</span>
+                    </div>
+                </div>
+                <div class="grid-item">
+                    <div class="dimension-label">Technology & Data</div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: 45%; background: var(--secondary-text);"></div>
+                        <div class="progress-bar-target" style="width: 90%; border-right: 2px dashed var(--capability-color);"></div>
+                    </div>
+                    <div class="progress-labels">
+                        <span class="current">Current: 45%</span>
+                        <span class="target">Target: 90%</span>
+                    </div>
+                </div>
+                <div class="grid-item">
+                    <div class="dimension-label">People & Skills</div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: 80%; background: var(--secondary-text);"></div>
+                        <div class="progress-bar-target" style="width: 95%; border-right: 2px dashed var(--capability-color);"></div>
+                    </div>
+                    <div class="progress-labels">
+                        <span class="current">Current: 80%</span>
+                        <span class="target">Target: 95%</span>
+                    </div>
+                </div>
+                <div class="grid-item">
+                    <div class="dimension-label">External Partnerships</div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: 35%; background: var(--secondary-text);"></div>
+                        <div class="progress-bar-target" style="width: 75%; border-right: 2px dashed var(--capability-color);"></div>
+                    </div>
+                    <div class="progress-labels">
+                        <span class="current">Current: 35%</span>
+                        <span class="target">Target: 75%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add new Implementation Roadmap Card -->
+<div class="value-prop">
+    <div class="deliverables-list">
+        <div class="value-prop-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <h3>Implementation Roadmap</h3>
+    </div>
+    
+    <div class="samples-section">
+        <h4>Sample Deliverables</h4>
+        
+        <div class="deliverable-preview">
+            <h4>Strategic Implementation Waves</h4>
+            <div class="wave-timeline">
+                <div class="wave" style="border-left: 4px solid var(--prep-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="wave-label">Wave 1: Foundation Building</span>
+                        <span class="wave-duration">Months 1-6</span>
+                    </div>
+                    <div style="font-size: 0.85em; color: var(--secondary-text); margin-top: 8px;">
+                        • Deploy climate risk modeling platform<br>
+                        • Launch supplier engagement program<br>
+                        • Implement carbon accounting system
+                    </div>
+                </div>
+                
+                <div class="wave" style="border-left: 4px solid var(--impact-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="wave-label">Wave 2: Acceleration</span>
+                        <span class="wave-duration">Months 7-12</span>
+                    </div>
+                    <div style="font-size: 0.85em; color: var(--secondary-text); margin-top: 8px;">
+                        • Scale regenerative agriculture<br>
+                        • Roll out fleet optimization<br>
+                        • Launch consumer platform
+                    </div>
+                </div>
+                
+                <div class="wave" style="border-left: 4px solid var(--cluster-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="wave-label">Wave 3: Transformation</span>
+                        <span class="wave-duration">Months 13-24</span>
+                    </div>
+                    <div style="font-size: 0.85em; color: var(--secondary-text); margin-top: 8px;">
+                        • Complete supplier transformation<br>
+                        • Transform logistics network<br>
+                        • Scale reuse models
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="deliverable-preview">
+            <h4>Success Metrics Framework</h4>
+            <table class="preview-table">
+                <tr>
+                    <th>Category</th>
+                    <th>Key Metrics</th>
+                    <th>Target</th>
+                    <th>Timeline</th>
+                </tr>
+                <tr>
+                    <td><strong>Impact</strong></td>
+                    <td>Value at Risk Reduction</td>
+                    <td>-40%</td>
+                    <td>24 months</td>
+                </tr>
+                <tr>
+                    <td><strong>Capability</strong></td>
+                    <td>Digital Platform Adoption</td>
+                    <td>85%</td>
+                    <td>18 months</td>
+                </tr>
+                <tr>
+                    <td><strong>Sustainability</strong></td>
+                    <td>Emissions Reduction</td>
+                    <td>-30%</td>
+                    <td>24 months</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sections = document.querySelectorAll('#home, #timeline, #deliverables');
+            const navLinks = document.querySelectorAll('.nav-menu a');
+
+            window.addEventListener('scroll', () => {
+                let current = '';
+                
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (window.pageYOffset >= (sectionTop - 100)) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+        });
+    </script>
+<div class="scroll-to-top">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 15l-6-6-6 6"/>
+    </svg>
+</div>
+
+<script>
+    // Add this to your existing script
+    const scrollToTop = document.querySelector('.scroll-to-top');
+    
+    window.addEventListener('scroll', () => {
+        // Show button when user scrolls down 500px
+        if (window.pageYOffset > 500) {
+            scrollToTop.classList.add('visible');
+        } else {
+            scrollToTop.classList.remove('visible');
+        }
+    });
+    
+    scrollToTop.addEventListener('click', () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    });
+
+        // Add scroll-down indicator logic
+        const scrollDownIndicator = document.querySelector('.scroll-down-indicator');
+    
+    window.addEventListener('scroll', () => {
+        // Existing scroll-to-top logic...
+        
+        // Hide scroll-down indicator after scrolling down 100px
+        if (window.pageYOffset > 100) {
+            scrollDownIndicator.classList.add('hidden');
+        } else {
+            scrollDownIndicator.classList.remove('hidden');
+        }
+    });
+
+    // Optional: Scroll down when clicking the indicator
+    scrollDownIndicator.addEventListener('click', () => {
+        const nextSection = document.querySelector('.why-now-section');
+        nextSection.scrollIntoView({ behavior: 'smooth' });
+    });
+</script>
+</body>
+</html>

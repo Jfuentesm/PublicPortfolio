@@ -7,7 +7,7 @@
     />
 
     <!-- Main content area -->
-    <main role="main" class="flex-grow w-full mx-auto">
+    <main role="main" class="flex-grow w-full mx-auto pt-16"> <!-- Added pt-16 for fixed navbar -->
       <!-- Render based on viewStore and potentially route -->
       <LandingPage
         v-if="viewStore.currentView === 'landing' && !isResetPasswordRoute"
@@ -26,9 +26,12 @@
         <!-- AppContent manages JobUpload, JobHistory, JobStatus -->
         <AppContent />
       </div>
+      <!-- === UPDATED: Render AdminDashboard for 'admin' view === -->
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" v-else-if="viewStore.currentView === 'admin'">
-        <UserManagement />
+        <AdminDashboard />
+        <!-- Note: UserManagement might be moved *inside* AdminDashboard or accessed via a sub-route/tab there -->
       </div>
+      <!-- === END UPDATED === -->
     </main>
 
     <Footer />
@@ -41,7 +44,8 @@ import Navbar from './components/Navbar.vue';
 import LandingPage from './components/LandingPage.vue';
 import AppContent from './components/AppContent.vue';
 import Footer from './components/Footer.vue';
-import UserManagement from './components/UserManagement.vue';
+// import UserManagement from './components/UserManagement.vue'; // Keep if needed elsewhere, remove if only in AdminDashboard
+import AdminDashboard from './components/AdminDashboard.vue'; // <<< Import AdminDashboard
 import ResetPassword from './components/ResetPassword.vue'; // Import ResetPassword
 import { useAuthStore } from './stores/auth';
 import { useJobStore } from './stores/job';
@@ -87,6 +91,9 @@ const navigateTo = (path: string, searchParams: URLSearchParams | null = null) =
     if (path === '/' || path === '/forgot-password') {
         if (!authStore.isAuthenticated) {
             viewStore.setView('landing');
+        } else if (viewStore.currentView === 'admin') {
+            // If navigating away from admin, switch back to app view
+            viewStore.setView('app');
         }
     }
     // If navigating to the main app view, check for job_id
@@ -141,7 +148,7 @@ const handleLogout = () => {
 
 const handleLoginSuccess = () => {
   console.log('Login successful, App.vue notified.');
-  viewStore.setView('app');
+  viewStore.setView('app'); // Default to app view on login
   authStore.fetchCurrentUserDetails();
   // Check URL for job_id immediately after login
   const urlParams = new URLSearchParams(window.location.search);
@@ -154,7 +161,7 @@ watch(() => authStore.isAuthenticated, (isAuth, wasAuth) => {
   if (!isResetPasswordRoute.value) { // Only change view if not on reset password page
     if (isAuth && viewStore.currentView === 'landing') {
       console.log("App.vue: Auth true, setting view to 'app'");
-      viewStore.setView('app');
+      viewStore.setView('app'); // Default to app view
       // Check URL for job_id when becoming authenticated
       const urlParams = new URLSearchParams(window.location.search);
       handleAppNavigation(urlParams);
@@ -166,14 +173,12 @@ watch(() => authStore.isAuthenticated, (isAuth, wasAuth) => {
 }, { immediate: false }); // Change immediate to false to avoid race conditions on initial load
 
 // Watch for route changes (path or search) to potentially update view or job ID
-// --- FIX: Use _oldPath to indicate unused variable ---
 watch([currentPath, currentSearch], ([newPath, newSearch], [_oldPath, oldSearch]) => {
-// --- END FIX ---
     console.log("App.vue: Route watcher triggered. New Path:", newPath, "New Search:", newSearch); // Debugging
     if (!isResetPasswordRoute.value && !authStore.isAuthenticated) {
         console.log("App.vue: Not reset route, not authenticated, setting view to landing.");
         viewStore.setView('landing');
-    } else if (authStore.isAuthenticated && viewStore.currentView === 'app') {
+    } else if (authStore.isAuthenticated && viewStore.currentView !== 'admin') { // Only adjust job ID if not in admin view
         // If already in the app view, check if the job_id param changed
         const oldParams = new URLSearchParams(oldSearch);
         const newParams = new URLSearchParams(newSearch);
@@ -190,10 +195,8 @@ watch([currentPath, currentSearch], ([newPath, newSearch], [_oldPath, oldSearch]
 
 
 onMounted(() => {
-    // --- FIX: Remove .then() chain from checkAuthStatus ---
     authStore.checkAuthStatus();
     // Rely on the watcher for isAuthenticated to handle logic after status check
-    // --- END FIX ---
 
     // Initial setup based on current state after checkAuthStatus might have run
     console.log("App.vue: onMounted - Initial state check. Auth state:", authStore.isAuthenticated);
@@ -202,7 +205,12 @@ onMounted(() => {
       authStore.fetchCurrentUserDetails();
       // Set initial view based on auth state *after* checking auth
       if (!isResetPasswordRoute.value) {
-        viewStore.setView('app');
+          // Don't force 'app' view here if 'admin' might be intended (e.g., from Navbar click)
+          // The Navbar click handler should set the view correctly.
+          // If landing page is shown initially, the auth watcher will switch to 'app'.
+          if (viewStore.currentView === 'landing') {
+              viewStore.setView('app');
+          }
       }
       handleAppNavigation(null); // Check URL for job_id after auth check
     } else {
@@ -224,5 +232,9 @@ onUnmounted(() => {
 html, body, #app {
   height: 100%;
   margin: 0;
+}
+/* Add padding to the top of the main content area to account for the fixed navbar */
+main[role="main"] {
+  padding-top: 4rem; /* Adjust this value based on your navbar's height (h-16 = 4rem) */
 }
 </style>

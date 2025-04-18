@@ -171,7 +171,7 @@ interface ReclassifyRequestItemData {
 // Matches backend schemas/review.py -> ReclassifyResponse
 interface ReclassifyResponseData {
     review_job_id: string;
-    message: string;
+    message: string; // Optional message if added in backend
 }
 // --- END ADDED ---
 
@@ -180,6 +180,42 @@ interface ReclassifyResponseData {
 interface MergeResponseData {
     message: string;
     updated_parent_job_id: string;
+}
+// --- END ADDED ---
+
+// --- ADDED: Admin Dashboard Interfaces ---
+// Matches backend schemas/admin.py -> SystemStatsResponse
+export interface SystemStatsResponse {
+    total_users: number;
+    total_jobs: number;
+    pending_jobs: number;
+    processing_jobs: number;
+    completed_jobs: number;
+    failed_jobs_last_24h: number;
+    estimated_recent_cost?: number | null;
+    health_status: Record<string, any>; // Dictionary for health check data
+}
+
+// Matches backend schemas/admin.py -> RecentJobItem
+export interface RecentJobItem {
+    id: string;
+    created_by: string;
+    company_name: string;
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    created_at: string; // ISO Date string
+    job_type: 'CLASSIFICATION' | 'REVIEW';
+}
+
+// Matches backend schemas/admin.py -> RecentJobsResponse
+export interface RecentJobsResponse {
+    jobs: RecentJobItem[];
+}
+// --- END ADDED: Admin Dashboard Interfaces ---
+
+// --- ADDED: Cancel Job Response Interface ---
+// Matches backend api/admin.py -> cancel_job response
+interface CancelJobResponse {
+    message: string;
 }
 // --- END ADDED ---
 
@@ -406,6 +442,7 @@ const apiService = {
 
     /**
         * Fetches a list of jobs for the current user, with optional filtering/pagination.
+        * (Superusers will receive all jobs from the backend).
         */
     async getJobs(params: GetJobsParams = {}): Promise<JobResponse[]> {
         const cleanedParams = Object.fromEntries(
@@ -543,8 +580,44 @@ const apiService = {
         const response = await axiosInstance.post<MergeResponseData>(`/jobs/${reviewJobId}/merge`);
         console.log(`[api.ts mergeReviewResults] Merge request successful: ${response.data.message}`);
         return response.data;
-    }
+    },
     // --- END ADDED ---
+
+    // --- ADDED: Admin Dashboard API Methods ---
+    /**
+     * Fetches system statistics (admin only).
+     */
+    async getSystemStats(): Promise<SystemStatsResponse> {
+        console.log('[api.ts getSystemStats] Fetching admin system stats...');
+        const response = await axiosInstance.get<SystemStatsResponse>('/admin/stats');
+        console.log('[api.ts getSystemStats] System stats received.');
+        return response.data;
+    },
+
+    /**
+     * Fetches recent jobs across all users (admin only).
+     */
+    async getRecentJobs(limit: number = 15): Promise<RecentJobsResponse> {
+        console.log(`[api.ts getRecentJobs] Fetching recent jobs (limit: ${limit})...`);
+        const response = await axiosInstance.get<RecentJobsResponse>('/admin/recent-jobs', { params: { limit } });
+        console.log(`[api.ts getRecentJobs] Received ${response.data.jobs.length} recent jobs.`);
+        return response.data;
+    },
+    // --- END ADDED: Admin Dashboard API Methods ---
+
+    // --- ADDED: Cancel Job API Method ---
+    /**
+     * Cancels a job (admin only).
+     */
+    async cancelJob(jobId: string): Promise<CancelJobResponse> {
+        console.log(`[api.ts cancelJob] Requesting cancellation for job ID: ${jobId}`);
+        // Uses axiosInstance, requires superuser auth token via interceptor
+        const response = await axiosInstance.post<CancelJobResponse>(`/admin/jobs/${jobId}/cancel`);
+        console.log(`[api.ts cancelJob] Cancellation response for job ${jobId}: ${response.data.message}`);
+        return response.data;
+    },
+    // --- END ADDED ---
+
 };
 
 export default apiService;
