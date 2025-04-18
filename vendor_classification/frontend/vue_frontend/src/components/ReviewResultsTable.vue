@@ -2,7 +2,7 @@
   <div class="mt-8 p-4 sm:p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner">
     <h5 class="text-lg font-semibold text-gray-800 mb-4">Reviewed Classification Results</h5>
     <p class="text-sm text-gray-600 mb-4">
-      Showing results after applying user hints. Target classification level for this review was **Level {{ targetLevel }}**. You can flag items again for further review if needed.
+      Showing results after applying user hints. Target classification level for this review was **Level {{ targetLevel }}**. You can flag items again to start another review cycle (hints will be asked for again during submission).
     </p>
 
     <!-- Search Input -->
@@ -34,6 +34,7 @@
           <PaperAirplaneIcon v-else class="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
           Submit {{ jobStore.flaggedForReview.size }} Flag{{ jobStore.flaggedForReview.size !== 1 ? 's' : '' }} for Re-classification
         </button>
+        <p class="mt-1 text-xs text-gray-600 text-right">Hints will be collected when submitting flags from the original job view.</p>
         <p v-if="jobStore.reclassifyError" class="text-xs text-red-600 mt-1 text-right">{{ jobStore.reclassifyError }}</p>
     </div>
 
@@ -85,7 +86,7 @@
             <td class="sticky left-0 z-10 bg-white px-2 py-2 text-center align-middle" :class="{'bg-indigo-50': jobStore.isFlagged(item.vendor_name)}">
                  <button
                     @click="toggleFlag(item.vendor_name)"
-                    :title="jobStore.isFlagged(item.vendor_name) ? 'Remove flag and hint' : 'Flag for re-classification'"
+                    :title="jobStore.isFlagged(item.vendor_name) ? 'Remove flag' : 'Flag for next review cycle'"
                     class="p-1 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary"
                     :class="jobStore.isFlagged(item.vendor_name) ? 'text-primary' : 'text-gray-400 hover:text-primary-dark'"
                   >
@@ -96,17 +97,10 @@
             </td>
             <!-- Vendor Name Cell (Sticky) -->
             <td class="sticky left-[48px] z-10 bg-white px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900" :class="{'bg-indigo-50': jobStore.isFlagged(item.vendor_name)}">{{ item.vendor_name }}</td>
-            <!-- Hint Cell -->
+            <!-- Hint Cell (Display Only) -->
             <td class="px-3 py-2 text-xs text-gray-600 max-w-xs break-words">
-                <span v-if="!jobStore.isFlagged(item.vendor_name)">{{ item.hint }}</span>
-                 <!-- Inline Hint Editor when Flagged -->
-                <textarea v-else
-                          rows="2"
-                          :value="jobStore.getHint(item.vendor_name)"
-                          @input="updateHint(item.vendor_name, ($event.target as HTMLTextAreaElement).value)"
-                          placeholder="Enter new hint..."
-                          class="block w-full text-xs rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                ></textarea>
+                <span>{{ item.hint }}</span>
+                <!-- Removed Hint Input Textarea -->
             </td>
             <!-- Original Classification -->
             <td class="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-500 bg-blue-50">{{ item.original_result?.level1_id || '-' }}</td>
@@ -125,6 +119,16 @@
                     {{ item.original_result?.final_status }}
                 </span>
             </td>
+            <td class="px-3 py-2 whitespace-nowrap text-xs text-center text-gray-500 bg-blue-50">
+               <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                     :class="getSourceClass(item.original_result?.classification_source)">
+                 {{ item.original_result?.classification_source }}
+               </span>
+             </td>
+            <td class="px-3 py-2 text-xs text-gray-500 max-w-xs break-words bg-blue-50">
+              {{ item.original_result?.classification_notes_or_reason || '-' }}
+            </td>
+
 
             <!-- New Classification -->
             <td class="px-3 py-2 whitespace-nowrap text-xs font-mono bg-green-50" :class="getCellClass(item.new_result, 1)">{{ item.new_result?.level1_id || '-' }}</td>
@@ -150,6 +154,12 @@
                 {{ item.new_result?.final_status }}
               </span>
             </td>
+             <td class="px-3 py-2 whitespace-nowrap text-xs text-center bg-green-50">
+               <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                     :class="getSourceClass(item.new_result?.classification_source)">
+                 {{ item.new_result?.classification_source }}
+               </span>
+             </td>
             <td class="px-3 py-2 text-xs text-gray-500 max-w-xs break-words bg-green-50">
               {{ item.new_result?.classification_notes_or_reason || '-' }}
             </td>
@@ -171,7 +181,6 @@ import { ref, computed, type PropType } from 'vue';
 import { useJobStore, type ReviewResultItem, type JobResultItem } from '@/stores/job';
 import { FlagIcon as FlagIconOutline, MagnifyingGlassIcon, PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/vue/24/outline';
 import { FlagIcon as FlagIconSolid, ChevronUpIcon, ChevronDownIcon, ChevronUpDownIcon } from '@heroicons/vue/20/solid';
-// import HintInputModal from './HintInputModal.vue'; // Import if using modal
 
 // --- Define Header Interface ---
 interface ReviewTableHeader {
@@ -214,11 +223,8 @@ const jobStore = useJobStore();
 const searchTerm = ref('');
 const sortKey = ref<string | null>('vendor_name'); // Default sort by vendor name
 const sortDirection = ref<'asc' | 'desc' | null>('asc'); // Default sort direction
-// const showHintModal = ref(false); // State for modal
-// const selectedVendorForHint = ref(''); // State for modal
 
 // --- Table Headers Definition ---
-// ADDED HEADERS FOR L2, L3, L4 for both Original and New sections
 const headers = ref<ReviewTableHeader[]>([
   { key: 'vendor_name', label: 'Vendor Name', sortable: true, sticky: true, minWidth: '150px' }, // Make Vendor sticky
   { key: 'hint', label: 'User Hint', sortable: true, minWidth: '180px' },
@@ -234,6 +240,8 @@ const headers = ref<ReviewTableHeader[]>([
   { key: 'original_result.level5_id', label: 'Orig L5 ID', sortable: true, minWidth: '80px', isOriginal: true },
   { key: 'original_result.level5_name', label: 'Orig L5 Name', sortable: true, minWidth: '120px', isOriginal: true },
   { key: 'original_result.final_status', label: 'Orig Status', sortable: true, minWidth: '100px', isOriginal: true },
+  { key: 'original_result.classification_source', label: 'Orig Source', sortable: true, minWidth: '80px', isOriginal: true },
+  { key: 'original_result.classification_notes_or_reason', label: 'Orig Notes/Reason', sortable: false, minWidth: '200px', isOriginal: true },
   // New Results
   { key: 'new_result.level1_id', label: 'New L1 ID', sortable: true, minWidth: '80px', isNew: true },
   { key: 'new_result.level1_name', label: 'New L1 Name', sortable: true, minWidth: '120px', isNew: true },
@@ -247,6 +255,7 @@ const headers = ref<ReviewTableHeader[]>([
   { key: 'new_result.level5_name', label: 'New L5 Name', sortable: true, minWidth: '120px', isNew: true },
   { key: 'new_result.final_confidence', label: 'New Confidence', sortable: true, minWidth: '100px', isNew: true },
   { key: 'new_result.final_status', label: 'New Status', sortable: true, minWidth: '100px', isNew: true },
+  { key: 'new_result.classification_source', label: 'New Source', sortable: true, minWidth: '80px', isNew: true },
   { key: 'new_result.classification_notes_or_reason', label: 'New Notes / Reason', sortable: false, minWidth: '200px', isNew: true },
 ]);
 
@@ -283,6 +292,8 @@ const filteredAndSortedResults = computed(() => {
       getNestedValue(item, 'original_result.level5_id')?.toLowerCase().includes(lowerSearchTerm) ||
       getNestedValue(item, 'original_result.level5_name')?.toLowerCase().includes(lowerSearchTerm) ||
       getNestedValue(item, 'original_result.final_status')?.toLowerCase().includes(lowerSearchTerm) ||
+      getNestedValue(item, 'original_result.classification_source')?.toLowerCase().includes(lowerSearchTerm) ||
+      getNestedValue(item, 'original_result.classification_notes_or_reason')?.toLowerCase().includes(lowerSearchTerm) ||
       // Search within new results (L1-L5)
       getNestedValue(item, 'new_result.level1_id')?.toLowerCase().includes(lowerSearchTerm) ||
       getNestedValue(item, 'new_result.level1_name')?.toLowerCase().includes(lowerSearchTerm) ||
@@ -295,6 +306,7 @@ const filteredAndSortedResults = computed(() => {
       getNestedValue(item, 'new_result.level5_id')?.toLowerCase().includes(lowerSearchTerm) ||
       getNestedValue(item, 'new_result.level5_name')?.toLowerCase().includes(lowerSearchTerm) ||
       getNestedValue(item, 'new_result.final_status')?.toLowerCase().includes(lowerSearchTerm) ||
+      getNestedValue(item, 'new_result.classification_source')?.toLowerCase().includes(lowerSearchTerm) ||
       getNestedValue(item, 'new_result.classification_notes_or_reason')?.toLowerCase().includes(lowerSearchTerm)
     );
   }
@@ -370,6 +382,15 @@ function getStatusClass(status: string | null | undefined): string {
     }
 }
 
+function getSourceClass(source: string | null | undefined): string {
+    switch(source?.toLowerCase()){
+        case 'initial': return 'bg-green-100 text-green-800';
+        case 'search': return 'bg-blue-100 text-blue-800';
+        case 'review': return 'bg-purple-100 text-purple-800'; // Added style for review source
+        default: return 'bg-gray-100 text-gray-800';
+    }
+}
+
 // Highlight cells beyond the target classification depth in the *new* result
 // Or if the ID itself is null/empty
 function getCellClass(item: JobResultItem | null | undefined, level: number): string {
@@ -402,35 +423,28 @@ function getCellClass(item: JobResultItem | null | undefined, level: number): st
     return baseClass; // Default style if it has an ID and is within target level
 }
 
-// --- Flagging and Hint Handling ---
+// --- Flagging Handling (Simplified: No Hint Input Here) ---
 function toggleFlag(vendorName: string) {
     if (jobStore.isFlagged(vendorName)) {
-        jobStore.unflagVendor(vendorName);
+        jobStore.unflagVendor(vendorName); // Unflagging removes hint automatically in store
     } else {
-        // Pre-populate hint if available from the current item's hint field
-        const currentItem = props.results?.find(r => r.vendor_name === vendorName);
-        const initialHint = currentItem?.hint || ''; // Use existing hint or empty string
+        // Just flag the vendor, no hint needed here.
+        // Hints will be collected when submitting from the original job view.
         jobStore.flagVendor(vendorName);
-        jobStore.setHint(vendorName, initialHint); // Set the initial hint when flagging
-        // Optionally open modal here if using one
-        // selectedVendorForHint.value = vendorName;
-        // showHintModal.value = true;
     }
 }
 
-function updateHint(vendorName: string, hint: string) {
-    jobStore.setHint(vendorName, hint);
-}
-
-// function saveHint(hint: string) {
-//     if (selectedVendorForHint.value) {
-//         jobStore.setHint(selectedVendorForHint.value, hint);
-//     }
-//     selectedVendorForHint.value = ''; // Clear selection
-// }
+// REMOVED updateHint method as it's no longer needed here
 
 async function submitFlags() {
-    emit('submit-flags'); // Notify parent (JobStatus) to handle submission logic
+    // Emit the event. The parent (JobStatus) will call the store's submit action.
+    // The store's submit action should be aware that hints might not be present
+    // if submitted from this table, or ideally, submission from here is disabled
+    // or triggers a different flow (e.g., navigating back to original job).
+    // For now, we keep the button and emission, assuming the store handles it.
+    // A better UX might be to disable the submit button here and only allow it
+    // on the JobResultsTable view.
+    emit('submit-flags');
 }
 
 // --- Helper Component for Sort Icons ---
@@ -467,6 +481,11 @@ tbody td.sticky {
     /* Apply background color matching the row's background (consider hover/flagged states) */
     background-color: inherit; /* Inherit from parent tr */
 }
+/* Ensure flagged rows inherit sticky background correctly */
+tbody tr.bg-indigo-50 td.sticky {
+    background-color: #e0e7ff; /* bg-indigo-50 */
+}
+
 
 /* Add slight borders for visual separation */
 th.isOriginal, td.isOriginal {
@@ -475,8 +494,15 @@ th.isOriginal, td.isOriginal {
 th.isNew, td.isNew {
     border-left: 1px solid #e5e7eb; /* gray-200 */
 }
-th:first-child, td:first-child {
+th:first-child, td:first-child { /* Flag column */
     border-left: none;
+}
+th:nth-child(2), td:nth-child(2) { /* Vendor name column */
+     border-left: none;
+}
+/* Adjust border for hint column if it's the first after vendor name */
+th:nth-child(3), td:nth-child(3) {
+    border-left: 1px solid #e5e7eb; /* Hint column always has left border now */
 }
 
 </style>

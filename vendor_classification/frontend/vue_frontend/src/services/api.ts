@@ -5,7 +5,9 @@ import axios, {
 } from 'axios';
 import { useAuthStore } from '@/stores/auth'; // Adjust path as needed
 // --- UPDATED: Import JobResultItem and ReviewResultItem ---
+// --- REMOVED JobStatsData from this import ---
 import type { JobDetails, JobResultItem, ReviewResultItem } from '@/stores/job'; // Adjust path as needed
+// --- END REMOVED ---
 // --- END UPDATED ---
 
 // --- Define API Response Interfaces ---
@@ -85,6 +87,7 @@ export interface JobResponse {
     job_type: 'CLASSIFICATION' | 'REVIEW';
     parent_job_id: string | null;
     // --- END ADDED ---
+    stats?: Record<string, any>; // Include stats field optionally
 }
 
 // --- ADDED: Job Results Response Interface ---
@@ -96,9 +99,11 @@ export interface JobResultsResponse {
 }
 // --- END ADDED ---
 
-
+// --- ADDED: Job Stats Data Interface ---
 // Matches backend models/classification.py -> ProcessingStats and console log
+// --- UPDATED: Export the interface ---
 export interface JobStatsData {
+// --- END UPDATED ---
     job_id: string;
     company_name: string;
     start_time: string | null; // Assuming ISO string
@@ -107,29 +112,31 @@ export interface JobStatsData {
     total_vendors: number | null; // Added
     unique_vendors: number | null; // Added (was present in console)
     target_level: number | null; // Added target level to stats
-    successfully_classified_l4: number | null; // Keep for reference
-    successfully_classified_l5: number | null; // Keep L5 count
-    classification_not_possible_initial: number | null; // Added
-    invalid_category_errors: number | null; // Added (was present in console)
-    search_attempts: number | null; // Added
-    search_successful_classifications_l1: number | null; // Added
-    search_successful_classifications_l5: number | null; // Renamed from search_assisted_l5
-    api_usage: { // Nested structure
+    successfully_classified_l4?: number | null; // Keep for reference (optional)
+    successfully_classified_l5?: number | null; // Keep L5 count (optional)
+    classification_not_possible_initial?: number | null; // Added (optional)
+    invalid_category_errors?: number | null; // Added (was present in console) (optional)
+    search_attempts?: number | null; // Added (optional)
+    search_successful_classifications_l1?: number | null; // Added (optional)
+    search_successful_classifications_l5?: number | null; // Renamed from search_assisted_l5 (optional)
+    api_usage?: { // Nested structure (optional)
         openrouter_calls: number | null;
         openrouter_prompt_tokens: number | null;
         openrouter_completion_tokens: number | null;
         openrouter_total_tokens: number | null;
-        tavily_search_calls: number | null;
+        tavily_search_calls?: number | null; // Optional if not always present
         cost_estimate_usd: number | null;
     } | null; // Allow api_usage itself to be null if not populated
     // --- ADDED: Stats specific to REVIEW jobs ---
-    reclassify_input?: Array<{ vendor_name: string; hint: string }>; // Input hints
-    total_items_processed?: number;
-    successful_reclassifications?: number;
-    failed_reclassifications?: number;
-    parent_job_id?: string; // Include parent ID in stats for review jobs
+    reclassify_input?: Array<{ vendor_name: string; hint: string }>; // Input hints (optional)
+    total_items_processed?: number; // Optional
+    successful_reclassifications?: number; // Optional
+    failed_reclassifications?: number; // Optional
+    parent_job_id?: string; // Include parent ID in stats for review jobs (optional)
+    merged_at?: string | null; // Added merge timestamp (optional)
     // --- END ADDED ---
 }
+// --- END ADDED ---
 
 
 // Structure for download result helper
@@ -165,6 +172,14 @@ interface ReclassifyRequestItemData {
 interface ReclassifyResponseData {
     review_job_id: string;
     message: string;
+}
+// --- END ADDED ---
+
+// --- ADDED: Merge Response Interface ---
+// Matches backend api/jobs.py -> merge_review_results response
+interface MergeResponseData {
+    message: string;
+    updated_parent_job_id: string;
 }
 // --- END ADDED ---
 
@@ -338,6 +353,7 @@ const apiService = {
         */
     async getJobStats(jobId: string): Promise<JobStatsData> { // Use the updated interface here
         console.log(`[api.ts getJobStats] Fetching stats for job ID: ${jobId}`); // LOGGING
+        // Use the exported JobStatsData interface
         const response = await axiosInstance.get<JobStatsData>(`/jobs/${jobId}/stats`);
         // LOGGING: Log the received stats structure
         console.log(`[api.ts getJobStats] Received stats for job ${jobId}:`, JSON.parse(JSON.stringify(response.data)));
@@ -514,6 +530,18 @@ const apiService = {
         const payload = { items: items };
         const response = await axiosInstance.post<ReclassifyResponseData>(`/jobs/${originalJobId}/reclassify`, payload);
         console.log(`[api.ts reclassifyJob] Reclassification job started: ${response.data.review_job_id}`);
+        return response.data;
+    },
+    // --- END ADDED ---
+
+    // --- ADDED: Merge API Method ---
+    /**
+     * Merges results from a review job into its parent.
+     */
+    async mergeReviewResults(reviewJobId: string): Promise<MergeResponseData> {
+        console.log(`[api.ts mergeReviewResults] Requesting merge for review job ${reviewJobId}`);
+        const response = await axiosInstance.post<MergeResponseData>(`/jobs/${reviewJobId}/merge`);
+        console.log(`[api.ts mergeReviewResults] Merge request successful: ${response.data.message}`);
         return response.data;
     }
     // --- END ADDED ---

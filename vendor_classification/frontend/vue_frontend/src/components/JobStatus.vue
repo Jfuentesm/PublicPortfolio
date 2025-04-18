@@ -28,6 +28,19 @@
              <button @click="viewReviewJob(jobStore.lastReviewJobId!)" class="ml-4 text-xs font-semibold text-green-700 hover:text-green-900 underline">View Review Job</button>
         </div>
 
+        <!-- Merge Action Feedback -->
+        <div v-if="jobStore.mergeError" class="p-3 bg-red-100 border border-red-300 text-red-800 rounded-md text-sm flex items-center">
+            <ExclamationTriangleIcon class="h-5 w-5 mr-2 text-red-600 flex-shrink-0"/>
+            <span>Merge Error: {{ jobStore.mergeError }}</span>
+        </div>
+        <div v-if="showMergeSuccessMessage" class="p-3 bg-green-100 border border-green-300 text-green-800 rounded-md text-sm flex items-center justify-between">
+             <div class="flex items-center">
+                 <CheckCircleIcon class="h-5 w-5 mr-2 text-green-600 flex-shrink-0"/>
+                 <span>Results successfully merged into original job.</span>
+             </div>
+             <button v-if="jobDetails?.parent_job_id" @click="viewParentJob" class="ml-4 text-xs font-semibold text-green-700 hover:text-green-900 underline">View Updated Original Job</button>
+        </div>
+
 
         <!-- Job ID & Status Row -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm border-b border-gray-100 pb-4">
@@ -41,6 +54,9 @@
              <strong class="text-gray-600">Status:</strong>
              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide" :class="statusBadgeClass">
                  {{ jobDetails?.status || 'Loading...' }}
+             </span>
+             <span v-if="jobDetails?.job_type === 'REVIEW' && jobStore.isMerged" class="ml-2 inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-gray-200 text-gray-700 align-middle" title="Results have been merged into the original job">
+                <CheckCircleIcon class="h-3 w-3 inline-block mr-0.5 text-gray-600"/> Merged
              </span>
            </div>
         </div>
@@ -127,6 +143,22 @@
           <p v-if="downloadError" class="mt-2 text-xs text-red-600 text-center">{{ downloadError }}</p>
         </div>
 
+        <!-- Merge Section (Only for completed REVIEW jobs that are not yet merged) -->
+        <div v-if="jobDetails?.status === 'completed' && jobDetails?.job_type === 'REVIEW' && !jobStore.isMerged" class="pt-5 border-t border-gray-100">
+          <button @click="handleMergeResults"
+                  class="w-full flex justify-center items-center px-4 py-2.5 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :disabled="jobStore.mergeLoading">
+             <svg v-if="jobStore.mergeLoading" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+             </svg>
+             <ArrowPathIcon v-else class="h-5 w-5 mr-2 -ml-1" /> <!-- Using ArrowPathIcon for merge -->
+            {{ jobStore.mergeLoading ? ' Merging Results...' : 'Merge Results into Original Job' }}
+          </button>
+          <p class="mt-2 text-xs text-gray-600 text-center">This will update the original classification job with the results shown below.</p>
+        </div>
+
+
         <!-- Stats Section (Rendered within JobStatus when complete) -->
          <JobStats v-if="jobDetails?.status === 'completed' && jobDetails?.id" :job-id="jobDetails.id" />
 
@@ -162,13 +194,14 @@
   <script setup lang="ts">
   import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
   import apiService from '@/services/api';
-  // Import store and types (Removed JobDetails from here)
+  // --- UPDATED: Removed JobDetails from this import ---
   import { useJobStore, type JobResultItem, type ReviewResultItem } from '@/stores/job';
+  // --- END UPDATED ---
   import JobStats from './JobStats.vue';
   // Import both results tables
   import JobResultsTable from './JobResultsTable.vue';
   import ReviewResultsTable from './ReviewResultsTable.vue';
-  import { EnvelopeIcon, ArrowDownTrayIcon, ExclamationTriangleIcon, ArrowUturnLeftIcon, CheckCircleIcon } from '@heroicons/vue/20/solid';
+  import { EnvelopeIcon, ArrowDownTrayIcon, ExclamationTriangleIcon, ArrowUturnLeftIcon, CheckCircleIcon, ArrowPathIcon } from '@heroicons/vue/20/solid';
 
   const POLLING_INTERVAL = 5000; // Poll every 5 seconds
   const jobStore = useJobStore();
@@ -177,6 +210,7 @@
   const errorMessage = ref<string | null>(null); // Stores polling or general errors
   const pollingIntervalId = ref<number | null>(null); // Stores the ID from setInterval
   const showReclassifySuccessMessage = ref(false); // Control visibility of success message
+  const showMergeSuccessMessage = ref(false); // Control visibility of merge success message
 
   // --- Notification State ---
   const notificationEmail = ref('');
@@ -283,7 +317,7 @@
         if (jobStore.currentJobId === jobId) {
             console.log(`JobStatus: [pollJobStatus] Received status for ${jobId}: Status=${data.status}, Progress=${data.progress}, Type=${data.job_type}`);
             const previousStatus = jobStore.jobDetails?.status; // Store previous status before update
-            jobStore.updateJobDetails(data);
+            jobStore.updateJobDetails(data); // Update details in store
             errorMessage.value = null;
 
             // Check if job just completed or failed
@@ -294,13 +328,15 @@
                 console.log(`JobStatus: [pollJobStatus] Job ${jobId} reached terminal state (${data.status}). Stopping polling.`);
                 stopPolling();
                 if (justCompleted) {
-                    console.log(`JobStatus: [pollJobStatus] Job ${jobId} completed. Triggering fetchCurrentJobResults.`);
-                    // Use the new action to fetch results (handles both types)
-                    if (!jobStore.resultsLoading && !jobStore.jobResults && !jobStore.relatedReviewResults) { // Check both result states
+                    console.log(`JobStatus: [pollJobStatus] Job ${jobId} completed. Triggering fetchCurrentJobResults and fetchJobStats.`);
+                    // Fetch results AND stats when completed
+                    if (!jobStore.resultsLoading && !jobStore.jobResults && !jobStore.relatedReviewResults) {
                          jobStore.fetchCurrentJobResults();
                     } else {
                          console.log(`JobStatus: [pollJobStatus] Job ${jobId} completed, but results already loading or present. Skipping fetch.`);
                     }
+                    // Fetch stats for completed job (needed for merge status check)
+                    jobStore.fetchJobStats(jobId);
                 }
             }
         } else {
@@ -406,6 +442,25 @@
     }
   };
 
+  // --- Merge Results Handler ---
+  const handleMergeResults = async () => {
+      const currentId = jobDetails.value?.id;
+      if (!currentId || jobDetails.value?.job_type !== 'REVIEW') return;
+      console.log(`JobStatus: Handling merge results for review job ${currentId}`);
+      const success = await jobStore.mergeReviewResults(currentId);
+      if (success) {
+          showMergeSuccessMessage.value = true;
+          setTimeout(() => { showMergeSuccessMessage.value = false; }, 7000);
+          // Optionally refresh job history or parent job view
+          jobStore.fetchJobHistory();
+          // Refresh stats for the current (review) job to show merged status
+          jobStore.fetchJobStats(currentId);
+      } else {
+           console.log("JobStatus: Merge failed (error handled in store).");
+           // Error message is displayed via jobStore.mergeError
+      }
+  };
+
   // --- Navigation ---
   const viewParentJob = () => {
       if (jobDetails.value?.parent_job_id) {
@@ -428,11 +483,15 @@
            console.log(`JobStatus: Fetching initial details and starting polling for ${jobId}`);
            startPolling(jobId); // Poll will fetch details
       } else if (currentDetails.status === 'completed') {
-           console.log(`JobStatus: Job ${jobId} already completed. Fetching results if needed.`);
+           console.log(`JobStatus: Job ${jobId} already completed. Fetching results and stats if needed.`);
            stopPolling();
-           // Use the new action to fetch results
+           // Fetch results if needed
            if (!jobStore.resultsLoading && !jobStore.jobResults && !jobStore.relatedReviewResults) {
                 jobStore.fetchCurrentJobResults();
+           }
+           // Fetch stats if needed (e.g., to check merge status)
+           if (!jobStore.statsLoading && !jobStore.jobStats) {
+                jobStore.fetchJobStats(jobId);
            }
       } else if (currentDetails.status === 'failed') {
            console.log(`JobStatus: Job ${jobId} already failed. Not polling or fetching results.`);
@@ -461,6 +520,7 @@
   watch(() => jobStore.currentJobId, (newJobId, oldJobId) => {
       console.log(`JobStatus: Watched currentJobId changed from ${oldJobId} to: ${newJobId}`);
       showReclassifySuccessMessage.value = false; // Hide success message on job change
+      showMergeSuccessMessage.value = false; // Hide merge success message
       if (newJobId) {
           // Reset component state related to the specific job
           errorMessage.value = null;
@@ -479,20 +539,22 @@
   }, { immediate: false }); // Don't run immediately on mount, let onMounted handle initial load
 
   // Watch for the job status changing to completed (handles updates from polling)
-  // This watcher seems redundant now as the polling logic handles stopping and fetching results.
-  // Keep it for now as a potential backup, but consider removing if polling logic proves robust.
   watch(() => jobStore.jobDetails?.status, (newStatus, oldStatus) => {
       const currentId = jobStore.currentJobId;
-      if (!currentId || newStatus === oldStatus) return; // Only act on change for the current job
+      if (!currentId || newStatus === oldStatus || jobStore.jobDetails?.id !== currentId) return; // Only act on change for the current job
 
       console.log(`JobStatus: Watched job status changed from ${oldStatus} to: ${newStatus} for job ${currentId}`);
 
       if (newStatus === 'completed') {
-          console.log(`JobStatus: Job ${currentId} completed (detected by status watcher). Ensuring results are fetched.`);
+          console.log(`JobStatus: Job ${currentId} completed (detected by status watcher). Ensuring results & stats are fetched.`);
           stopPolling(); // Ensure polling is stopped
-          // Use the new action to fetch results if not already loading/present
+          // Fetch results if not already loading/present
           if (!jobStore.resultsLoading && !jobStore.jobResults && !jobStore.relatedReviewResults) {
             jobStore.fetchCurrentJobResults();
+          }
+          // Fetch stats if not already loading/present
+          if (!jobStore.statsLoading && !jobStore.jobStats) {
+            jobStore.fetchJobStats(currentId);
           }
       } else if (newStatus === 'failed') {
           console.log(`JobStatus: Job ${currentId} failed (detected by status watcher). Ensuring polling is stopped.`);

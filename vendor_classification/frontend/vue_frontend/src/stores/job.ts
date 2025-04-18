@@ -1,8 +1,9 @@
 // <file path='frontend/vue_frontend/src/stores/job.ts'>
 import { defineStore } from 'pinia';
 import { ref, reactive, computed } from 'vue';
-// Removed JobResultsResponse from here
-import apiService, { type JobResponse } from '@/services/api';
+// --- UPDATED: Import JobStatsData from apiService ---
+import apiService, { type JobResponse, type JobStatsData } from '@/services/api';
+// --- END UPDATED ---
 
 // Define the structure of the job details object based on your API response
 // Should align with app/schemas/job.py -> JobResponse
@@ -23,6 +24,7 @@ export interface JobDetails {
     created_by?: string;
     job_type: 'CLASSIFICATION' | 'REVIEW';
     parent_job_id: string | null;
+    stats?: Record<string, any>; // Include stats field optionally
 }
 
 // Interface for a single detailed result item (for CLASSIFICATION jobs)
@@ -60,8 +62,11 @@ export const useJobStore = defineStore('job', () => {
     // --- State ---
     const currentJobId = ref<string | null>(null);
     const jobDetails = ref<JobDetails | null>(null);
+    const jobStats = ref<JobStatsData | null>(null); // Add state for job stats
     const isLoading = ref(false); // For tracking polling/loading state for CURRENT job details
-    const error = ref<string | null>(null); // For storing errors related to fetching CURRENT job status
+    const statsLoading = ref(false); // For tracking stats loading state
+    const error = ref<string | null>(null); // For storing errors related to fetching CURRENT job status/details
+    const statsError = ref<string | null>(null); // For storing errors related to fetching CURRENT job stats
 
     const jobHistory = ref<JobResponse[]>([]);
     const historyLoading = ref(false);
@@ -81,6 +86,12 @@ export const useJobStore = defineStore('job', () => {
     const reclassifyError = ref<string | null>(null);
     const lastReviewJobId = ref<string | null>(null);
 
+    // --- ADDED: Merge State ---
+    const mergeLoading = ref(false);
+    const mergeError = ref<string | null>(null);
+    const isMerged = computed(() => !!jobStats.value?.merged_at); // Derive merge status from stats
+    // --- END ADDED ---
+
     // --- Computed ---
     const hasFlaggedItems = computed(() => flaggedForReview.size > 0);
 
@@ -91,11 +102,14 @@ export const useJobStore = defineStore('job', () => {
             currentJobId.value = jobId;
             // Clear details and results when ID changes
             jobDetails.value = null;
+            jobStats.value = null; // Clear stats
             jobResults.value = null;
             relatedReviewResults.value = null; // Clear related results too
-            console.log(`JobStore: Cleared jobDetails and results due to ID change.`);
+            console.log(`JobStore: Cleared jobDetails, stats, and results due to ID change.`);
             error.value = null;
+            statsError.value = null; // Clear stats error
             isLoading.value = false;
+            statsLoading.value = false; // Reset stats loading
             resultsLoading.value = false; // Reset results loading
             resultsError.value = null; // Reset results error
             // Clear flagging state
@@ -103,7 +117,10 @@ export const useJobStore = defineStore('job', () => {
             reclassifyLoading.value = false;
             reclassifyError.value = null;
             lastReviewJobId.value = null;
-            console.log(`JobStore: Cleared flagging state due to ID change.`);
+            // Clear merge state
+            mergeLoading.value = false;
+            mergeError.value = null;
+            console.log(`JobStore: Cleared flagging and merge state due to ID change.`);
 
             // Update URL
             try {
@@ -122,12 +139,15 @@ export const useJobStore = defineStore('job', () => {
         }
          // If the same job ID is set again, force a refresh
          else if (jobId !== null) {
-             console.log(`JobStore: Re-setting same job ID ${jobId}, clearing details and results to force refresh.`);
+             console.log(`JobStore: Re-setting same job ID ${jobId}, clearing details, stats, and results to force refresh.`);
              jobDetails.value = null;
+             jobStats.value = null; // Clear stats
              jobResults.value = null;
              relatedReviewResults.value = null; // Clear related results too
              error.value = null;
+             statsError.value = null; // Clear stats error
              isLoading.value = false;
+             statsLoading.value = false; // Reset stats loading
              resultsLoading.value = false;
              resultsError.value = null;
              // Clear flagging state
@@ -135,6 +155,9 @@ export const useJobStore = defineStore('job', () => {
              reclassifyLoading.value = false;
              reclassifyError.value = null;
              lastReviewJobId.value = null;
+             // Clear merge state
+             mergeLoading.value = false;
+             mergeError.value = null;
          }
     }
 
@@ -191,6 +214,41 @@ export const useJobStore = defineStore('job', () => {
             historyLoading.value = false;
         }
     }
+
+    // --- ADDED: Action to fetch job stats ---
+    async function fetchJobStats(jobId: string): Promise<void> {
+        if (!jobId || jobId !== currentJobId.value) {
+            console.warn(`JobStore: fetchJobStats called for non-current job ${jobId}. Current: ${currentJobId.value}`);
+            return;
+        }
+        if (statsLoading.value) {
+            console.log(`JobStore: fetchJobStats called for ${jobId} while already loading. Skipping.`);
+            return;
+        }
+        console.log(`JobStore: Fetching stats for job ${jobId}...`);
+        statsLoading.value = true;
+        statsError.value = null;
+        try {
+            const stats = await apiService.getJobStats(jobId);
+            if (jobId === currentJobId.value) { // Check again after await
+                jobStats.value = stats;
+                console.log(`JobStore: Successfully fetched stats for job ${jobId}. Merged status: ${isMerged.value}`);
+            } else {
+                 console.log(`JobStore: Job ID changed while fetching stats for ${jobId}. Discarding.`);
+            }
+        } catch (err: any) {
+            console.error(`JobStore: Failed to fetch stats for job ${jobId}:`, err);
+            if (jobId === currentJobId.value) {
+                statsError.value = err.message || 'Failed to load job statistics.';
+                jobStats.value = null;
+            }
+        } finally {
+            if (jobId === currentJobId.value) {
+                statsLoading.value = false;
+            }
+        }
+    }
+    // --- END ADDED ---
 
     // --- NEW HELPER: Find latest completed review job for a parent ---
     function findLatestReviewJobFor(parentId: string): JobResponse | null {
@@ -330,7 +388,8 @@ export const useJobStore = defineStore('job', () => {
 
     function flagVendor(vendorName: string, initialHint: string | null = null): void { // Added optional initial hint
         if (!flaggedForReview.has(vendorName)) {
-            flaggedForReview.set(vendorName, { hint: initialHint }); // Use initial hint if provided
+            // Only set hint if provided (relevant for JobResultsTable)
+            flaggedForReview.set(vendorName, { hint: initialHint });
             console.log(`JobStore: Flagged vendor '${vendorName}' for review.`);
         }
     }
@@ -373,18 +432,26 @@ export const useJobStore = defineStore('job', () => {
         }
         // --- End Ensure submission job ID ---
 
-        const itemsToReclassify = Array.from(flaggedForReview.entries())
-            .filter(([_, data]) => data.hint && data.hint.trim() !== '')
-            .map(([vendorName, data]) => ({
-                vendor_name: vendorName,
-                hint: data.hint!,
-            }));
+        // --- Validation: Ensure all flagged items have hints (if submitting from JobResultsTable) ---
+        // This check is more relevant if the submission is triggered from JobResultsTable where hints are edited.
+        // If triggered from ReviewResultsTable (where hints are not edited), this check might be skipped or adapted.
+        // Let's assume hints ARE required for *any* submission for now.
+        const itemsWithoutHints = Array.from(flaggedForReview.keys())
+            .filter(vendorName => !flaggedForReview.get(vendorName)?.hint?.trim());
 
-        if (itemsToReclassify.length === 0) {
-            console.warn("JobStore: submitFlagsForReview called, but no flagged items have valid hints.");
-            reclassifyError.value = "Please provide hints for the flagged items before submitting.";
+        if (itemsWithoutHints.length > 0) {
+            console.warn(`JobStore: Submission blocked. Flagged items missing hints: ${itemsWithoutHints.join(', ')}`);
+            reclassifyError.value = `Please provide hints for all flagged items: ${itemsWithoutHints.slice(0, 3).join(', ')}${itemsWithoutHints.length > 3 ? '...' : ''}`;
             return null;
         }
+        // --- End Validation ---
+
+        const itemsToReclassify = Array.from(flaggedForReview.entries())
+            .map(([vendorName, data]) => ({
+                vendor_name: vendorName,
+                hint: data.hint!, // Hint is guaranteed non-empty due to validation above
+            }));
+
 
         console.log(`JobStore: Submitting ${itemsToReclassify.length} flags for reclassification against job ${submissionJobId}...`);
         reclassifyLoading.value = true;
@@ -410,13 +477,45 @@ export const useJobStore = defineStore('job', () => {
     }
     // --- END Reclassification Actions ---
 
+    // --- ADDED: Merge Action ---
+    async function mergeReviewResults(reviewJobId: string): Promise<boolean> {
+        if (!reviewJobId) {
+            console.error("JobStore: mergeReviewResults called without reviewJobId.");
+            mergeError.value = "Review Job ID is missing.";
+            return false;
+        }
+        console.log(`JobStore: Attempting to merge results for review job ${reviewJobId}`);
+        mergeLoading.value = true;
+        mergeError.value = null;
+
+        try {
+            const response = await apiService.mergeReviewResults(reviewJobId);
+            console.log(`JobStore: Merge successful for review job ${reviewJobId}. Response: ${response.message}`);
+            // Update merge status (by refetching stats)
+            await fetchJobStats(reviewJobId);
+            // Refresh job history to show updated parent job potentially
+            await fetchJobHistory();
+            mergeLoading.value = false;
+            return true;
+        } catch (err: any) {
+            console.error(`JobStore: Failed to merge results for review job ${reviewJobId}:`, err);
+            mergeError.value = err.message || 'Failed to merge results.';
+            mergeLoading.value = false;
+            return false;
+        }
+    }
+    // --- END ADDED ---
+
 
     return {
         // State
         currentJobId,
         jobDetails,
+        jobStats, // Expose stats
         isLoading,
+        statsLoading, // Expose stats loading
         error,
+        statsError, // Expose stats error
         jobHistory,
         historyLoading,
         historyError,
@@ -428,6 +527,11 @@ export const useJobStore = defineStore('job', () => {
         reclassifyLoading,
         reclassifyError,
         lastReviewJobId,
+        mergeLoading, // Expose merge loading
+        mergeError, // Expose merge error
+        isMerged, // Expose computed merge status
+
+        // Computed
         hasFlaggedItems,
 
         // Actions
@@ -437,13 +541,14 @@ export const useJobStore = defineStore('job', () => {
         setError,
         clearJob,
         fetchJobHistory,
+        fetchJobStats, // Expose stats fetch action
         fetchCurrentJobResults, // Use this action to fetch results
-        // fetchJobResults, // Keep original name if preferred, but fetchCurrentJobResults is clearer
         isFlagged,
         getHint,
         flagVendor,
         unflagVendor,
         setHint,
         submitFlagsForReview,
+        mergeReviewResults, // Expose merge action
     };
 });

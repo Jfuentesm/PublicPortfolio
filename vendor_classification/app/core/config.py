@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     OUTPUT_DATA_DIR: str = "/data/output"
     TAXONOMY_DATA_DIR: str = "/data/taxonomy"
     OPENROUTER_API_BASE: str = "https://openrouter.ai/api/v1"
-    OPENROUTER_MODEL: str = "deepseek/deepseek-chat-v3-0324:free"
+    OPENROUTER_MODEL: str = "nvidia/llama-3.1-nemotron-ultra-253b-v1:free" #"deepseek/deepseek-chat-v3-0324:free"
     GENERATED_KEY_NAME_PREFIX: str = "auto-gen-vendor-classifier"
     GENERATED_KEY_LABEL: Optional[str] = None
     GENERATED_KEY_CREDIT_LIMIT: Optional[float] = None

@@ -4,7 +4,7 @@ from sqlalchemy import Column, String, Float, DateTime, Enum as SQLEnum, JSON, T
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Session # <<< ADDED IMPORT FOR TYPE HINTING
 from enum import Enum as PyEnum
-from datetime import datetime
+from datetime import datetime, timezone # <<< Added timezone
 from typing import Optional, Dict, Any, List # <<< ADDED List
 
 from core.database import Base
@@ -54,7 +54,7 @@ class Job(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
     notification_email = Column(String, nullable=True)
     error_message = Column(Text, nullable=True)
-    stats = Column(JSON, default={}) # Structure defined by ProcessingStats model OR used for review inputs
+    stats = Column(JSON, default={}) # Structure defined by ProcessingStats model OR used for review inputs/status
     created_by = Column(String, nullable=False)
     target_level = Column(Integer, nullable=False, default=5) # Store the desired classification depth (1-5)
 
@@ -72,7 +72,7 @@ class Job(Base):
         """Update job progress and stage, optionally committing."""
         self.progress = progress
         self.current_stage = stage.value
-        self.updated_at = datetime.now()
+        self.updated_at = datetime.now(timezone.utc) # Use timezone aware now
         # Optionally commit immediately if session provided
         if db_session:
             try:
@@ -94,7 +94,7 @@ class Job(Base):
         # Ensure stage reflects completion (Result Generation for CLASSIFICATION, RECLASSIFICATION for REVIEW)
         self.current_stage = ProcessingStage.RESULT_GENERATION.value if self.job_type == JobType.CLASSIFICATION.value else ProcessingStage.RECLASSIFICATION.value
         self.output_file_name = output_file_name # Can be None for review jobs if no file is generated
-        self.completed_at = datetime.now()
+        self.completed_at = datetime.now(timezone.utc) # Use timezone aware now
         self.stats = stats
         # --- UPDATED: Save detailed results ---
         self.detailed_results = detailed_results
@@ -107,7 +107,7 @@ class Job(Base):
         # Optionally set progress to 1.0 or leave as is upon failure
         # self.progress = 1.0
         self.error_message = error_message
-        self.updated_at = datetime.now()
+        self.updated_at = datetime.now(timezone.utc) # Use timezone aware now
         # Ensure completed_at is Null if it failed
         self.completed_at = None
         # --- UPDATED: Ensure detailed_results is Null if it failed ---

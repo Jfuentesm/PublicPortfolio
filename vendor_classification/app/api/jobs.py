@@ -1,10 +1,9 @@
-
 # <file path='app/api/jobs.py'>
 # app/api/jobs.py
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Path # Added Path
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Union # <<< ADDED Union
-from datetime import datetime
+from typing import List, Optional, Dict, Union, Any # <<< ADDED Union, Any
+from datetime import datetime, timezone # <<< ADDED timezone
 import logging # Import logging
 import uuid # <<< ADDED for generating review job IDs
 import os # <<< ADDED for path joining
@@ -25,6 +24,9 @@ from core.config import settings # Need settings for file path construction
 # --- CORRECTED IMPORT PATH ---
 from tasks.classification_tasks import reclassify_flagged_vendors_task
 # --- END CORRECTED IMPORT PATH ---
+# --- ADDED: Import file service for merge ---
+from services.file_service import generate_output_file
+# --- END ADDED ---
 
 
 logger = get_logger("vendor_classification.api.jobs")
@@ -129,7 +131,7 @@ async def read_job_stats(
 ):
     """
     Retrieve processing statistics for a specific job.
-    For REVIEW jobs, this might contain the input hints.
+    For REVIEW jobs, this might contain the input hints and merge status.
     """
     set_log_context({"username": current_user.username, "target_job_id": job_id})
     logger.info(f"Fetching statistics for job ID: {job_id}")
@@ -210,7 +212,8 @@ async def download_job_results(
 ):
     """
     Downloads the output Excel file for a completed job.
-    Note: Currently only generates Excel for CLASSIFICATION jobs.
+    Note: Only generates Excel for CLASSIFICATION jobs.
+    The file reflects the latest state, including merged review results.
     """
     from fastapi.responses import FileResponse # Import here
     # import os # Already imported above
@@ -247,6 +250,8 @@ async def download_job_results(
     if not os.path.exists(file_path):
          logger.error(f"Output file record exists in DB but file not found on disk",
                       extra={"job_id": job_id, "expected_path": file_path})
+         # Consider regenerating the file here if it's missing? Or just fail.
+         # For now, fail. Regeneration should happen on completion/merge.
          raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Output file not found.")
 
     logger.info(f"Streaming output file for download",
@@ -267,7 +272,7 @@ async def reclassify_job_items(
 ):
     """
     Initiates a re-classification task for specific vendors from an original job,
-    using user-provided hints.
+    using user-provided hints. Creates a new REVIEW job.
     """
     set_log_context({"username": current_user.username, "original_job_id": original_job_id})
     logger.info(f"Received reclassification request for job {original_job_id}", extra={"item_count": len(payload.items)})
@@ -301,7 +306,7 @@ async def reclassify_job_items(
         id=review_job_id,
         company_name=original_job.company_name, # Inherit company name
         input_file_name=f"Review of {original_job.input_file_name}", # Indicate source
-        output_file_name=None, # Review jobs don't produce downloads (for now)
+        output_file_name=None, # Review jobs don't produce downloads
         status=JobStatus.PENDING.value,
         # --- FIX: Use a valid ProcessingStage ---
         current_stage=ProcessingStage.RECLASSIFICATION.value, # Set initial stage to RECLASSIFICATION
@@ -340,4 +345,146 @@ async def reclassify_job_items(
 
     # 6. Return the review job ID
     return ReclassifyResponse(review_job_id=review_job_id)
+# --- END ADDED ---
+
+# --- ADDED: Merge Endpoint ---
+@router.post("/{review_job_id}/merge", status_code=status.HTTP_200_OK)
+async def merge_review_results(
+    review_job_id: str = Path(..., description="The ID of the completed REVIEW job to merge"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Merges the results from a completed REVIEW job back into its parent CLASSIFICATION job.
+    Updates the parent job's detailed_results and triggers regeneration of its downloadable Excel file.
+    """
+    set_log_context({"username": current_user.username, "review_job_id": review_job_id})
+    logger.info(f"Received request to merge results for review job {review_job_id}")
+
+    # 1. Fetch the REVIEW job
+    review_job = db.query(Job).filter(Job.id == review_job_id).first()
+    if not review_job:
+        logger.warning(f"Review job {review_job_id} not found for merging.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review job not found")
+
+    # 2. Authorization check (user owns the review job)
+    if review_job.created_by != current_user.username:
+        logger.warning(f"Authorization failed: User '{current_user.username}' attempted merge for job '{review_job_id}' owned by '{review_job.created_by}'")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to merge this review job")
+
+    # 3. Validation
+    if review_job.job_type != JobType.REVIEW.value:
+        logger.warning(f"Attempted to merge a non-REVIEW job.", extra={"job_id": review_job_id, "job_type": review_job.job_type})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only REVIEW jobs can be merged.")
+    if review_job.status != JobStatus.COMPLETED.value:
+        logger.warning(f"Attempted to merge a non-completed REVIEW job.", extra={"job_id": review_job_id, "status": review_job.status})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Review job must be COMPLETED to merge.")
+    if not review_job.parent_job_id:
+        logger.error(f"Review job {review_job_id} is missing a parent_job_id.", extra={"job_id": review_job_id})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Review job has no associated parent job.")
+    if not review_job.detailed_results:
+        logger.warning(f"Review job {review_job_id} has no detailed results to merge.", extra={"job_id": review_job_id})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Review job has no results to merge.")
+
+    # Check if already merged
+    if review_job.stats and review_job.stats.get("merged_at"):
+        logger.warning(f"Review job {review_job_id} has already been merged.", extra={"job_id": review_job_id, "merged_at": review_job.stats["merged_at"]})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This review job has already been merged.")
+
+    # 4. Fetch the Parent (Original) CLASSIFICATION job
+    parent_job = db.query(Job).filter(Job.id == review_job.parent_job_id).first()
+    if not parent_job:
+        logger.error(f"Parent job {review_job.parent_job_id} not found for merging (referenced by review job {review_job_id}).")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent classification job not found.")
+    if parent_job.job_type != JobType.CLASSIFICATION.value:
+        logger.error(f"Parent job {parent_job.id} is not a CLASSIFICATION job.", extra={"parent_job_type": parent_job.job_type})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent job is not a classification job.")
+    if not parent_job.detailed_results:
+        logger.warning(f"Parent job {parent_job.id} has no detailed results to update. This is unusual but proceeding.", extra={"parent_job_id": parent_job.id})
+        # Initialize as empty list if missing
+        parent_job.detailed_results = []
+
+    set_log_context({"parent_job_id": parent_job.id})
+    logger.info(f"Found parent job {parent_job.id} for merging.")
+
+    # 5. Load results and perform the merge
+    try:
+        # Load review results (List[ReviewResultItem])
+        review_results_data: List[ReviewResultItem] = [ReviewResultItem.model_validate(item) for item in review_job.detailed_results]
+        logger.info(f"Loaded {len(review_results_data)} items from review job {review_job_id}.")
+
+        # Load original results (List[JobResultItem])
+        original_results_data: List[JobResultItem] = [JobResultItem.model_validate(item) for item in parent_job.detailed_results]
+        logger.info(f"Loaded {len(original_results_data)} items from parent job {parent_job.id}.")
+
+        # Create a map of original results keyed by vendor_name for efficient updates
+        original_results_map: Dict[str, JobResultItem] = {item.vendor_name: item for item in original_results_data}
+
+        # Iterate through review results and update the map
+        updated_count = 0
+        for review_item in review_results_data:
+            vendor_name = review_item.vendor_name
+            # The 'new_result' field in ReviewResultItem is already a dict matching JobResultItem structure
+            new_result_dict = review_item.new_result
+            if vendor_name in original_results_map:
+                # Ensure the source is marked correctly in the merged result
+                new_result_dict['classification_source'] = 'Review'
+                # Validate the new result dict against the schema before replacing
+                validated_new_result = JobResultItem.model_validate(new_result_dict)
+                original_results_map[vendor_name] = validated_new_result
+                updated_count += 1
+                logger.debug(f"Updated result for vendor '{vendor_name}' in parent job map.")
+            else:
+                logger.warning(f"Vendor '{vendor_name}' from review job {review_job_id} not found in parent job {parent_job.id} results. Skipping update for this vendor.")
+
+        logger.info(f"Updated {updated_count} vendor results in the parent job map.")
+
+        # Convert the updated map back into a List[JobResultItem]
+        updated_detailed_results_list: List[Dict[str, Any]] = [item.model_dump() for item in original_results_map.values()]
+
+        # 6. Update the parent job's detailed_results
+        parent_job.detailed_results = updated_detailed_results_list
+        parent_job.updated_at = datetime.now(timezone.utc) # Mark parent job as updated
+        logger.info(f"Updated detailed_results field on parent job {parent_job.id}.")
+
+        # 7. Regenerate the Excel file for the parent job
+        try:
+            logger.info(f"Triggering Excel regeneration for parent job {parent_job.id}...")
+            # Call generate_output_file with the updated results list
+            # Ensure generate_output_file accepts List[JobResultItem] or adapt here
+            new_output_filename = generate_output_file(
+                job_id=parent_job.id,
+                detailed_results=[JobResultItem.model_validate(item) for item in updated_detailed_results_list] # Pass validated models
+            )
+            parent_job.output_file_name = new_output_filename
+            logger.info(f"Successfully regenerated Excel file for parent job {parent_job.id}: {new_output_filename}")
+        except Exception as excel_err:
+            logger.error(f"Failed to regenerate Excel file for parent job {parent_job.id} during merge.", exc_info=True)
+            # Should we rollback the merge or proceed without the updated file?
+            # Let's proceed but log the error prominently. The results are still merged in the DB.
+            # Optionally, set output_file_name to None or keep the old one? Keeping old one for now.
+            # parent_job.output_file_name = None # Or keep existing?
+            # Raise an internal error to signal partial failure?
+            # For now, just log and continue with DB commit.
+
+        # 8. Mark the REVIEW job as merged in its stats
+        if not review_job.stats:
+            review_job.stats = {}
+        review_job.stats["merged_at"] = datetime.now(timezone.utc).isoformat()
+        logger.info(f"Marked review job {review_job_id} as merged in stats.")
+
+        # 9. Commit changes to both jobs
+        db.commit()
+        logger.info(f"Successfully committed changes for merge operation (Review Job: {review_job_id}, Parent Job: {parent_job.id}).")
+
+        # 10. Return success response
+        return {
+            "message": f"Successfully merged results from review job {review_job_id} into parent job {parent_job.id}.",
+            "updated_parent_job_id": parent_job.id
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error during merge operation for review job {review_job_id}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to merge results: {str(e)}")
 # --- END ADDED ---

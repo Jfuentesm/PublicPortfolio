@@ -23,7 +23,7 @@ class JobResultItem(BaseModel):
     level5_name: Optional[str] = Field(None, description="Level 5 Category Name")
     final_confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Confidence score of the final classification level achieved (0.0 if not possible)")
     final_status: str = Field(..., description="Overall status ('Classified', 'Not Possible', 'Error')")
-    classification_source: Optional[str] = Field(None, description="Source of the final classification ('Initial', 'Search')")
+    classification_source: Optional[str] = Field(None, description="Source of the final classification ('Initial', 'Search', 'Review')") # Added 'Review'
     classification_notes_or_reason: Optional[str] = Field(None, description="LLM notes or reason for failure/low confidence")
     achieved_level: Optional[int] = Field(None, ge=0, le=5, description="Deepest level successfully classified (0 if none)")
 
@@ -52,7 +52,7 @@ class JobResponse(JobBase):
     updated_at: datetime = Field(...)
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = Field(None, example="Failed during search phase.")
-    stats: Dict[str, Any] = Field(default={}, example={"total_vendors": 100, "unique_vendors": 95})
+    stats: Dict[str, Any] = Field(default={}, example={"total_vendors": 100, "unique_vendors": 95, "merged_at": None}) # Added merged_at example
     created_by: str = Field(..., example="user@example.com")
 
     # --- ADDED: Job Type and Parent Link ---

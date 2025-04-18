@@ -2,7 +2,7 @@
 import os # Keep the import
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone # <<< Added timezone
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Tuple, Optional
 
@@ -15,6 +15,7 @@ from models.job import Job, JobStatus, ProcessingStage, JobType # Assuming Job m
 from services.llm_service import LLMService # Assuming LLM service is needed
 from schemas.review import ReclassifyRequestItem, ReviewResultItem # Assuming review schemas are needed
 from schemas.job import JobResultItem # Assuming job result schema is needed for structure
+from pydantic import ValidationError # Import ValidationError for specific catching
 
 # Import classification prompts if needed for reclassification
 from .reclassification_prompts import generate_reclassification_prompt # Example: Assuming a specific prompt exists
@@ -29,11 +30,13 @@ async def process_reclassification(
     """
     Processes the reclassification request based on the review job details.
     Fetches original results, applies hints using LLM, and generates new results.
+    Returns the results list (empty if major error) and the final stats dict.
+    The stats dict will contain an 'error_message' key if a critical error occurred.
     """
     logger.info(f"Starting reclassification logic for review job {review_job.id}")
     set_log_context({"review_job_id": review_job.id, "parent_job_id": review_job.parent_job_id})
 
-    start_time = datetime.now()
+    start_time = datetime.now(timezone.utc) # Use timezone aware now
     # Initialize stats structure similar to classification, but focused on review
     final_stats: Dict[str, Any] = {
         "job_id": review_job.id,
@@ -53,15 +56,18 @@ async def process_reclassification(
             "openrouter_total_tokens": 0,
             "tavily_search_calls": 0, # Should remain 0
             "cost_estimate_usd": 0.0
-        }
+        },
+        "error_message": None # Initialize error message field
     }
     review_results_list: List[Dict[str, Any]] = [] # Holds ReviewResultItem dicts
 
     try:
         # 1. Validate Input
         if not review_job or not review_job.parent_job_id or not review_job.stats or 'reclassify_input' not in review_job.stats:
-            logger.error("Review job is missing parent job ID or input hints.", extra={"job_stats": review_job.stats if review_job else None})
-            raise ValueError("Review job is missing parent job ID or input hints.")
+            err_msg = "Review job is missing parent job ID or input hints."
+            logger.error(err_msg, extra={"job_stats": review_job.stats if review_job else None})
+            final_stats["error_message"] = err_msg
+            return [], final_stats # Return empty list and stats with error
 
         # --- FIX: Handle potential non-list or invalid items in reclassify_input ---
         input_items = review_job.stats['reclassify_input']
@@ -71,18 +77,20 @@ async def process_reclassification(
                 try:
                     # Validate each item conforms to the Pydantic model
                     items_to_reclassify.append(ReclassifyRequestItem.model_validate(item))
-                except Exception as item_validation_err:
+                except ValidationError as item_validation_err: # Catch specific validation error
                     logger.warning(f"Skipping invalid item in reclassify_input: {item}. Error: {item_validation_err}", exc_info=False)
         else:
-            logger.error(f"reclassify_input in job stats is not a list: {type(input_items)}", extra={"job_id": review_job.id})
-            raise ValueError("Invalid format for reclassify_input in job stats.")
+            err_msg = f"reclassify_input in job stats is not a list: {type(input_items)}"
+            logger.error(err_msg, extra={"job_id": review_job.id})
+            final_stats["error_message"] = err_msg
+            return [], final_stats # Return empty list and stats with error
         # --- END FIX ---
 
         final_stats["total_items_processed"] = len(items_to_reclassify)
         if not items_to_reclassify:
              logger.warning("No valid items found in reclassify_input stats.")
              # Complete the job successfully but with 0 items processed
-             end_time = datetime.now()
+             end_time = datetime.now(timezone.utc) # Use timezone aware now
              final_stats["end_time"] = end_time.isoformat()
              final_stats["processing_duration_seconds"] = (end_time - start_time).total_seconds()
              return [], final_stats # Return empty results and stats
@@ -93,12 +101,15 @@ async def process_reclassification(
         # Use a separate session or ensure the passed `db` session is robust
         parent_job = db.query(Job).filter(Job.id == review_job.parent_job_id).first()
         if not parent_job:
-             logger.error(f"Parent job {review_job.parent_job_id} not found.")
-             raise ValueError(f"Parent job {review_job.parent_job_id} not found.")
+             err_msg = f"Parent job {review_job.parent_job_id} not found."
+             logger.error(err_msg)
+             final_stats["error_message"] = err_msg
+             return [], final_stats
         if not parent_job.detailed_results:
-             logger.error(f"Parent job {review_job.parent_job_id} has no detailed results.")
-             # Decide how to handle this: fail or process items as failures?
-             raise ValueError(f"Parent job {review_job.parent_job_id} has no detailed results.")
+             err_msg = f"Parent job {review_job.parent_job_id} has no detailed results."
+             logger.error(err_msg)
+             final_stats["error_message"] = err_msg
+             return [], final_stats
 
         original_results_map: Dict[str, JobResultItem] = {}
         try:
@@ -106,9 +117,11 @@ async def process_reclassification(
                  # Validate each item conforms to JobResultItem before adding
                  validated_item = JobResultItem.model_validate(item_dict)
                  original_results_map[validated_item.vendor_name] = validated_item
-        except Exception as validation_err:
-             logger.error(f"Error validating original results from parent job {parent_job.id}", exc_info=True)
-             raise ValueError("Failed to parse original results from parent job.")
+        except ValidationError as validation_err: # Catch specific validation error
+             err_msg = "Failed to parse original results from parent job."
+             logger.error(f"{err_msg} Error: {validation_err}", exc_info=True)
+             final_stats["error_message"] = f"{err_msg} Details: {validation_err}"
+             return [], final_stats
 
         logger.info(f"Loaded {len(original_results_map)} original results from parent job.")
 
@@ -128,27 +141,31 @@ async def process_reclassification(
             set_log_context({"current_vendor": vendor_name}) # Add vendor to context
 
             original_result_model = original_results_map.get(vendor_name)
+
+            # --- MODIFIED: Handle missing original result ---
             if not original_result_model:
                 logger.warning(f"Vendor '{vendor_name}' from review request not found in parent job results. Skipping.")
                 final_stats["failed_reclassifications"] += 1
-                # Create a failure entry for this item
-                failed_result_item = ReviewResultItem(
-                    vendor_name=vendor_name,
-                    hint=hint,
-                    original_result={"error": "Original result not found in parent job"}, # Indicate error source
-                    new_result=JobResultItem( # Use JobResultItem for structure consistency
-                        vendor_name=vendor_name,
-                        level1_id="ERROR", level1_name="ERROR",
+                # Create a failure entry for this item, ensuring it matches ReviewResultItem structure
+                failed_new_result = JobResultItem( # Use JobResultItem for structure consistency
+                        vendor_name=vendor_name, level1_id="ERROR", level1_name="ERROR",
                         level2_id=None, level2_name=None, level3_id=None, level3_name=None,
                         level4_id=None, level4_name=None, level5_id=None, level5_name=None,
                         final_confidence=0.0, final_status="Error", classification_source="Review",
                         classification_notes_or_reason="Original result not found in parent job",
                         achieved_level=0
-                    ).model_dump()
+                    )
+                # Create a minimal placeholder for the original result if it's missing
+                minimal_original = JobResultItem(vendor_name=vendor_name, final_status="Error", classification_notes_or_reason="Original result missing")
+                failed_result_item = ReviewResultItem(
+                    vendor_name=vendor_name, hint=hint,
+                    original_result=minimal_original.model_dump(), # Store dict
+                    new_result=failed_new_result.model_dump() # Store dict
                 )
                 review_results_list.append(failed_result_item.model_dump())
                 clear_log_context(["current_vendor"])
                 continue
+            # --- END MODIFIED ---
 
             # --- Actual Reclassification LLM Call ---
             new_result_model = None
@@ -182,15 +199,9 @@ async def process_reclassification(
                 )
                 # --- END UPDATED ---
 
-                # Remove the old parse call:
-                # parsed_llm_output = llm_service.parse_json_response(llm_response_str, ...)
-
                 logger.debug(f"Parsed LLM response dictionary for '{vendor_name}': {parsed_llm_output}")
 
                 # Extract the classification result for this vendor
-                # The prompt asks for a specific JSON output format, so parse that
-                # Expecting format like: {"batch_id": "...", "level": N, "classifications": [...]}
-                # Or potentially just the classification dict directly if the prompt asks for single output
                 llm_output_data = None # Initialize
                 if parsed_llm_output and isinstance(parsed_llm_output, dict):
                     # Check if the response has the expected 'classifications' list structure
@@ -307,6 +318,21 @@ async def process_reclassification(
                          achieved_level=0
                      )
 
+            # --- MODIFIED: Catch specific validation errors ---
+            except ValidationError as pydantic_err:
+                # This might happen if the LLM output doesn't match JobResultItem structure
+                err_msg = f"Pydantic validation failed processing LLM output for '{vendor_name}'."
+                logger.error(err_msg, exc_info=True)
+                final_stats["failed_reclassifications"] += 1
+                new_result_model = JobResultItem( # Create error result
+                    vendor_name=vendor_name, level1_id="ERROR", level1_name="ERROR",
+                    level2_id=None, level2_name=None, level3_id=None, level3_name=None,
+                    level4_id=None, level4_name=None, level5_id=None, level5_name=None,
+                    final_confidence=0.0, final_status="Error", classification_source="Review",
+                    classification_notes_or_reason=f"Error processing LLM output: {pydantic_err}",
+                    achieved_level=0
+                )
+            # --- END MODIFIED ---
             except Exception as llm_err:
                 logger.error(f"Error during LLM reclassification call or processing for '{vendor_name}'", exc_info=True)
                 final_stats["failed_reclassifications"] += 1
@@ -321,14 +347,30 @@ async def process_reclassification(
                 )
             # --- End Actual Reclassification LLM Call ---
 
-            # Store the result (original + new)
-            review_item = ReviewResultItem(
-                vendor_name=vendor_name,
-                hint=hint,
-                original_result=original_result_model.model_dump(), # Store as dict
-                new_result=new_result_model.model_dump() # Store as dict
-            )
-            review_results_list.append(review_item.model_dump()) # Append the dict representation
+            # --- MODIFIED: Validate and store the result ---
+            try:
+                # Ensure original_result_model is not None before dumping
+                original_result_dict = original_result_model.model_dump() if original_result_model else {}
+                new_result_dict = new_result_model.model_dump() if new_result_model else {}
+
+                # Validate the final ReviewResultItem before appending
+                review_item = ReviewResultItem(
+                    vendor_name=vendor_name,
+                    hint=hint,
+                    original_result=original_result_dict,
+                    new_result=new_result_dict
+                )
+                review_results_list.append(review_item.model_dump()) # Append the validated dict
+            except ValidationError as final_validation_err:
+                 # This is the error that was likely causing the issue
+                 err_msg = f"Failed to validate final ReviewResultItem for '{vendor_name}' before storage."
+                 logger.error(err_msg, exc_info=True)
+                 # Store the error in stats - this indicates a problem saving results
+                 final_stats["error_message"] = (final_stats.get("error_message", "") + f"; {err_msg} Details: {final_validation_err}").strip("; ")
+                 # Optionally increment failed count again?
+                 # final_stats["failed_reclassifications"] += 1 # Maybe double-counts if LLM also failed
+                 # Do NOT append the invalid item to review_results_list
+            # --- END MODIFIED ---
 
             processed_count += 1
             if processed_count % update_interval == 0 or processed_count == len(items_to_reclassify):
@@ -341,11 +383,11 @@ async def process_reclassification(
                       logger.error("Failed to update job progress during reclassification loop", exc_info=db_update_err)
                       db.rollback() # Rollback potential partial commit within update_progress
 
-            clear_log_context(["current_vendor"]) # Clear vendor from context
+            clear_log_context(["current_vendor"])
 
 
         # 5. Finalize Stats
-        end_time = datetime.now()
+        end_time = datetime.now(timezone.utc) # Use timezone aware now
         processing_duration = (end_time - start_time).total_seconds()
         final_stats["end_time"] = end_time.isoformat()
         final_stats["processing_duration_seconds"] = round(processing_duration, 2)
@@ -361,15 +403,14 @@ async def process_reclassification(
         logger.info(f"Reclassification logic finished for review job {review_job.id}. Results: {final_stats}")
 
     except Exception as e:
-        logger.error(f"Error during reclassification logic for review job {review_job.id}", exc_info=True)
-        # Ensure the job is marked as failed by the caller (_process_reclassification_async)
-        final_stats["error_message"] = f"Reclassification logic failed: {type(e).__name__}: {str(e)}"
-        # Attempt to add an overall error marker to results if possible
-        if not review_results_list: # If no results were added yet
-             review_results_list.append({"error": final_stats["error_message"]})
-        # Return potentially partial results and error stats
-        return review_results_list, final_stats
+        # Catch broader errors (e.g., taxonomy loading, initial DB query)
+        err_msg = f"Critical error during reclassification logic for review job {review_job.id}"
+        logger.error(err_msg, exc_info=True)
+        final_stats["error_message"] = f"{err_msg}: {type(e).__name__}: {str(e)}"
+        # Return empty list as results are likely invalid/incomplete
+        return [], final_stats
     finally:
         clear_log_context() # Clear job-specific context
 
+    # Return the list of successfully processed ReviewResultItem dicts and stats
     return review_results_list, final_stats

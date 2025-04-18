@@ -16,6 +16,8 @@ from core.logging_config import get_logger
 from core.log_context import set_log_context
 # Import log helpers from utils
 from utils.log_utils import LogTimer, log_function_call
+# Import JobResultItem for type hinting
+from schemas.job import JobResultItem
 
 # Configure logger
 logger = get_logger("vendor_classification.file_service")
@@ -355,132 +357,76 @@ def normalize_vendor_data(vendors_data: List[Dict[str, Any]]) -> List[Dict[str, 
     return normalized_vendors_data
 
 
+# --- UPDATED: generate_output_file to accept List[JobResultItem] ---
 @log_function_call(logger)
 def generate_output_file(
-    original_vendor_data: List[Dict[str, Any]],
-    classification_results: Dict[str, Dict],
-    job_id: str
+    job_id: str,
+    detailed_results: List[JobResultItem]
 ) -> str:
     """
-    Generate output Excel file with classification results (up to Level 5), mapping back to
-    original vendor data including optional fields read from the input.
+    Generate output Excel file directly from the List[JobResultItem] structure.
+    This is used for initial generation and regeneration after merging.
     """
-    log_extra = {"job_id": job_id, "original_vendor_count": len(original_vendor_data)}
-    logger.info(f"Generating output file for {len(original_vendor_data)} original vendor entries",
+    log_extra = {"job_id": job_id, "result_item_count": len(detailed_results)}
+    logger.info(f"Generating output file for job {job_id} using {len(detailed_results)} result items.",
                extra=log_extra)
 
     output_data = []
 
     # --- FIX: Remove 'extra' from LogTimer call ---
-    with LogTimer(logger, "Mapping results to original vendors"): # Removed extra=log_extra
+    with LogTimer(logger, "Processing JobResultItems for Excel"): # Removed extra=log_extra
     # --- END FIX ---
-        for original_entry in original_vendor_data:
-            original_vendor_name = original_entry.get('vendor_name', '')
-            # Use the normalized name for lookup if normalization happened before this step
-            # Assuming classification_results keys are based on normalized names if normalize_vendor_data was called
-            lookup_name = original_vendor_name # Adjust if needed based on workflow
-            result = classification_results.get(lookup_name, {})
+        for item in detailed_results:
+            # Determine the reason/notes string based on status
+            reason_or_notes = item.classification_notes_or_reason
+            if item.final_status == "Not Possible" and not reason_or_notes:
+                reason_or_notes = "Classification not possible" # Default reason if none provided
+            elif item.final_status == "Error" and not reason_or_notes:
+                 reason_or_notes = "Processing error occurred"
 
-            final_level1_id = ""; final_level1_name = ""
-            final_level2_id = ""; final_level2_name = ""
-            final_level3_id = ""; final_level3_name = ""
-            final_level4_id = ""; final_level4_name = ""
-            final_level5_id = ""; final_level5_name = ""
-            final_confidence = 0.0
-            classification_not_possible_flag = True
-            final_notes = ""
-            reason = "Classification not possible"
-            classification_source = "Initial"
+            # Determine classification_not_possible flag
+            classification_not_possible_flag = item.final_status != "Classified"
 
-            highest_successful_level = 0
-            for level in range(5, 0, -1):
-                level_key = f"level{level}"
-                level_res = result.get(level_key)
-                if level_res and isinstance(level_res, dict) and not level_res.get("classification_not_possible", True):
-                    highest_successful_level = level
-                    break
-
-            if highest_successful_level > 0:
-                classification_not_possible_flag = False
-                reason = None # Clear default reason if successful
-                final_confidence = result[f"level{highest_successful_level}"].get("confidence", 0.0)
-                final_notes = result[f"level{highest_successful_level}"].get("notes", "")
-
-                for level in range(1, highest_successful_level + 1):
-                    level_res = result.get(f"level{level}", {})
-                    if level == 1: final_level1_id = level_res.get("category_id", ""); final_level1_name = level_res.get("category_name", "")
-                    elif level == 2: final_level2_id = level_res.get("category_id", ""); final_level2_name = level_res.get("category_name", "")
-                    elif level == 3: final_level3_id = level_res.get("category_id", ""); final_level3_name = level_res.get("category_name", "")
-                    elif level == 4: final_level4_id = level_res.get("category_id", ""); final_level4_name = level_res.get("category_name", "")
-                    elif level == 5: final_level5_id = level_res.get("category_id", ""); final_level5_name = level_res.get("category_name", "")
-
-                if result.get("classified_via_search"):
-                    classification_source = "Search"
-                    # Prepend search info to notes if notes exist, otherwise just use search info
-                    search_note = "Classified via search."
-                    final_notes = f"{search_note} {final_notes}" if final_notes else search_note
-
-            else: # No level was successfully classified
-                classification_not_possible_flag = True
-                final_confidence = 0.0
-                failure_reason_found = False
-                # Look for explicit failure reasons from highest level down
-                for level in range(5, 0, -1):
-                     level_res = result.get(f"level{level}")
-                     if level_res and isinstance(level_res, dict) and level_res.get("classification_not_possible", False):
-                          reason = level_res.get("classification_not_possible_reason", f"Classification failed at Level {level}")
-                          final_notes = level_res.get("notes", "") # Capture notes even on failure
-                          failure_reason_found = True
-                          break
-                # If no explicit reason found, check search results for failure info
-                if not failure_reason_found:
-                     if result.get("search_attempted"):
-                          search_l1_result = result.get("search_results", {}).get("classification_l1", {})
-                          if search_l1_result and search_l1_result.get("classification_not_possible", False):
-                               reason = search_l1_result.get("classification_not_possible_reason", "Search did not yield classification")
-                               final_notes = search_l1_result.get("notes", "")
-                          elif result.get("search_results", {}).get("error"):
-                               reason = f"Search error: {result['search_results']['error']}"
-                          else:
-                               # Default reason if search attempted but no specific failure reason found
-                               reason = "Classification failed after search attempt."
-
-            # Retrieve original optional fields from the input data
-            original_address = original_entry.get('vendor_address')
-            original_website = original_entry.get('vendor_website')
-            original_internal_cat = original_entry.get('internal_category')
-            original_parent_co = original_entry.get('parent_company')
-            original_spend_cat = original_entry.get('spend_category')
-            original_example = original_entry.get('example') # Assuming 'example' key was used in vendors_data
-
-            search_sources_urls = ""
-            search_data = result.get("search_results", {})
-            if search_data and isinstance(search_data.get("sources"), list):
-                 search_sources_urls = ", ".join(
-                     source.get("url", "") for source in search_data["sources"] if isinstance(source, dict) and source.get("url")
-                 )
+            # TODO: How to get original optional fields (address, website, etc.)?
+            # The JobResultItem schema currently doesn't store the original optional fields.
+            # OPTION 1: Add these fields to JobResultItem schema and ensure they are populated during classification/review.
+            # OPTION 2: Modify this function to re-read the original input file (less efficient, requires file path).
+            # OPTION 3: Store the original input data alongside detailed_results in the Job model (maybe in stats or a new field).
+            # For now, we'll leave these columns blank as the data isn't available in detailed_results.
+            # This needs to be addressed for the output file to be complete.
+            # --- Placeholder values ---
+            original_address = ""
+            original_website = ""
+            original_internal_cat = ""
+            original_parent_co = ""
+            original_spend_cat = ""
+            original_example = ""
+            search_sources_urls = "" # This info is also not directly in JobResultItem, needs adding or separate storage.
+            # --- End Placeholder values ---
 
             row = {
-                # Use original vendor name from input file for output consistency
-                "vendor_name": original_entry.get('vendor_name', ''), # Use the name directly from original_entry
-                "vendor_address": original_address or "",
-                "vendor_website": original_website or "",
-                "internal_category": original_internal_cat or "",
-                "parent_company": original_parent_co or "",
-                "spend_category": original_spend_cat or "",
-                 # Use the full optional column name as expected in output
-                "Optional_example_good_serviced_purchased": original_example or "",
-                "level1_category_id": final_level1_id, "level1_category_name": final_level1_name,
-                "level2_category_id": final_level2_id, "level2_category_name": final_level2_name,
-                "level3_category_id": final_level3_id, "level3_category_name": final_level3_name,
-                "level4_category_id": final_level4_id, "level4_category_name": final_level4_name,
-                "level5_category_id": final_level5_id, "level5_category_name": final_level5_name,
-                "final_confidence": final_confidence,
+                "vendor_name": item.vendor_name,
+                "vendor_address": original_address, # Placeholder
+                "vendor_website": original_website, # Placeholder
+                "internal_category": original_internal_cat, # Placeholder
+                "parent_company": original_parent_co, # Placeholder
+                "spend_category": original_spend_cat, # Placeholder
+                "Optional_example_good_serviced_purchased": original_example, # Placeholder
+                "level1_category_id": item.level1_id or "",
+                "level1_category_name": item.level1_name or "",
+                "level2_category_id": item.level2_id or "",
+                "level2_category_name": item.level2_name or "",
+                "level3_category_id": item.level3_id or "",
+                "level3_category_name": item.level3_name or "",
+                "level4_category_id": item.level4_id or "",
+                "level4_category_name": item.level4_name or "",
+                "level5_category_id": item.level5_id or "",
+                "level5_category_name": item.level5_name or "",
+                "final_confidence": item.final_confidence if item.final_confidence is not None else 0.0,
                 "classification_not_possible": classification_not_possible_flag,
-                # Combine reason and notes for clarity if classification failed
-                "classification_notes_or_reason": reason if classification_not_possible_flag else (final_notes or ""),
-                "classification_source": classification_source,
-                "sources": search_sources_urls
+                "classification_notes_or_reason": reason_or_notes or "",
+                "classification_source": item.classification_source or "Unknown",
+                "sources": search_sources_urls # Placeholder
             }
             output_data.append(row)
 
@@ -495,6 +441,7 @@ def generate_output_file(
     ]
     if not output_data:
         logger.warning("No data rows generated for the output file.", extra=log_extra)
+        # Create empty DataFrame with correct columns if no results
         df = pd.DataFrame(columns=output_columns)
     else:
         # --- FIX: Remove 'extra' from LogTimer call ---
@@ -511,6 +458,7 @@ def generate_output_file(
         raise IOError(f"Could not create output directory for job {job_id}: {e}")
 
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Use a consistent base name, maybe incorporating 'merged' if applicable?
     output_file_name = f"classification_results_{job_id[:8]}_{timestamp_str}.xlsx"
     output_path = os.path.join(output_dir, output_file_name)
 
@@ -533,3 +481,4 @@ def generate_output_file(
          logger.warning(f"Could not get size of generated output file", exc_info=False, extra={**output_log_extra, "error": str(e)})
 
     return output_file_name
+# --- END UPDATED ---

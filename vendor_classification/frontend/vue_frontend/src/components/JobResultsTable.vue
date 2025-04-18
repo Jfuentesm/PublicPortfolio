@@ -7,7 +7,7 @@
       Showing original classification results alongside the latest reviewed results (if available). Target level: **Level {{ targetLevel }}**.
     </p>
      <p v-else class="text-sm text-gray-600 mb-4">
-      Target classification level for this job was **Level {{ targetLevel }}**.
+      Target classification level for this job was **Level {{ targetLevel }}**. You can flag items to start a review.
     </p>
 
     <!-- Search Input -->
@@ -152,7 +152,7 @@
                </span>
              </td>
              <td class="px-3 py-2 text-xs text-gray-500 max-w-xs break-words" :class="isIntegratedView ? 'bg-blue-50' : ''">
-                  <!-- Show hint input if flagged, otherwise original notes -->
+                  <!-- Show hint input if flagged AND NOT in integrated view, otherwise original notes -->
                   <div v-if="jobStore.isFlagged(item.vendor_name) && !isIntegratedView">
                      <label :for="'hint-' + index" class="sr-only">Hint for {{ item.vendor_name }}</label>
                      <textarea :id="'hint-' + index"
@@ -297,6 +297,7 @@ const combinedItems = computed((): CombinedResultItem[] => {
             vendor_name: originalItem.vendor_name,
             original_result: originalItem,
             review_hint: reviewItem ? reviewItem.hint : null,
+            // Ensure new_result from reviewItem is used
             new_result: reviewItem ? reviewItem.new_result : null,
         };
     });
@@ -498,7 +499,7 @@ function getSourceClass(source: string | null | undefined): string {
     }
 }
 
-// Highlight cells beyond the target classification depth or if ID is null/empty
+// Highlight cells based on achieved level vs current level, and target level
 function getCellClass(item: JobResultItem | null | undefined, level: number): string {
     const baseClass = 'text-gray-700';
     const beyondDepthClass = 'text-gray-400 italic';
@@ -510,7 +511,20 @@ function getCellClass(item: JobResultItem | null | undefined, level: number): st
     const hasId = item[levelIdKey] !== null && item[levelIdKey] !== undefined && String(item[levelIdKey]).trim() !== '';
 
     if (!hasId) return nullClass;
-    if (level > props.targetLevel) return beyondDepthClass;
+
+    // Check if the classification stopped before this level
+    const achievedLevel = item.achieved_level ?? 0;
+    if (level > achievedLevel) {
+        // Style differently if classification didn't reach this level (e.g., L2 failed, styling L3 cell)
+        // This might overlap with beyondDepthClass if targetLevel was also lower
+        return beyondDepthClass; // Use the same style for simplicity
+    }
+
+    // Check if this level is beyond the job's target level
+    if (level > props.targetLevel) {
+        return beyondDepthClass;
+    }
+
     return baseClass;
 }
 

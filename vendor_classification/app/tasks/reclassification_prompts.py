@@ -82,38 +82,58 @@ def generate_reclassification_prompt(
 Respond *only* with a valid JSON object containing the *new* classification result for this vendor, based *primarily* on the <user_hint> and <original_vendor_data>.
 The JSON object should represent the full classification attempt up to Level {target_level}, following the standard structure used previously.
 
-json
+```json
 {{
-  "level": {target_level}, // The target level for this reclassification
-  "attempt_id": "{attempt_id}", // ID for this specific attempt
-  "vendor_name": "{vendor_name}", // Exact vendor name
-  "classifications": [ // Array with ONE entry for this vendor
+  "level": {target_level},
+  "attempt_id": "{attempt_id}",
+  "vendor_name": "{vendor_name}",
+  "classifications": [
     {{
-      "vendor_name": "{vendor_name}", // Vendor name again
-      // --- L1 Result ---
+      "vendor_name": "{vendor_name}",
       "level1": {{
-        "category_id": "string", // L1 ID from taxonomy or "N/A"
-        "category_name": "string", // L1 Name or "N/A"
-        "confidence": "float", // 0.0-1.0
-        "classification_not_possible": "boolean",
-        "classification_not_possible_reason": "string | null",
-        "notes": "string | null" // Justification based on hint/data
-      }},
-      // --- L2 Result (if L1 possible and target_level >= 2) ---
-      "level2": {{ // Include ONLY if L1 was possible AND target_level >= 2
-        "category_id": "string", // L2 ID or "N/A"
-        "category_name": "string", // L2 Name or "N/A"
+        "category_id": "string",
+        "category_name": "string",
         "confidence": "float",
         "classification_not_possible": "boolean",
         "classification_not_possible_reason": "string | null",
         "notes": "string | null"
-      }} // , ... include level3, level4, level5 similarly if possible and target_level allows
-      // --- L3 Result (if L2 possible and target_level >= 3) ---
-      // --- L4 Result (if L3 possible and target_level >= 4) ---
-      // --- L5 Result (if L4 possible and target_level >= 5) ---
+      }},
+      "level2": {{
+        "category_id": "string",
+        "category_name": "string",
+        "confidence": "float",
+        "classification_not_possible": "boolean",
+        "classification_not_possible_reason": "string | null",
+        "notes": "string | null"
+      }},
+      "level3": {{
+        "category_id": "string",
+        "category_name": "string",
+        "confidence": "float",
+        "classification_not_possible": "boolean",
+        "classification_not_possible_reason": "string | null",
+        "notes": "string | null"
+      }},
+      "level4": {{
+        "category_id": "string",
+        "category_name": "string",
+        "confidence": "float",
+        "classification_not_possible": "boolean",
+        "classification_not_possible_reason": "string | null",
+        "notes": "string | null"
+      }},
+      "level5": {{
+        "category_id": "string",
+        "category_name": "string",
+        "confidence": "float",
+        "classification_not_possible": "boolean",
+        "classification_not_possible_reason": "string | null",
+        "notes": "string | null"
+      }}
     }}
   ]
 }}
+```
 
 </output_format>"""
 
@@ -132,9 +152,9 @@ json
     a.  Determine the most appropriate category based on the hint and data. Use the provided taxonomy structure (implicitly known or explicitly provided if needed in future versions).
     b.  If a confident classification for the current level is possible, provide the `category_id`, `category_name`, `confidence` (> 0.0), set `classification_not_possible` to `false`, and optionally add `notes`. Proceed to the next level if the target level allows.
     c.  If classification for the current level is **not possible** (due to ambiguity even with the hint, or the hint pointing to an activity outside the available subcategories), set `classification_not_possible` to `true`, `confidence` to `0.0`, provide a `classification_not_possible_reason`, set `category_id`/`category_name` to "N/A", and **stop** the classification process for this vendor (do not include results for subsequent levels).
-6.  Structure your response as a **single JSON object** matching the schema in `<output_format>`. Ensure it contains results for all levels attempted up to the point of success or failure.
+6.  Structure your response as a **single JSON object** matching the schema in `<output_format>`. Ensure it contains results for all levels attempted up to the point of success or failure. Ensure the JSON is enclosed in ```json ... ```.
 7.  The output JSON should represent the *new* classification attempt based on the hint.
-8.  Respond *only* with the valid JSON object.
+8.  Respond *only* with the valid JSON object enclosed in the markdown code fence.
 </instructions>
 
 {vendor_data_xml}

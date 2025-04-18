@@ -3,7 +3,7 @@
 import os
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone # <<< Added timezone
 from celery import shared_task
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -293,7 +293,7 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
         return
 
     # --- Initialize stats (Updated for L5) ---
-    start_time = datetime.now()
+    start_time = datetime.now(timezone.utc) # Use timezone aware now
     # --- MODIFIED: Type hints added ---
     stats: Dict[str, Any] = {
         "job_id": job.id,
@@ -425,23 +425,32 @@ async def _process_vendor_file_async(job_id: str, file_path: str, db: Session, t
         # --- End Process results for DB Storage ---
 
         # --- Generate Excel File ---
-        try:
-                logger.info(f"Generating output file")
-                with log_duration(logger, "Generating output file"):
-                    # Pass the original complex results_dict to generate_output_file
-                    # generate_output_file needs to be updated if its logic depends on the old flattened structure
-                    # For now, assume it can handle the complex results_dict or adapt it internally
-                    output_file_name = generate_output_file(normalized_vendors_data, results_dict, job_id)
-                logger.info(f"Output file generated", extra={"output_file": output_file_name})
-        except Exception as gen_err:
-                logger.error("Failed during output file generation", exc_info=True)
-                job.fail(f"Failed to generate output file: {str(gen_err)}")
-                db.commit()
-                return # Stop processing
+        if detailed_results_for_db is not None: # Only generate if DB results were processed successfully
+            try:
+                    logger.info(f"Generating output file")
+                    with log_duration(logger, "Generating output file"):
+                        # --- UPDATED: Call generate_output_file with List[JobResultItem] ---
+                        # Pass original vendor data as well for optional columns
+                        output_file_name = generate_output_file(
+                            job_id=job_id,
+                            detailed_results=[JobResultItem.model_validate(item) for item in detailed_results_for_db],
+                            # original_vendor_data=normalized_vendors_data # Pass original data if needed by generate_output_file
+                        )
+                        # --- END UPDATED ---
+                    logger.info(f"Output file generated", extra={"output_file": output_file_name})
+            except Exception as gen_err:
+                    logger.error("Failed during output file generation", exc_info=True)
+                    # Don't fail the whole job, just log and proceed without the file
+                    output_file_name = None # Ensure filename is None if generation failed
+                    # Optionally add a note to the job's error message or stats?
+                    # For now, just log it. The job can still complete with DB results.
+        else:
+            logger.warning("Skipping output file generation because detailed results processing failed.")
+            output_file_name = None
         # --- End Generate Excel File ---
 
         # --- Finalize stats ---
-        end_time = datetime.now()
+        end_time = datetime.now(timezone.utc) # Use timezone aware now
         processing_duration = (end_time - datetime.fromisoformat(stats["start_time"])).total_seconds()
         stats["end_time"] = end_time.isoformat()
         stats["processing_duration_seconds"] = round(processing_duration, 2)
@@ -658,6 +667,7 @@ async def _process_reclassification_async(review_job_id: str, db: Session):
 
     review_results_list = None
     final_stats = {}
+    logic_error_message = None # Variable to store error message from logic
 
     try:
         review_job.status = JobStatus.PROCESSING.value
@@ -677,13 +687,22 @@ async def _process_reclassification_async(review_job_id: str, db: Session):
         )
         # --- End call ---
 
+        # --- Check if the logic function reported an error in stats ---
+        logic_error_message = final_stats.get("error_message")
+        if logic_error_message:
+            logger.error(f"Reclassification logic reported an error: {logic_error_message}")
+            # Raise an exception to trigger the failure handling block below
+            raise Exception(logic_error_message)
+        # --- End Check ---
+
         logger.info(f"Reclassification logic completed. Processed {final_stats.get('total_items_processed', 0)} items.")
         review_job.progress = 0.95 # Mark logic as complete
 
-        # --- Final Commit Block ---
+        # --- Final Commit Block (Only if no error from logic) ---
         try:
             logger.info("Attempting final review job completion update in database.")
             # Pass None for output_file_name as review jobs don't generate one
+            # Pass the potentially modified final_stats (e.g., with duration)
             review_job.complete(output_file_name=None, stats=final_stats, detailed_results=review_results_list)
             review_job.progress = 1.0
             logger.info(f"[_process_reclassification_async] Committing final review job completion status.")
@@ -714,7 +733,7 @@ async def _process_reclassification_async(review_job_id: str, db: Session):
                 logger.error("CRITICAL: Also failed to mark review job as failed after final commit error.", exc_info=fail_err)
         # --- End Final Commit Block ---
 
-    # Handle specific errors from process_reclassification or other issues
+    # --- UPDATED: Catch specific errors and the generic Exception (including the one raised above) ---
     except (ValueError, FileNotFoundError) as logic_err:
         logger.error(f"[_process_reclassification_async] Data or File error during reclassification logic", exc_info=True,
                     extra={"error": str(logic_err)})
@@ -739,20 +758,28 @@ async def _process_reclassification_async(review_job_id: str, db: Session):
             logger.error("CRITICAL: Also failed to mark review job as failed after database error.", exc_info=fail_err)
 
     except Exception as async_err:
+        # This catches errors from process_reclassification or other unexpected errors
         logger.error(f"[_process_reclassification_async] Unexpected error during async reclassification processing", exc_info=True,
                     extra={"error": str(async_err)})
         db.rollback()
-        # Attempt to mark as failed (similar logic as in main task handler)
+        # Attempt to mark as failed
         try:
             db_fail_unexpected = SessionLocal()
             job_fail_unexpected = db_fail_unexpected.query(Job).filter(Job.id == review_job_id).first()
             if job_fail_unexpected and job_fail_unexpected.status not in [JobStatus.FAILED.value, JobStatus.COMPLETED.value]:
-                err_msg = f"Unexpected error: {type(async_err).__name__}: {str(async_err)}"
-                job_fail_unexpected.fail(err_msg[:2000])
+                # Use the error message captured from logic_error_message if available, otherwise use the current exception
+                err_to_report = logic_error_message if logic_error_message else f"Unexpected error: {type(async_err).__name__}: {str(async_err)}"
+                job_fail_unexpected.fail(err_to_report[:2000])
+                # Add the error message to stats as well before committing failure
+                if job_fail_unexpected.stats:
+                     job_fail_unexpected.stats['error_message'] = err_to_report[:2000]
+                else:
+                     job_fail_unexpected.stats = {'error_message': err_to_report[:2000]}
                 db_fail_unexpected.commit()
             db_fail_unexpected.close()
         except Exception as fail_err:
             logger.error("CRITICAL: Also failed to mark review job as failed after unexpected error.", exc_info=fail_err)
+    # --- END UPDATED ---
     finally:
         logger.info(f"[_process_reclassification_async] Finished async processing for review job {review_job_id}")
 
