@@ -74,6 +74,64 @@ def create_or_update_admin_user():
             db.close()
             logger.info("Admin user check/creation DB session closed.")
 
+    # --- Add sample users user_1 and user_2 ---
+    sample_users = [
+        {
+            "username": "user_1",
+            "email": "user_1@example.com",
+            "full_name": "User One",
+            "password": "user_1",
+            "is_superuser": False
+        },
+        {
+            "username": "user_2",
+            "email": "user_2@example.com",
+            "full_name": "User Two",
+            "password": "user_2",
+            "is_superuser": False
+        }
+    ]
+    db = None
+    try:
+        db = SessionLocal()
+        for user in sample_users:
+            existing_user = db.query(User).filter(User.username == user["username"]).first()
+            if existing_user:
+                logger.info(f"Sample user '{user['username']}' already exists.")
+                # Optionally update password to default
+                try:
+                    logger.info(f"Attempting to update password for '{user['username']}' to default '{user['password']}'...")
+                    existing_user.hashed_password = get_password_hash(user["password"])
+                    db.commit()
+                    logger.info(f"Password for '{user['username']}' was updated/reset to default: '{user['password']}'.")
+                except Exception as hash_err:
+                    logger.error(f"Failed to update password for '{user['username']}': {hash_err}", exc_info=True)
+                    db.rollback()
+            else:
+                logger.info(f"Sample user '{user['username']}' not found, creating...")
+                new_user = User(
+                    id=str(uuid.uuid4()),
+                    username=user["username"],
+                    email=user["email"],
+                    full_name=user["full_name"],
+                    hashed_password=get_password_hash(user["password"]),
+                    is_active=True,
+                    is_superuser=user["is_superuser"]
+                )
+                db.add(new_user)
+                db.commit()
+                logger.info(f"Created sample user: {user['username']} / {user['password']}")
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during sample user check/creation: {e}", exc_info=True)
+        if db: db.rollback()
+    except Exception as e:
+        logger.error(f"Unexpected error ensuring sample users: {e}", exc_info=True)
+        if db: db.rollback()
+    finally:
+        if db:
+            db.close()
+            logger.info("Sample user check/creation DB session closed.")
+
 def initialize_database():
     """Initialize database by creating all tables, then ensuring 'admin' user exists."""
     max_retries = 5
