@@ -183,6 +183,35 @@ interface MergeResponseData {
 }
 // --- END ADDED ---
 
+// --- ADDED: Admin Dashboard Interfaces ---
+// Matches backend schemas/admin.py -> SystemStatsResponse
+export interface SystemStatsResponse {
+    total_users: number;
+    total_jobs: number;
+    pending_jobs: number;
+    processing_jobs: number;
+    completed_jobs: number;
+    failed_jobs_last_24h: number;
+    estimated_recent_cost?: number | null;
+    health_status: Record<string, any>; // Dictionary for health check data
+}
+
+// Matches backend schemas/admin.py -> RecentJobItem
+export interface RecentJobItem {
+    id: string;
+    created_by: string;
+    company_name: string;
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    created_at: string; // ISO Date string
+    job_type: 'CLASSIFICATION' | 'REVIEW';
+}
+
+// Matches backend schemas/admin.py -> RecentJobsResponse
+export interface RecentJobsResponse {
+    jobs: RecentJobItem[];
+}
+// --- END ADDED: Admin Dashboard Interfaces ---
+
 
 // --- Axios Instance Setup ---
 
@@ -543,8 +572,31 @@ const apiService = {
         const response = await axiosInstance.post<MergeResponseData>(`/jobs/${reviewJobId}/merge`);
         console.log(`[api.ts mergeReviewResults] Merge request successful: ${response.data.message}`);
         return response.data;
-    }
+    },
     // --- END ADDED ---
+
+    // --- ADDED: Admin Dashboard API Methods ---
+    /**
+     * Fetches system statistics (admin only).
+     */
+    async getSystemStats(): Promise<SystemStatsResponse> {
+        console.log('[api.ts getSystemStats] Fetching admin system stats...');
+        const response = await axiosInstance.get<SystemStatsResponse>('/admin/stats');
+        console.log('[api.ts getSystemStats] System stats received.');
+        return response.data;
+    },
+
+    /**
+     * Fetches recent jobs across all users (admin only).
+     */
+    async getRecentJobs(limit: number = 15): Promise<RecentJobsResponse> {
+        console.log(`[api.ts getRecentJobs] Fetching recent jobs (limit: ${limit})...`);
+        const response = await axiosInstance.get<RecentJobsResponse>('/admin/recent-jobs', { params: { limit } });
+        console.log(`[api.ts getRecentJobs] Received ${response.data.jobs.length} recent jobs.`);
+        return response.data;
+    },
+    // --- END ADDED: Admin Dashboard API Methods ---
+
 };
 
 export default apiService;

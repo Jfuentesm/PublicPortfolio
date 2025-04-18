@@ -1,47 +1,36 @@
 # app/api/main.py
-import socket
-import sqlalchemy
-import httpx
 from fastapi import (
     FastAPI, Depends, HTTPException, UploadFile, File, Form,
     BackgroundTasks, status, Request
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse # Added FileResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel # Added for response model
+from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
 import uuid
 import os
-from datetime import datetime, timedelta, timezone # Added timezone
 import logging
 import time
 from sqlalchemy.orm import Session
 
 # --- Core Imports ---
-# Import config module directly to access manual variables
-from core import config
-# Import settings object for other configurations
-from core.config import settings
-# Import logger and context functions from refactored modules
 from core.logging_config import setup_logging, get_logger
 from core.log_context import set_correlation_id, set_user, set_job_id, get_correlation_id
-# Import middleware (which now uses updated context functions)
 from middleware.logging_middleware import RequestLoggingMiddleware
-from core.database import get_db, SessionLocal, engine
+from core.database import get_db, SessionLocal
 from core.initialize_db import initialize_database
 
 # --- Model Imports ---
-from models.job import Job, JobStatus, ProcessingStage
+from models.job import Job, JobStatus, ProcessingStage # Keep top-level imports
 from models.user import User
 
 # --- Service Imports ---
 from services.file_service import save_upload_file, validate_file_header
 
 # --- Task Imports ---
-from tasks.celery_app import celery_app
-from tasks.classification_tasks import process_vendor_file
+from tasks.classification_tasks import process_vendor_file # Keep this specific import
 
 # --- Utility Imports ---
 from utils.taxonomy_loader import load_taxonomy
@@ -52,20 +41,23 @@ from api.auth import (
     get_current_user,
     authenticate_user,
     create_access_token,
-    get_current_active_user
+    get_current_active_user,
+    get_current_active_superuser
 )
 
 # --- Router Imports ---
 from api import jobs as jobs_router
 from api import users as users_router
 from api import password_reset as password_reset_router
+from api import admin as admin_router
+from api.health_utils import health_check
 
 # --- Schema Imports ---
 from schemas.job import JobResponse
 from schemas.user import UserResponse as UserResponseSchema
+from core.config import settings
 
 # --- Logging Setup ---
-# Initialize logging BEFORE creating the FastAPI app instance
 setup_logging(log_level=logging.DEBUG, log_to_file=True, log_dir=settings.TAXONOMY_DATA_DIR.replace('taxonomy', 'logs'))
 logger = get_logger("vendor_classification.api")
 
@@ -109,6 +101,14 @@ app.include_router(
     tags=["Password Reset"],
 )
 logger.info("Included password reset router with prefix /api/v1/auth")
+
+app.include_router(
+    admin_router.router,
+    prefix="/api/v1/admin",
+    tags=["Admin"],
+    dependencies=[Depends(get_current_active_superuser)]
+)
+logger.info("Included admin router with prefix /api/v1/admin (superuser required)")
 # --- End Include Routers ---
 
 # --- Vue.js Frontend Serving Setup ---
@@ -125,109 +125,9 @@ else:
 # --- API ROUTES ---
 
 @app.get("/health", tags=["Health"])
-async def health_check():
-    """Health check endpoint."""
-    hostname = socket.gethostname()
-    local_ip = ""
-    try:
-        local_ip = socket.gethostbyname(hostname)
-    except socket.gaierror:
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-            s.close()
-        except Exception:
-                local_ip = "Could not resolve IP"
-
-    logger.info(f"Health check called", extra={"hostname": hostname, "ip": local_ip})
-    db_status = "unknown"
-    db = None
-    try:
-        db = SessionLocal()
-        db.execute(sqlalchemy.text("SELECT 1"))
-        db_status = "connected"
-    except Exception as e:
-        logger.error(f"Health Check: Database connection error", exc_info=True, extra={"error_details": str(e)})
-        db_status = f"error: {str(e)[:100]}"
-    finally:
-        if db:
-            db.close()
-
-    vue_frontend_status = "found" if os.path.exists(VUE_INDEX_FILE) else "missing"
-
-    celery_broker_status = "unknown"
-    celery_connection = None
-    try:
-        celery_connection = celery_app.connection(heartbeat=2.0)
-        celery_connection.ensure_connection(max_retries=1, timeout=2)
-        celery_broker_status = "connected"
-    except Exception as celery_e:
-        logger.error(f"Celery broker connection error during health check: {str(celery_e)}", exc_info=False)
-        celery_broker_status = f"error: {str(celery_e)[:100]}"
-    finally:
-            if celery_connection:
-                try: celery_connection.close()
-                except Exception as close_err: logger.warning(f"Error closing celery connection in health check: {close_err}")
-
-    # --- UPDATED: Use manually loaded config variables for API checks ---
-    openrouter_status = "unknown"
-    tavily_status = "unknown"
-    tavily_api_functional = False # Added flag for Tavily functionality
-
-    # Check OpenRouter configuration (using manually loaded keys)
-    if config.MANUAL_OPENROUTER_PROVISIONING_KEYS and settings.OPENROUTER_API_BASE:
-        openrouter_status = "CONFIGURED"
-        # Optional: Add a light check here if needed, e.g., try to generate a key
-        # For now, just check if configuration exists
-        if any("REPLACE_WITH_YOUR_VALID" in k for k in config.MANUAL_OPENROUTER_PROVISIONING_KEYS):
-             openrouter_status = "CONFIGURED (PLACEHOLDER KEYS)"
-             logger.warning("OpenRouter health check: Provisioning keys appear to be placeholders.")
-    else:
-        openrouter_status = "NOT CONFIGURED"
-        logger.warning("OpenRouter provisioning keys or API base missing/empty for health check.")
-
-    # Check Tavily configuration and functionality (using manually loaded keys)
-    if config.MANUAL_TAVILY_API_KEYS:
-        tavily_status = "CONFIGURED"
-        if any("REPLACE_WITH_YOUR_VALID" in k for k in config.MANUAL_TAVILY_API_KEYS):
-             tavily_status = "CONFIGURED (PLACEHOLDER KEYS)"
-             logger.warning("Tavily health check: API keys appear to be placeholders.")
-        else:
-            # Try a real API call if keys seem valid
-            try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    test_payload = {"api_key": config.MANUAL_TAVILY_API_KEYS[0], "query": "test", "max_results": 1}
-                    response = await client.post("https://api.tavily.com/search", json=test_payload)
-                    if response.status_code == 200:
-                        tavily_api_functional = True
-                        tavily_status = "API FUNCTIONAL" # More specific status
-                    else:
-                        logger.warning(f"Tavily health check API call failed with status {response.status_code}")
-                        tavily_status = f"API ERROR ({response.status_code})"
-            except Exception as e:
-                logger.error(f"Tavily health check API call failed: {e}", exc_info=True)
-                tavily_status = f"API ERROR ({type(e).__name__})"
-    else:
-        tavily_status = "NOT CONFIGURED"
-        logger.warning("Tavily API keys missing/empty for health check.")
-    # --- END UPDATED API CHECKS ---
-
-    email_status = "configured" if settings.SMTP_HOST and settings.SMTP_USER and settings.EMAIL_FROM else "not_configured"
-
-    return {
-        "status": "healthy",
-        "hostname": hostname,
-        "ip": local_ip,
-        "database": db_status,
-        "celery_broker": celery_broker_status,
-        "vue_frontend_index": vue_frontend_status,
-        "email_service": email_status,
-        "openrouter_status": openrouter_status, # Updated status name
-        "tavily_status": tavily_status,         # Updated status name
-        "tavily_api_functional": tavily_api_functional, # Added functional check result
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
+async def get_health_status():
+    """Provides the system health status."""
+    return await health_check()
 
 
 # --- Exception Handlers ---
@@ -260,13 +160,16 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         "detail": exc.detail,
     }, exc_info=(exc.status_code >= 500))
 
-    headers = getattr(exc, "headers", {})
-    headers["X-Correlation-ID"] = correlation_id
+    # --- FIX: Robust header handling ---
+    exc_headers = getattr(exc, "headers", None) # Get actual headers or None
+    headers = exc_headers if isinstance(exc_headers, dict) else {} # Ensure headers is a dict
+    headers["X-Correlation-ID"] = correlation_id # Now this should be safe
+    # --- END FIX ---
 
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers=headers,
+        headers=headers, # Pass the modified dict
     )
 
 
@@ -326,6 +229,7 @@ async def login_for_access_token(
         }
 
     except HTTPException as http_exc:
+        # Log unexpected HTTP exceptions, but re-raise all HTTP exceptions
         if http_exc.status_code not in [status.HTTP_401_UNAUTHORIZED, status.HTTP_400_BAD_REQUEST]:
                 logger.error(f"Unexpected HTTP exception during login for {form_data.username}", exc_info=True)
         raise
@@ -383,8 +287,7 @@ async def validate_uploaded_file_header(
         logger.info(f"File header validation completed", extra=current_log_extra)
 
         status_code = status.HTTP_200_OK
-        if not validation_result["is_valid"]:
-            pass # Stick with 200 OK, let frontend interpret is_valid
+        # No need to change status code based on validation result
 
         return JSONResponse(
             status_code=status_code,
@@ -398,6 +301,7 @@ async def validate_uploaded_file_header(
         logger.error(f"Unexpected error during file header validation", exc_info=True, extra=log_extra)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error validating file: {e}")
     finally:
+        # Ensure file is closed even if validation fails early
         if hasattr(file, 'close') and callable(file.close):
             try:
                  file.close()
@@ -455,6 +359,9 @@ async def upload_vendor_file(
     job = None
     try:
         logger.debug(f"Creating database job record for job {job_id}")
+        # --- FIX: Explicitly import JobStatus and ProcessingStage here ---
+        from models.job import Job, JobStatus, ProcessingStage
+        # --- END FIX ---
         job = Job(
             id=job_id,
             company_name=company_name,
@@ -478,12 +385,15 @@ async def upload_vendor_file(
 
     try:
         logger.info(f"Adding Celery task 'process_vendor_file' to background tasks for job {job_id}")
+        # process_vendor_file is already imported at the top level
         background_tasks.add_task(process_vendor_file.delay, job_id=job_id, file_path=saved_file_path, target_level=target_level)
         logger.info(f"Celery task queued successfully for job {job_id}")
     except Exception as e:
         logger.error(f"Failed to queue Celery task for job {job_id}", exc_info=True)
         if job:
-            job.fail(f"Failed to queue processing task: {str(e)}")
+            # Need to import JobStatus if not already available locally (it is now due to the fix above)
+            job.status = JobStatus.FAILED.value # Manually update status if fail method isn't easily usable
+            job.error_message = f"Failed to queue processing task: {str(e)}"
             db.commit()
         else:
              logger.error(f"Job object was None when trying to mark as failed due to Celery queue error.")
@@ -501,16 +411,22 @@ if os.path.exists(VUE_BUILD_DIR) and os.path.exists(VUE_INDEX_FILE):
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_vue_app(request: Request, full_path: str):
         potential_file_path = os.path.join(VUE_BUILD_DIR, full_path.lstrip('/'))
-        if not full_path.startswith("api"):
-            if os.path.isfile(potential_file_path) and os.path.basename(potential_file_path) != 'index.html':
-                 logger.debug(f"Serving static file directly: {full_path}")
-                 return FileResponse(potential_file_path)
-            else:
-                logger.debug(f"Serving index.html for SPA route or missing file: {full_path}")
-                return FileResponse(VUE_INDEX_FILE)
+        # Prevent serving API routes via the static file server
+        if full_path.startswith("api/") or full_path.startswith("/api/"):
+             logger.warning(f"Request for API path '{full_path}' reached static file fallback. Letting FastAPI handle.")
+             # Let FastAPI handle 404s for actual API routes
+             return None
+
+        if os.path.isfile(potential_file_path) and os.path.basename(potential_file_path) != 'index.html':
+             logger.debug(f"Serving static file directly: {full_path}")
+             return FileResponse(potential_file_path)
         else:
-            logger.error(f"Request starting with 'api' reached fallback route: {full_path}")
-            return JSONResponse(status_code=404, content={"detail": "API route not found"})
+            logger.debug(f"Serving index.html for SPA route or missing file: {full_path}")
+            if os.path.exists(VUE_INDEX_FILE):
+                return FileResponse(VUE_INDEX_FILE)
+            else:
+                logger.error(f"Vue index.html not found at {VUE_INDEX_FILE} when trying to serve fallback route.")
+                return JSONResponse(status_code=500, content={"detail": "Frontend index file missing."})
 
 else:
     logger.error(f"Cannot mount Vue app: Directory {VUE_BUILD_DIR} or index file {VUE_INDEX_FILE} not found.")

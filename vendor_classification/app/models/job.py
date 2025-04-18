@@ -1,6 +1,6 @@
 # <file path='app/models/job.py'>
 # --- file path='app/models/job.py' ---
-from sqlalchemy import Column, String, Float, DateTime, Enum as SQLEnum, JSON, Text, Integer, ForeignKey # <<< ADDED ForeignKey
+from sqlalchemy import Column, String, Float, DateTime, Enum as SQLEnum, JSON, Text, Integer, ForeignKey, Index # <<< ADDED Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Session # <<< ADDED IMPORT FOR TYPE HINTING
 from enum import Enum as PyEnum
@@ -46,26 +46,37 @@ class Job(Base):
     company_name = Column(String, nullable=False)
     input_file_name = Column(String, nullable=False)
     output_file_name = Column(String, nullable=True)
-    status = Column(String, default=JobStatus.PENDING.value)
+    status = Column(String, default=JobStatus.PENDING.value) # Consider adding index if frequently filtered by status
     current_stage = Column(String, default=ProcessingStage.INGESTION.value)
     progress = Column(Float, default=0.0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now()) # Consider adding index if frequently sorted/filtered by creation time
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now()) # Consider index if filtered by update time (e.g., failed jobs in last X hours)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     notification_email = Column(String, nullable=True)
     error_message = Column(Text, nullable=True)
     stats = Column(JSON, default={}) # Structure defined by ProcessingStats model OR used for review inputs/status
-    created_by = Column(String, nullable=False)
+    created_by = Column(String, nullable=False) # Consider adding index if frequently filtered by user
     target_level = Column(Integer, nullable=False, default=5) # Store the desired classification depth (1-5)
 
     # --- ADDED: Job Type and Parent Link ---
-    job_type = Column(String, default=JobType.CLASSIFICATION.value, nullable=False)
+    job_type = Column(String, default=JobType.CLASSIFICATION.value, nullable=False) # Consider adding index if frequently filtered by job type
     parent_job_id = Column(String, ForeignKey("jobs.id"), nullable=True, index=True) # Link to original job for reviews
     # --- END ADDED ---
 
     # Stores List[JobResultItem] for CLASSIFICATION jobs
     # Stores List[ReviewResultItem] for REVIEW jobs
     detailed_results = Column(JSON, nullable=True)
+
+
+    # --- ADDED: Potential Indexes for Admin Dashboard Performance ---
+    __table_args__ = (
+        Index('ix_jobs_status_updated_at', 'status', 'updated_at'), # For failed jobs in last X hours query
+        Index('ix_jobs_created_at_desc', created_at.desc()), # For recent jobs query
+        Index('ix_jobs_created_by', 'created_by'), # If filtering by user becomes common
+        Index('ix_jobs_job_type', 'job_type'), # If filtering by job type becomes common
+        # parent_job_id already has an index due to index=True above
+    )
+    # --- END ADDED ---
 
 
     def update_progress(self, progress: float, stage: ProcessingStage, db_session: Optional[Session] = None): # Type hint now valid
